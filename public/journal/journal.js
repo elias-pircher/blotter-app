@@ -64,10 +64,10 @@ const now0 = new Date();
 const S = {
   view: 'kalender', mounted: null, mountN: 0,
   month: new Date(now0.getFullYear(), now0.getMonth(), 1),
-  acct: ['all','main','neben'].includes(lsGet('blotter.acct')) ? lsGet('blotter.acct') : 'all',
-  lastAccount: lsGet('blotter.lastAccount') === 'neben' ? 'neben' : 'main',
+  acct: lsGet('blotter.acct') || 'all',
+  lastAccount: lsGet('blotter.lastAccount') || 'main',
   trades: [], learnings: [], outlooks: [],
-  settings: {theme: 'navy', name: '', modules: {learnings: true, outlooks: true}, acctNames: {main: 'Main-Konto', neben: 'Neben-Konto'}, setupDone: false},
+  settings: {theme: 'navy', name: '', modules: {learnings: true, outlooks: true}, accounts: [{id: 'main', name: 'Main-Konto', color: 'gold'}, {id: 'neben', name: 'Neben-Konto', color: 'silver'}], setupDone: false},
   settingsLoaded: false, mountSig: '',
   mode: 'connecting', loaded: {trades: false, learnings: false, outlooks: false},
   lq: '', lcat: '', oq: '', obias: 'all'
@@ -598,21 +598,24 @@ function resOf(t){
 }
 const chrono = list => list.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '99').localeCompare(b.time || '99') || (a.createdAt || 0) - (b.createdAt || 0));
 function calc(list){
-  let tp = 0, sl = 0, be = 0, main = 0, neben = 0, run = 0, best = 0;
+  let tp = 0, sl = 0, be = 0, run = 0, best = 0;
+  const per = {};
   const days = new Set();
   for (const t of chrono(list)) {
     const r = resOf(t);
     if (r === 'tp') { tp++; run++; if (run > best) best = run; }
     else if (r === 'sl') { sl++; run = 0; }
     else if (r === 'be') be++;
-    if (t.account === 'neben') neben++; else main++;
+    const ak = acctOf(t); per[ak] = (per[ak] || 0) + 1;
     if (t.date) days.add(t.date);
   }
-  return {n: list.length, tp, sl, be, main, neben, tdays: days.size, best, run, wr: (tp + sl) ? tp / (tp + sl) : null};
+  return {n: list.length, tp, sl, be, per, tdays: days.size, best, run, wr: (tp + sl) ? tp / (tp + sl) : null};
 }
 function tone(c){ if (!c.n) return ''; if (c.tp > c.sl) return 'pos'; if (c.sl > c.tp) return 'neg'; return (c.tp || c.sl || c.be) ? 'flat' : ''; }
 const pct = (a, n) => n ? Math.round(a / n * 100) + ' %' : '–';
-const byAcct = list => S.acct === 'all' ? list : list.filter(t => (t.account === 'neben' ? 'neben' : 'main') === S.acct);
+const curAcct = () => S.acct !== 'all' && acctById(S.acct) ? S.acct : 'all';
+const byAcct = list => { const f = curAcct(); return f === 'all' ? list : list.filter(t => acctOf(t) === f); };
+const acctCounts = per => accts().filter(a => per[a.id]).map(a => ({a, n: per[a.id]}));
 const sortTrades = list => list.slice().sort((a, b) => (a.time || '99').localeCompare(b.time || '99') || (a.createdAt || 0) - (b.createdAt || 0));
 const sortEntries = list => list.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
 
@@ -672,8 +675,7 @@ const Views = {
         <span class="spacer"></span>
         <div class="seg" role="radiogroup" aria-label="Konto-Filter" id="acct-filter">
           <button type="button" role="radio" data-acct="all">Alle</button>
-          <button type="button" role="radio" data-acct="main">${esc(an('main'))}</button>
-          <button type="button" role="radio" data-acct="neben">${esc(an('neben'))}</button>
+          ${accts().map(a => `<button type="button" role="radio" data-acct="${esc(a.id)}" title="${esc(a.name)}">${adot(a.id)}${esc(a.name)}</button>`).join('')}
         </div>
         <button type="button" class="btn primary" data-action="new-trade">${ICON.plus}Trade eintragen</button>
       </div>
@@ -687,8 +689,7 @@ const Views = {
         <span><span class="pill tp"><b>TP</b></span>Take Profit</span>
         <span><span class="pill be"><b>BE</b></span>Break Even</span>
         <span><span class="pill sl"><b>SL</b></span>Stop Loss</span>
-        <span><i class="ad main"></i>${esc(an('main'))}</span>
-        <span><i class="ad neben"></i>${esc(an('neben'))}</span>
+        ${accts().map(a => `<span>${adot(a.id)}${esc(a.name)}</span>`).join('')}
         ${modOn('outlooks') ? '<span><span class="mk">O</span>Outlook</span>' : ''}
         ${modOn('learnings') ? '<span><span class="mk">L</span>Learning</span>' : ''}
       </div>
@@ -697,6 +698,8 @@ const Views = {
       const hr = n.getHours(), greet = hr < 5 ? 'Gute Nacht' : hr < 11 ? 'Guten Morgen' : hr < 18 ? 'Guten Tag' : 'Guten Abend';
       $('#hero-date').textContent = (S.settings.name ? greet + ', ' + S.settings.name + ' · ' : '') + fLong.format(n) + ' · KW ' + isoWeek(n);
       Mantra.mount($('#mantra'));
+      const af = $('#acct-filter'), afEdge = () => af.classList.toggle('more', af.scrollLeft + af.clientWidth < af.scrollWidth - 2);
+      af.addEventListener('scroll', afEdge, {passive: true}); requestAnimationFrame(afEdge);
       void $('#ratio').offsetWidth;
       this.lastTape = null; this.mountMk = null; this.lastMk = null;
     },
@@ -704,7 +707,10 @@ const Views = {
       const M = S.mountN;
       const m = S.month, y = m.getFullYear(), mo = m.getMonth(), mk = y + '-' + pad(mo + 1);
       $('#month-title').textContent = fMonth.format(m);
-      $$('#acct-filter button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.acct === S.acct)));
+      const fa = curAcct();
+      $$('#acct-filter button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.acct === fa)));
+      const afb = $('#acct-filter [aria-checked="true"]'), afw = afb && afb.parentElement;
+      if (afw && afw.scrollWidth > afw.clientWidth && (afb.offsetLeft < afw.scrollLeft || afb.offsetLeft + afb.offsetWidth > afw.scrollLeft + afw.clientWidth)) afw.scrollLeft = Math.max(0, afb.offsetLeft - 24);
       const trades = byAcct(S.trades);
       const monthT = trades.filter(t => (t.date || '').startsWith(mk));
       const s = calc(monthT);
@@ -719,13 +725,13 @@ const Views = {
       const rs = $$('#ratio .r');
       rs[0].style.width = ratioW(s.tp, tot); rs[1].style.width = ratioW(s.be, tot); rs[2].style.width = ratioW(s.sl, tot);
       $('#ratio-l').innerHTML = !ready ? '' : (tot ? countsHtml(s) : 'Noch keine Trades in diesem Monat');
-      const tsig = mk + '|' + S.acct + '|' + monthT.map(t => t.id + ':' + resOf(t) + ':' + t.date + (t.time || '')).join(',');
+      const tsig = mk + '|' + fa + '|' + monthT.map(t => t.id + ':' + resOf(t) + ':' + t.date + (t.time || '')).join(',');
       if (tsig !== this.lastTape) {
         $('#tape').innerHTML = monthT.length ? tapeHtml(monthT) : '<span class="tape-empty">Jeder Trade erscheint hier als farbiger Block.</span>';
         this.lastTape = tsig;
       }
       const streak = calc(trades).run;
-      $('#eq-foot').innerHTML = `<span><i class="ad main"></i>${esc(an('main'))} <b>${s.main}</b></span><span><i class="ad neben"></i>${esc(an('neben'))} <b>${s.neben}</b></span><span>Aktuelle Serie <b class="${streak ? 'up' : ''}">${streak ? streak + '× TP' : '–'}</b></span>`;
+      $('#eq-foot').innerHTML = `${acctCounts(s.per).map(({a, n}) => `<span>${adot(a.id)}${esc(a.name)} <b>${n}</b></span>`).join('')}<span>Aktuelle Serie <b class="${streak ? 'up' : ''}">${streak ? streak + '× TP' : '–'}</b></span>`;
 
       // stats
       if (ready) {
@@ -769,7 +775,7 @@ const Views = {
           const marks = (o ? '<span class="mk" title="Outlook">O</span>' : '') + (l ? '<span class="mk" title="Learning">L</span>' : '');
           const pills = list.slice(0, 4).map(t => {
             const rr = resOf(t) || 'na';
-            return `<span class="pill ${rr}" title="${esc((t.symbol || 'Trade') + ' · ' + (RES_NAME[rr] || 'ohne Ergebnis') + ' · ' + an(t.account))}"><i class="ad ${t.account === 'neben' ? 'neben' : 'main'}"></i><b>${RES_LABEL[rr] || '–'}</b>${t.symbol ? `<span class="sym">${esc(t.symbol)}</span>` : ''}</span>`;
+            return `<span class="pill ${rr}" title="${esc((t.symbol || 'Trade') + ' · ' + (RES_NAME[rr] || 'ohne Ergebnis') + ' · ' + an(t.account))}">${adot(acctOf(t))}<b>${RES_LABEL[rr] || '–'}</b>${t.symbol ? `<span class="sym">${esc(t.symbol)}</span>` : ''}</span>`;
           }).join('') + (list.length > 4 ? `<span class="pill more">+${list.length - 4}</span>` : '');
           const dots = list.slice(0, 6).map(t => `<i class="${resOf(t) || 'na'}"></i>`).join('') + (o ? '<i class="ol"></i>' : '') + (l ? '<i class="ol"></i>' : '');
           h += `<button type="button" class="${cls.join(' ')}" data-day="${key}" aria-label="${esc(label)}" ${rvOn ? `data-rv="${M}:${mk}:${key}"` : ''} style="--rd:${Math.min(700, 480 + (r * 7 + c) * 12)}ms;--gd:${c * 45}ms">
@@ -944,10 +950,10 @@ function openDay(key){
     const s = calc(list);
     const ol = modOn('outlooks') ? S.outlooks.filter(o => o.date === key) : [], le = modOn('learnings') ? S.learnings.filter(l => l.date === key) : [];
     const card = t => {
-      const r = resOf(t), nb = t.account === 'neben';
+      const r = resOf(t), ak = acctOf(t);
       return `<article class="tcard ${r || ''}">
         <div class="tc-row">
-          <span class="acc ${nb ? 'neben' : 'main'}">${esc(an(t.account))}</span>
+          <span class="acc" style="--ac:${acVar(ak)}">${esc(an(ak))}</span>
           <span class="tc-sym">${esc(t.symbol || '—')}</span>
           ${t.side ? `<span class="side ${t.side === 'short' ? 'short' : 'long'}">${t.side === 'short' ? '▼ Short' : '▲ Long'}</span>` : ''}
           ${t.time ? `<span class="tc-time">${esc(t.time)} Uhr</span>` : ''}
@@ -960,7 +966,7 @@ function openDay(key){
       </article>`;
     };
     const eyebrow = list.length
-      ? list.length + (list.length === 1 ? ' Trade' : ' Trades') + ' · ' + s.main + ' ' + an('main') + ' · ' + s.neben + ' ' + an('neben')
+      ? [list.length + (list.length === 1 ? ' Trade' : ' Trades')].concat(acctCounts(s.per).map(({a, n}) => n + ' ' + esc(a.name))).join(' · ')
       : 'Keine Trades';
     return `
       <div class="p-head"><div class="ph-t"><span class="eyebrow">${eyebrow} · KW ${isoWeek(d)}</span><h2 id="modal-title">${esc(fLong.format(d))}</h2></div>
@@ -992,7 +998,7 @@ function openDay(key){
 const FORMS = {
   trades: {
     newTitle: 'Trade eintragen', editTitle: 'Trade bearbeiten', saved: 'Trade gespeichert', deleted: 'Trade gelöscht', what: 'diesen Trade',
-    defaults: o => ({account: S.lastAccount, date: o.date || todayStr(), side: 'long'}),
+    defaults: o => ({account: acctById(S.lastAccount) ? S.lastAccount : accts()[0].id, date: o.date || todayStr(), side: 'long'}),
     fields: [
       {k: 'account', t: 'acct', label: 'Konto'},
       {k: 'date', t: 'date', label: 'Datum'},
@@ -1056,8 +1062,8 @@ function fieldHtml(f, v){
     case 'acct':
       return `<div class="fld full"><span class="lbl" id="${id}-l">${f.label}</span>
         <div class="acct-pick" role="radiogroup" aria-labelledby="${id}-l" data-field="${f.k}">
-          ${[['main', esc(an('main')), 'Konto 1'], ['neben', esc(an('neben')), 'Konto 2']].map(([k, l, s]) =>
-            `<button type="button" role="radio" data-val="${k}" aria-checked="${val === k}"><span class="dot"></span><span><b>${l}</b><small>${s}</small></span></button>`).join('')}
+          ${(() => { const cur = acctOf({account: val}); return accts().map((a, i) =>
+            `<button type="button" role="radio" data-val="${esc(a.id)}" data-c="${a.color}" style="--ac:${acVar(a.id)}" aria-checked="${a.id === cur}"><span class="dot"></span><span><b>${esc(a.name)}</b><small>Konto ${i + 1}</small></span></button>`).join(''); })()}
         </div></div>`;
     case 'seg':
       return `<div class="fld${full}"><span class="lbl" id="${id}-l">${f.label}${opt}</span>
@@ -1270,17 +1276,50 @@ const SKINS = [
 const SKIN_IDS = SKINS.map(k => k.id);
 function normSettings(d){
   d = d || {};
-  const o = {theme: 'navy', name: '', modules: {learnings: true, outlooks: true}, acctNames: {main: 'Main-Konto', neben: 'Neben-Konto'}, setupDone: !!d.setupDone};
+  const o = {theme: 'navy', name: '', modules: {learnings: true, outlooks: true}, accounts: [], setupDone: !!d.setupDone};
   if (SKIN_IDS.includes(d.theme)) o.theme = d.theme;
   if (typeof d.name === 'string') o.name = d.name.trim().slice(0, 30);
   if (d.modules && typeof d.modules === 'object') { o.modules.learnings = d.modules.learnings !== false; o.modules.outlooks = d.modules.outlooks !== false; }
-  if (d.acctNames && typeof d.acctNames === 'object') for (const k of ['main', 'neben']) { const v = String(d.acctNames[k] || '').trim().slice(0, 24); if (v) o.acctNames[k] = v; }
+  o.accounts = normAccounts(d);
   return o;
 }
-const settingsSig = () => JSON.stringify([S.settings.name, S.settings.modules, S.settings.acctNames]);
+/* Accounts: 1 to 10, each {id, name, color}. Trades point to an id. Older journals stored two fixed
+   names (acctNames.main / .neben); those become the first two accounts with the same ids. */
+const MAX_ACCTS = 10;
+const AC_KEYS = ['gold', 'silver', 'violet', 'coral', 'mint', 'rose', 'sky', 'lemon', 'blue', 'sand'];
+const ACCT_PH = ['z. B. FTMO 100k', 'z. B. Privatkonto', 'z. B. Apex 50k', 'z. B. Topstep', 'z. B. Demokonto'];
+const acctDefault = (id, i) => id === 'main' ? 'Main-Konto' : id === 'neben' ? 'Neben-Konto' : 'Konto ' + (i + 1);
+function normAccounts(d){
+  let src = Array.isArray(d.accounts) ? d.accounts : null;
+  if (!src) { const n = d.acctNames && typeof d.acctNames === 'object' ? d.acctNames : {}; src = [{id: 'main', name: n.main, color: 'gold'}, {id: 'neben', name: n.neben, color: 'silver'}]; }
+  const out = [], seen = new Set();
+  for (const a of src) {
+    if (!a || typeof a !== 'object') continue;
+    const id = String(a.id || '');
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push({id, name: String(a.name || '').trim().slice(0, 24) || acctDefault(id, out.length), color: AC_KEYS.includes(a.color) ? a.color : ''});
+    if (out.length >= MAX_ACCTS) break;
+  }
+  if (!out.length) out.push({id: 'main', name: 'Main-Konto', color: 'gold'});
+  for (const a of out) if (!a.color) a.color = freeColor(out);
+  return out;
+}
+function freeColor(list, after){
+  const used = new Set(list.map(a => a.color)), start = after ? AC_KEYS.indexOf(after) + 1 : 0;
+  for (let i = 0; i < AC_KEYS.length; i++) { const k = AC_KEYS[(start + i) % AC_KEYS.length]; if (!used.has(k)) return k; }
+  return AC_KEYS[start % AC_KEYS.length];
+}
+const newAcctId = () => 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+function accts(){ const l = S.settings.accounts; return l && l.length ? l : [{id: 'main', name: 'Main-Konto', color: 'gold'}]; }
+function acctById(id){ return id ? accts().find(a => a.id === id) : undefined; }
+function acctOf(t){ const a = t && acctById(t.account); return a ? a.id : accts()[0].id; }
+function acVar(id){ return 'var(--ac-' + (acctById(id) || accts()[0]).color + ')'; }
+const adot = id => `<i class="ad" style="--ac:${acVar(id)}"></i>`;
+const settingsSig = () => JSON.stringify([S.settings.name, S.settings.modules, S.settings.accounts]);
 function modOn(k){ return k === 'kalender' || !(S.settings.modules && S.settings.modules[k] === false); }
 function pagesOn(){ return ['kalender', 'learnings', 'outlooks'].filter(modOn); }
-function an(k){ const n = S.settings.acctNames || {}; return k === 'neben' ? (n.neben || 'Neben-Konto') : (n.main || 'Main-Konto'); }
+function an(id){ return (acctById(id) || accts()[0]).name; }
 function applySkin(id, persist){
   if (!SKIN_IDS.includes(id)) id = 'navy';
   const r = document.documentElement;
@@ -1316,11 +1355,55 @@ function modGrid(mods){
     ? `<div class="mod-card locked" aria-checked="true"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.desc}</small><span class="tg">Immer dabei<span class="tgl"></span></span></div>`
     : `<button type="button" class="mod-card" role="switch" aria-checked="${mods[m.k] !== false}" data-mod="${m.k}"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.desc}</small><span class="tg">Anzeigen<span class="tgl"></span></span></button>`).join('')}</div>`;
 }
-function acctFields(n, p){
-  return `<div class="acct-fields">
-    <label class="fld" for="${p}-acc-main"><span class="lbl"><i class="ad main"></i>Konto 1</span><input class="inp big-inp" id="${p}-acc-main" maxlength="24" autocomplete="off" placeholder="z. B. FTMO 100k" value="${esc(n.main)}"></label>
-    <label class="fld" for="${p}-acc-neben"><span class="lbl"><i class="ad neben"></i>Konto 2</span><input class="inp big-inp" id="${p}-acc-neben" maxlength="24" autocomplete="off" placeholder="z. B. Privatkonto" value="${esc(n.neben)}"></label>
+function acctEditor(list, p, fresh){
+  return `<div class="acct-ed" data-acct-ed="${p}">
+    ${list.map((a, i) => `<div class="acct-row${a.id === fresh ? ' new' : ''}">
+      <button type="button" class="acct-color" data-acct-color="${esc(a.id)}" data-c="${a.color}" style="--ac:var(--ac-${a.color})" title="Farbe wechseln" aria-label="Farbe von Konto ${i + 1} wechseln"></button>
+      <input class="inp" id="${p}-acc-${i}" data-acct-name="${esc(a.id)}" maxlength="24" autocomplete="off" placeholder="${ACCT_PH[i % ACCT_PH.length]}" value="${esc(a.name)}" aria-label="Name von Konto ${i + 1}">
+      <button type="button" class="btn icon ghost acct-del" data-acct-del="${esc(a.id)}" title="Konto entfernen" aria-label="Konto ${i + 1} entfernen"${list.length < 2 ? ' disabled' : ''}>${ICON.x}</button>
+    </div>`).join('')}
+    <div class="acct-foot">${list.length < MAX_ACCTS ? `<button type="button" class="btn sm" data-acct-add>${ICON.plus}Konto hinzufügen</button>` : ''}<small>${list.length} von ${MAX_ACCTS} Konten</small></div>
+    <p class="acct-msg" role="alert" hidden></p>
   </div>`;
+}
+function acctEdClick(e, draft){
+  const ed = e.target.closest('[data-acct-ed]');
+  if (!ed) return false;
+  const p = ed.dataset.acctEd, add = e.target.closest('[data-acct-add]'), del = e.target.closest('[data-acct-del]'), col = e.target.closest('[data-acct-color]');
+  if (!add && !del && !col) return false;
+  readNames(draft, p);
+  const list = draft.accounts;
+  let fresh = null, focus = null;
+  if (add) {
+    if (list.length >= MAX_ACCTS) return true;
+    fresh = newAcctId();
+    list.push({id: fresh, name: '', color: freeColor(list)});
+    focus = '#' + p + '-acc-' + (list.length - 1);
+  } else if (del) {
+    const id = del.dataset.acctDel, i = list.findIndex(a => a.id === id);
+    if (i < 0 || list.length < 2) return true;
+    const n = S.trades.filter(t => acctOf(t) === id).length;
+    if (n) {
+      const m = $('.acct-msg', ed);
+      m.textContent = '„' + (list[i].name || 'Dieses Konto') + '“ hat ' + n + (n === 1 ? ' Trade' : ' Trades') + '. Ordne ' + (n === 1 ? 'ihn' : 'sie') + ' zuerst einem anderen Konto zu oder lösche ' + (n === 1 ? 'ihn' : 'sie') + ', dann kannst du das Konto entfernen.';
+      m.hidden = false;
+      return true;
+    }
+    list.splice(i, 1);
+    focus = list.length < MAX_ACCTS ? '[data-acct-add]' : '#' + p + '-acc-' + Math.max(0, i - 1);
+  } else {
+    const a = list.find(x => x.id === col.dataset.acctColor);
+    if (!a) return true;
+    a.color = freeColor(list.filter(x => x !== a), a.color);
+    col.dataset.c = a.color; col.style.setProperty('--ac', 'var(--ac-' + a.color + ')');
+    return true;
+  }
+  const box = document.createElement('div');
+  box.innerHTML = acctEditor(list, p, fresh);
+  ed.replaceWith(box.firstElementChild);
+  const f = focus && document.querySelector('[data-acct-ed="' + p + '"] ' + focus);
+  if (f) { try { f.focus({preventScroll: false}); } catch (err) {} }
+  return true;
 }
 function pickerClick(e, draft){
   if (!draft) return false;
@@ -1328,13 +1411,17 @@ function pickerClick(e, draft){
   if (sk) { draft.theme = sk.dataset.skinPick; $$('[data-skin-pick]', sk.parentElement).forEach(b => b.setAttribute('aria-checked', String(b === sk))); applySkin(draft.theme); return true; }
   const md = e.target.closest('[data-mod]');
   if (md) { const k = md.dataset.mod; draft.modules[k] = draft.modules[k] === false; md.setAttribute('aria-checked', String(draft.modules[k])); return true; }
-  return false;
+  return acctEdClick(e, draft);
+}
+function pruneAccts(draft){
+  const keep = draft.accounts.filter(a => a.name || S.trades.some(t => acctOf(t) === a.id));
+  draft.accounts = keep.length ? keep : draft.accounts.slice(0, 1);
 }
 function readNames(draft, p){
-  const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : null; };
-  const a = v(p + '-acc-main'), b = v(p + '-acc-neben');
-  if (a != null) draft.acctNames.main = a.slice(0, 24) || 'Main-Konto';
-  if (b != null) draft.acctNames.neben = b.slice(0, 24) || 'Neben-Konto';
+  $$('[data-acct-ed="' + p + '"] [data-acct-name]').forEach(el => {
+    const a = draft.accounts.find(x => x.id === el.dataset.acctName);
+    if (a) a.name = el.value.trim().slice(0, 24);
+  });
 }
 
 const Setup = {
@@ -1346,7 +1433,14 @@ const Setup = {
       if (b) { const a = b.dataset.su; if (a === 'next') this.next(); else if (a === 'back') this.go(this.step - 1); else if (a === 'skip') this.finish(true); return; }
       pickerClick(e, this.draft);
     });
-    this.el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); this.next(); } });
+    this.el.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
+      e.preventDefault();
+      // Enter in the last account name adds the next account instead of finishing the wizard
+      const ed = e.target.closest('[data-acct-ed]'), rows = ed ? $$('[data-acct-name]', ed) : [];
+      if (ed && e.target === rows[rows.length - 1] && e.target.value.trim() && rows.length < MAX_ACCTS) { const b = $('[data-acct-add]', ed); if (b) { b.click(); return; } }
+      this.next();
+    });
   },
   maybe(){ if (S.settingsLoaded && !S.settings.setupDone && !this.isOpen && !this.dismissed) this.start(); },
   start(){
@@ -1377,7 +1471,7 @@ const Setup = {
         <label class="fld" for="su-name"><span class="lbl">Wie dürfen wir dich nennen?<span class="opt">optional</span></span><input class="inp big-inp" id="su-name" maxlength="30" autocomplete="given-name" placeholder="Dein Vorname" value="${esc(d.name)}"></label>`,
       () => `<div class="su-h"><span class="eyebrow gold">Farbschema</span><h2 id="su-title">Wähle deinen Look.</h2><p>Deine Auswahl gilt sofort für das ganze Journal im Hintergrund.</p></div>${skinGrid(d.theme)}`,
       () => `<div class="su-h"><span class="eyebrow gold">Seiten</span><h2 id="su-title">Was soll dein Journal können?</h2><p>Der Kalender ist immer dabei. Learnings und Outlooks nimmst du dazu oder lässt sie weg.</p></div>${modGrid(d.modules)}`,
-      () => `<div class="su-h"><span class="eyebrow gold">Konten</span><h2 id="su-title">Wie heißen deine Konten?</h2><p>Zum Beispiel dein Broker oder deine Prop-Firm-Challenge. Die Namen siehst du überall im Journal.</p></div>${acctFields(d.acctNames, 'su')}`
+      () => `<div class="su-h"><span class="eyebrow gold">Konten</span><h2 id="su-title">Welche Konten tradest du?</h2><p>Leg so viele an, wie du brauchst, zum Beispiel deinen Broker und deine Prop-Firm-Challenges. Mit einem Klick auf das Farbfeld wählst du die Farbe, an der du das Konto im Kalender erkennst.</p></div>${acctEditor(d.accounts, 'su')}`
     ];
     $('#su-body').innerHTML = `<div class="su-step${dir < 0 ? ' back' : ''}">${steps[i]()}</div>`;
     const f = $('#su-body input') || $('#su-body [aria-checked="true"]:not(.locked)') || $('#su-next');
@@ -1387,6 +1481,7 @@ const Setup = {
   async finish(skip){
     if (this.busy) return;
     this.collect();
+    pruneAccts(this.draft);
     this.busy = true;
     const btn = $('#su-next'); btn.disabled = true;
     const prev = S.settings;
@@ -1423,7 +1518,7 @@ function openSettings(){
       <section class="set-sec"><h3>Dein Name</h3><input class="inp" id="set-name" maxlength="30" autocomplete="given-name" placeholder="Dein Vorname" value="${esc(draft.name)}"></section>
       <section class="set-sec"><h3>Farbschema</h3>${skinGrid(draft.theme)}</section>
       <section class="set-sec"><h3>Seiten</h3>${modGrid(draft.modules)}</section>
-      <section class="set-sec"><h3>Konten</h3>${acctFields(draft.acctNames, 'set')}</section>
+      <section class="set-sec"><h3>Konten</h3>${acctEditor(draft.accounts, 'set')}</section>
       ${window.BlotterBackend ? `<section class="set-sec"><h3>Konto &amp; Abo</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p><div class="acct-btns"><button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button><button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}
       <p class="form-err" id="form-err" role="alert" hidden></p>
     </div>
@@ -1452,6 +1547,7 @@ function openSettings(){
         else if (act === 'set-save') {
           draft.name = ($('#set-name', p).value || '').trim().slice(0, 30);
           readNames(draft, 'set');
+          pruneAccts(draft);
           const prev = S.settings;
           S.settings = normSettings(Object.assign({}, draft, {setupDone: true}));
           a.disabled = true;

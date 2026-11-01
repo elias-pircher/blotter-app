@@ -33,8 +33,8 @@ js = rep(js, "'In dieser Ansicht kann nichts gespeichert werden. Öffne das Jour
 js = rep(js, "'Gespeichert im Journal, auf all deinen Geräten verfügbar'", "'Gespeichert in deinem Konto, auf all deinen Geräten verfügbar'")
 
 # ---- account & subscription section in the settings dialog
-js = rep(js, """      <section class="set-sec"><h3>Konten</h3>${acctFields(draft.acctNames, 'set')}</section>""",
-"""      <section class="set-sec"><h3>Konten</h3>${acctFields(draft.acctNames, 'set')}</section>
+js = rep(js, """      <section class="set-sec"><h3>Konten</h3>${acctEditor(draft.accounts, 'set')}</section>""",
+"""      <section class="set-sec"><h3>Konten</h3>${acctEditor(draft.accounts, 'set')}</section>
       ${window.BlotterBackend ? `<section class="set-sec"><h3>Konto &amp; Abo</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p><div class="acct-btns"><button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button><button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}""")
 js = rep(js, """        if (act === 'set-cancel') { if (Modal.cur) Modal.cur.dirty = false; Modal.close(); }""",
 """        if (act === 'set-cancel') { if (Modal.cur) Modal.cur.dirty = false; Modal.close(); }

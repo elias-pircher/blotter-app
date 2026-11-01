@@ -15,7 +15,7 @@ const I = {
 const FEATURES = [
   [I.cal, 'Kalender auf einen Blick', 'Jeder Tag zeigt deine Trades als TP, BE oder SL. Grüne und rote Tage siehst du sofort, dazu die Bilanz pro Woche.'],
   [I.target, 'Ergebnis statt Kontostand', 'Win-Rate, Serien und Verteilung von TP, BE und SL. Ohne dich mit Beträgen abzulenken.'],
-  [I.wallet, 'Zwei Konten, deine Namen', 'Trenne Hauptkonto und Challenge oder Zweitkonto und benenne sie, wie du willst.'],
+  [I.wallet, 'Alle Konten in einem Journal', 'Bis zu 10 Konten mit eigenem Namen und eigener Farbe: Broker, Prop-Firm-Challenges, Demo. Filtern mit einem Klick.'],
   [I.img, 'Screenshots dazu', 'Chart einfügen per Drag & Drop oder direkt aus der Zwischenablage. Groß ansehen mit einem Klick.'],
   [I.bulb, 'Learnings als Timeline', 'Schreib auf, was du gelernt hast. Fehler, die du aufschreibst, kosten dich nur einmal Geld.'],
   [I.compass, 'Outlooks mit Trefferquote', 'Plane Bias und Key Levels vor der Session und markiere danach, ob es eingetreten ist.'],
@@ -90,7 +90,7 @@ export default async function Home() {
               <ul>
                 <li>Unbegrenzt Trades, Learnings und Outlooks</li>
                 <li>Screenshots zu jedem Eintrag</li>
-                <li>6 Farbschemen und eigene Kontonamen</li>
+                <li>Bis zu 10 Konten, 6 Farbschemen</li>
                 <li>Synchron auf Laptop, Tablet und Handy</li>
                 <li>Deine Daten sind nur für dich sichtbar</li>
               </ul>
