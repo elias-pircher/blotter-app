@@ -44,7 +44,7 @@ async function checkSupabase() {
   try {
     const { error } = await createAdminClient().auth.admin.listUsers({ page: 1, perPage: 1 });
     if (!error) return { status: 'ok' };
-    return { status: 'ungültig', hinweis: supabaseHint(key), antwort: `${error.status || ''} ${error.message || ''}`.trim().slice(0, 80) };
+    return { status: 'ungültig', hinweis: supabaseHint(key), http: typeof error.status === 'number' ? error.status : undefined };
   } catch (e) {
     return { status: 'ungültig', hinweis: supabaseHint(key) };
   }
