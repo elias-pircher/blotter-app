@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { stripe, syncSubscription } from '@/lib/stripe';
+import { secret as readSecret } from '@/lib/secrets';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ const HANDLED = new Set([
 
 export async function POST(req) {
   const signature = req.headers.get('stripe-signature');
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = readSecret('STRIPE_WEBHOOK_SECRET');
   if (!signature || !secret) return NextResponse.json({ error: 'missing_signature' }, { status: 400 });
 
   let event;
