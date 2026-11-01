@@ -154,3 +154,4 @@ img{max-width:100%}
   .foot nav{margin-left:0}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.inp.code{font-size:24px;letter-spacing:.35em;text-align:center;font-variant-numeric:tabular-nums}

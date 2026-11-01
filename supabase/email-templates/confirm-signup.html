@@ -1,0 +1,5 @@
+<h2>Willkommen bei Blotter</h2>
+<p>Dein Code, um dein Konto zu bestätigen:</p>
+<p style="font-size:30px;font-weight:700;letter-spacing:6px;margin:12px 0">{{ .Token }}</p>
+<p>Oder klick hier: <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email">Konto bestätigen</a></p>
+<p>Der Code ist nur kurze Zeit gültig. Wenn du dich nicht registrieren wolltest, kannst du diese E-Mail ignorieren.</p>
