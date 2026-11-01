@@ -29,7 +29,7 @@ Jeder Kunde sieht nur seine eigenen Daten. Das erzwingt die Datenbank selbst (Ro
    - Site URL: deine Adresse, z. B. `https://blotter-app.vercel.app` (später deine Domain)
    - Redirect URLs: `https://DEINE-ADRESSE/auth/callback` und `http://localhost:3000/auth/callback`
 4. **Project Settings → API**: Project URL und anon/publishable key notieren (öffentlich). Den service_role/secret key **geheim halten**.
-5. **Authentication → Emails → Templates**: Bei „Magic Link“ und „Confirm signup“ den Inhalt aus `supabase/email-templates/` einsetzen. Dann enthält die E-Mail einen Code und einen Link, der in jedem Browser und auf jedem Gerät funktioniert.
+5. Die Standard-E-Mails von Supabase funktionieren ohne Änderung: Der Anmelde-Link klappt in jedem Browser und auf jedem Gerät. Eigene Vorlagen (Ordner `supabase/email-templates/`, mit Code in der E-Mail) lassen sich erst mit eigenem SMTP einsetzen.
 6. Für echte Kunden: **Authentication → Emails → SMTP** mit einem eigenen Versanddienst (z. B. Resend) einrichten. Der eingebaute Versand ist nur zum Testen gedacht und stark begrenzt.
 
 ### 2 · Stripe (erst im Testmodus)
