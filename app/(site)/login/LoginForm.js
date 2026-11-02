@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { diag } from '@/lib/diag';
 import { createClient as createPlainClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
 
@@ -24,6 +25,7 @@ export default function LoginForm({ next, linkError }) {
   const [email, setEmail] = useState('');
   const [state, setState] = useState(linkError ? 'linkerr' : 'idle');
   const [err, setErr] = useState('');
+  useEffect(() => { diag('login-view', { st: linkError ? 'fehler' : '' }); }, [linkError]);
 
   async function send(e) {
     e.preventDefault();

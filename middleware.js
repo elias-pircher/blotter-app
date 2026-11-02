@@ -13,9 +13,14 @@ export async function middleware(request) {
       },
     },
   });
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
   if (!user && (path.startsWith('/app') || path.startsWith('/abo'))) {
+    console.log('[diag] mw-redirect ' + JSON.stringify({
+      path, rsc: request.headers.get('rsc') || '', purpose: request.headers.get('purpose') || request.headers.get('sec-purpose') || '',
+      cookies: request.cookies.getAll().filter((c) => c.name.startsWith('sb-')).map((c) => c.name.replace(/^sb-[^-]+-/, '') + ':' + c.value.length),
+      err: error ? String(error.code || error.name || error.status || '') : '', ua: (request.headers.get('user-agent') || '').slice(0, 140),
+    }));
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.search = '';
@@ -26,5 +31,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|journal/|api/stripe/webhook|api/health|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|txt)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|journal/|api/stripe/webhook|api/health|api/diag|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|txt)$).*)'],
 };
