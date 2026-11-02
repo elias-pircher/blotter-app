@@ -447,14 +447,12 @@ function setNum(el, v, fmt){
 
 /* ---------- motion: mantra ---------- */
 const MANTRAS = [
-  ['Erst planen.', 'Dann handeln.'],
-  ['Disziplin ist', 'dein Vorteil.'],
+  ['Kontoschutz vor', 'Kontowachstum.'],
   ['Prozess', 'vor Gewinn.'],
-  ['Konstanz', 'schlägt Glück.'],
-  ['Kapital schützen.', 'Chancen nutzen.'],
+  ['Konstanz', 'schlägt zurück.'],
   ['Geduld wird', 'bezahlt.'],
-  ['Verluste klein.', 'Gewinne laufen.'],
-  ['Jeder Tag ist', 'ein Datenpunkt.']
+  ['Halte dich an', 'das System.'],
+  ['Disziplin ist', 'dein Vorteil.']
 ];
 const Mantra = {
   i: Math.floor(Date.now() / 86400000) % MANTRAS.length, timer: 0, el: null,
@@ -1325,17 +1323,20 @@ const LB = {
 /* ---------- personalisation ---------- */
 const SKINS = [
   {id: 'navy', name: 'Navy & Gold', sub: 'Das Original'},
-  {id: 'onyx', name: 'Onyx & Platin', sub: 'Schwarz, kühl, minimal'},
-  {id: 'ocean', name: 'Ozean', sub: 'Petrol & Himmelblau'},
-  {id: 'royal', name: 'Royal', sub: 'Violett & Gold'},
-  {id: 'copper', name: 'Graphit & Kupfer', sub: 'Warm und dunkel'},
-  {id: 'arctic', name: 'Arctic', sub: 'Hell und klar'}
+  {id: 'onyx', name: 'Graphit', sub: 'Schwarz und Weiß, ganz schlicht'},
+  {id: 'slate', name: 'Schiefer', sub: 'Blaugrau und ruhig'},
+  {id: 'mocha', name: 'Mokka', sub: 'Dunkel und warm'},
+  {id: 'paper', name: 'Hell', sub: 'Weiß und Anthrazit'},
+  {id: 'sand', name: 'Sand', sub: 'Hell und warm'}
 ];
 const SKIN_IDS = SKINS.map(k => k.id);
+// schemes that were replaced by calmer ones
+const SKIN_OLD = {ocean: 'slate', royal: 'navy', copper: 'mocha', arctic: 'paper'};
+const skinId = id => SKIN_OLD[id] || id;
 function normSettings(d){
   d = d || {};
   const o = {theme: 'navy', name: '', modules: {learnings: true, outlooks: true}, accounts: [], setupDone: !!d.setupDone};
-  if (SKIN_IDS.includes(d.theme)) o.theme = d.theme;
+  if (SKIN_IDS.includes(skinId(d.theme))) o.theme = skinId(d.theme);
   if (typeof d.name === 'string') o.name = d.name.trim().slice(0, 30);
   if (d.modules && typeof d.modules === 'object') { o.modules.learnings = d.modules.learnings !== false; o.modules.outlooks = d.modules.outlooks !== false; }
   o.accounts = normAccounts(d);
@@ -1379,6 +1380,7 @@ function modOn(k){ return k === 'kalender' || !(S.settings.modules && S.settings
 function pagesOn(){ return ['kalender', 'learnings', 'outlooks'].filter(modOn); }
 function an(id){ return (acctById(id) || accts()[0]).name; }
 function applySkin(id, persist){
+  id = skinId(id);
   if (!SKIN_IDS.includes(id)) id = 'navy';
   const r = document.documentElement;
   if (r.getAttribute('data-skin') !== id) { r.setAttribute('data-skin', id); BG.P = null; if (reduce) BG.draw(performance.now() + 1e5); }

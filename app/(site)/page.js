@@ -70,7 +70,7 @@ export default async function Home() {
             {FEATURES.map(([ic, h, p]) => <div className="f" key={h}><span className="ic">{ic}</span><h3>{h}</h3><p>{p}</p></div>)}
           </div>
           <div className="skins" aria-label="Farbschemen">
-            {[['Navy & Gold', '#060F27', '#D9B450'], ['Onyx & Platin', '#0A0B0E', '#C9CED8'], ['Ozean', '#03141B', '#4CC3FF'], ['Royal', '#0F0A1F', '#D9B450'], ['Graphit & Kupfer', '#0E0D0C', '#E0895A'], ['Arctic', '#EEF2F8', '#2B5BE8']].map(([n, a, b]) => (
+            {[['Navy & Gold', '#060F27', '#D9B450'], ['Graphit', '#0B0C0E', '#D6DAE1'], ['Schiefer', '#0D131A', '#9DBBDD'], ['Mokka', '#12100E', '#CDAA84'], ['Hell', '#F4F5F7', '#1F2B46'], ['Sand', '#F5F1EA', '#94703F']].map(([n, a, b]) => (
               <span className="skin" key={n}><i style={{ background: `linear-gradient(135deg, ${a} 50%, ${b} 50%)` }} />{n}</span>
             ))}
           </div>

@@ -7,7 +7,7 @@ export const metadata = {
   robots: { index: false },
 };
 
-const SKIN = 'try{var k=localStorage.getItem("blotter.skin");if(k&&/^[a-z]+$/.test(k))document.documentElement.setAttribute("data-skin",k)}catch(e){}';
+const SKIN = 'try{var k=localStorage.getItem("blotter.skin"),o={ocean:"slate",royal:"navy",copper:"mocha",arctic:"paper"};if(k&&/^[a-z]+$/.test(k))document.documentElement.setAttribute("data-skin",o[k]||k)}catch(e){}';
 
 export default function JournalLayout({ children }) {
   return (
