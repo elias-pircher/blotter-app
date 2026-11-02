@@ -7,9 +7,11 @@ const safeNext = (n) => (n && n.startsWith('/') && !n.startsWith('//') ? n : '/a
 const OTP_TYPES = new Set(['email', 'magiclink', 'signup', 'invite', 'recovery', 'email_change']);
 
 // The login link from the e-mail ends up here.
-// - Standard Supabase e-mails (our login form): the session arrives in the URL fragment,
-//   which only the browser can read, so we hand over to /login/fertig with the fragment intact.
-// - token_hash links (custom e-mail templates, later with own SMTP): verified here, any browser.
+// - token_hash links (our e-mail templates): a plain GET never uses up the one-time link, because
+//   mail scanners open links before the customer does. GET shows a page with a button (/login/bestaetigen);
+//   the button POSTs back here and only then is the link verified.
+// - Standard Supabase e-mails: the session arrives in the URL fragment, which only the browser can read,
+//   so we hand over to /login/fertig with the fragment intact.
 // - code links (older PKCE e-mails): only work in the browser that requested them.
 export async function GET(req) {
   const url = new URL(req.url);
@@ -18,7 +20,15 @@ export async function GET(req) {
   const tokenHash = url.searchParams.get('token_hash');
   const type = url.searchParams.get('type');
 
-  if (!code && !tokenHash) {
+  if (tokenHash) {
+    const to = new URL('/login/bestaetigen', url.origin);
+    to.searchParams.set('token_hash', tokenHash);
+    to.searchParams.set('type', OTP_TYPES.has(type) ? type : 'email');
+    to.searchParams.set('next', next);
+    return NextResponse.redirect(to, 303);
+  }
+
+  if (!code) {
     const html = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
       + '<title>Anmelden…</title><meta name="robots" content="noindex"></head><body style="margin:0;background:#07111f">'
       + "<script>location.replace('/login/fertig'+location.search+location.hash)</script>"
@@ -26,16 +36,26 @@ export async function GET(req) {
     return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
   }
 
-  const supabase = createClient();
-  let error = null;
-  if (tokenHash && OTP_TYPES.has(type)) {
-    ({ error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type }));
-  } else if (code) {
-    const flowId = url.searchParams.get('sb_flow_id');
-    ({ error } = await supabase.auth.exchangeCodeForSession(code, flowId ? { flowId } : undefined));
-  } else {
-    error = { code: 'bad_type' };
-  }
+  const flowId = url.searchParams.get('sb_flow_id');
+  const { error } = await createClient().auth.exchangeCodeForSession(code, flowId ? { flowId } : undefined);
   if (error) console.error('Login-Link fehlgeschlagen:', error.code || error.name || 'unbekannt');
   return NextResponse.redirect(new URL(error ? '/login?fehler=link' : next, url.origin));
+}
+
+// The button on /login/bestaetigen: verifies the one-time link and signs the customer in.
+export async function POST(req) {
+  const url = new URL(req.url);
+  // only our own confirmation page may submit here (protects against being logged into someone else's account)
+  const origin = req.headers.get('origin');
+  if (origin && origin !== url.origin) return new NextResponse('Ungültige Anfrage', { status: 403 });
+  let form;
+  try { form = await req.formData(); } catch (e) { form = new FormData(); }
+  const tokenHash = String(form.get('token_hash') || '');
+  const type = String(form.get('type') || 'email');
+  const next = safeNext(String(form.get('next') || ''));
+  let error = null;
+  if (!tokenHash || !OTP_TYPES.has(type)) error = { code: 'bad_request' };
+  else ({ error } = await createClient().auth.verifyOtp({ token_hash: tokenHash, type }));
+  if (error) console.error('Login-Link fehlgeschlagen:', error.code || error.name || 'unbekannt');
+  return NextResponse.redirect(new URL(error ? '/login?fehler=link' : next, url.origin), 303);
 }
