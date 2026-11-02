@@ -10,7 +10,7 @@ export default function Journal({ userId, email }) {
     window.__blotterBooted = true;
     window.BlotterBackend = makeBackend(createClient(), userId, email);
     const s = document.createElement('script');
-    s.src = '/journal/journal.js?v=7';
+    s.src = '/journal/journal.js?v=8';
     s.async = false;
     document.body.appendChild(s);
   }, [userId, email]);

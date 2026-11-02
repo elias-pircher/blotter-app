@@ -403,9 +403,9 @@ function setNum(el, v, fmt){
 
 /* ---------- motion: mantra ---------- */
 const MANTRAS = [
-  ['Plan the trade.', 'Trade the plan.'],
-  ['Disziplin ist', 'dein Edge.'],
-  ['Prozess', 'vor Profit.'],
+  ['Erst planen.', 'Dann handeln.'],
+  ['Disziplin ist', 'dein Vorteil.'],
+  ['Prozess', 'vor Gewinn.'],
   ['Konstanz', 'schlägt Glück.'],
   ['Kapital schützen.', 'Chancen nutzen.'],
   ['Geduld wird', 'bezahlt.'],
