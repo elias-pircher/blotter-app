@@ -26,7 +26,7 @@ Jeder Kunde sieht nur seine eigenen Daten. Das erzwingt die Datenbank selbst (Ro
 1. Neues Projekt, Region **Frankfurt (eu-central-1)**.
 2. **SQL Editor** → Inhalt von `supabase/schema.sql` einfügen → **Run**.
 3. **Authentication → URL Configuration**
-   - Site URL: deine Adresse, z. B. `https://blotter-app.vercel.app` (später deine Domain)
+   - Site URL: `https://blotterjournal.com`
    - Redirect URLs: `https://DEINE-ADRESSE/auth/callback` und `http://localhost:3000/auth/callback`
 4. **Project Settings → API**: Project URL und anon/publishable key notieren (öffentlich). Den service_role/secret key **geheim halten**.
 5. Die Standard-E-Mails von Supabase funktionieren ohne Änderung: Der Anmelde-Link klappt in jedem Browser und auf jedem Gerät. Eigene Vorlagen (Ordner `supabase/email-templates/`, mit Code in der E-Mail) lassen sich erst mit eigenem SMTP einsetzen.
