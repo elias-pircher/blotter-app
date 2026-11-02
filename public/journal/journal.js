@@ -211,6 +211,50 @@ const Store = {
   }
 };
 
+/* ---------- calendar previews of screenshots ---------- */
+/* Saving a trade stores a ~10 KB preview of its first screenshot (t.thumb, made from t.thumbRef), so the
+   calendar shows it without loading full images. Older trades get one generated once per session. */
+function loadImg(url, cors){
+  return new Promise((res, rej) => { const i = new Image(); if (cors) i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => rej({code: 'unsupported_type'}); i.src = url; });
+}
+function drawThumb(img){
+  const w0 = img.naturalWidth, h0 = img.naturalHeight;
+  if (!w0 || !h0) throw {code: 'unsupported_type'};
+  const k = Math.min(1, 240 / w0, 160 / h0), c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w0 * k)); c.height = Math.max(1, Math.round(h0 * k));
+  const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.74);
+}
+async function makeThumb(src){
+  if (!src) throw {code: 'unsupported_type'};
+  if (typeof src === 'string') return drawThumb(await loadImg(src, !/^(data|blob):/.test(src)));
+  const url = URL.createObjectURL(src);
+  try { return drawThumb(await loadImg(url, false)); } finally { URL.revokeObjectURL(url); }
+}
+const Thumbs = {
+  m: new Map(), q: [], busy: 0,
+  get(ref){
+    if (this.m.has(ref)) return this.m.get(ref);
+    this.m.set(ref, ''); this.q.push(ref); this.pump();
+    return '';
+  },
+  pump(){
+    while (this.busy < 2 && this.q.length) {
+      const ref = this.q.shift(), src = Store.imgSrc(ref);
+      this.busy++;
+      makeThumb(src).then(d => this.m.set(ref, d), () => this.m.set(ref, src || false))
+        .then(() => { this.busy--; schedule(); this.pump(); });
+    }
+  }
+};
+// '' = preview is being made, false = no image available, otherwise an image URL
+function tradeThumb(t){
+  const ref = t && t.shots && t.shots[0];
+  if (!ref) return false;
+  if (t.thumb && t.thumbRef === ref) return t.thumb;
+  return Thumbs.get(ref);
+}
+
 /* ---------- motion: background chart ---------- */
 const BG = {
   c: null, x: null, w: 0, h: 0, dpr: 1, gap: 17, headX: 0, cs: [], live: null, period: 1600, born: 0,
@@ -771,7 +815,13 @@ const Views = {
           if (c >= 5) cls.push('we');
           if (key > today) cls.push('fut');
           if (!list.length) cls.push('is-empty'); else { const tn = tone(dc); if (tn) cls.push(tn); }
-          const label = fLong.format(d) + (list.length ? ': ' + list.length + (list.length === 1 ? ' Trade' : ' Trades') + ', ' + dc.tp + ' TP, ' + dc.be + ' BE, ' + dc.sl + ' SL' : ': keine Trades');
+          const shotT = list.filter(t => t.shots && t.shots.length), nShots = shotT.reduce((a, t) => a + t.shots.length, 0);
+          const label = fLong.format(d) + (list.length ? ': ' + list.length + (list.length === 1 ? ' Trade' : ' Trades') + ', ' + dc.tp + ' TP, ' + dc.be + ' BE, ' + dc.sl + ' SL' + (nShots ? ', ' + nShots + (nShots === 1 ? ' Screenshot' : ' Screenshots') : '') : ': keine Trades');
+          let shot = '';
+          if (shotT.length) {
+            const src = tradeThumb(shotT[0]);
+            if (src !== false) shot = `<span class="d-shot${src ? '' : ' wait'}">${src ? `<img src="${esc(src)}" alt="" decoding="async">` : ''}${nShots > 1 ? `<b>${nShots}</b>` : ''}</span>`;
+          }
           const marks = (o ? '<span class="mk" title="Outlook">O</span>' : '') + (l ? '<span class="mk" title="Learning">L</span>' : '');
           const pills = list.slice(0, 4).map(t => {
             const rr = resOf(t) || 'na';
@@ -779,7 +829,7 @@ const Views = {
           }).join('') + (list.length > 4 ? `<span class="pill more">+${list.length - 4}</span>` : '');
           const dots = list.slice(0, 6).map(t => `<i class="${resOf(t) || 'na'}"></i>`).join('') + (o ? '<i class="ol"></i>' : '') + (l ? '<i class="ol"></i>' : '');
           h += `<button type="button" class="${cls.join(' ')}" data-day="${key}" aria-label="${esc(label)}" ${rvOn ? `data-rv="${M}:${mk}:${key}"` : ''} style="--rd:${Math.min(700, 480 + (r * 7 + c) * 12)}ms;--gd:${c * 45}ms">
-            <span class="row1"><span class="d-num">${d.getDate()}</span><span class="marks">${marks}</span></span>
+            <span class="row1"><span class="d-num">${d.getDate()}</span><span class="rt"><span class="marks">${marks}</span>${shot}</span></span>
             ${list.length ? `<span class="pills">${pills}</span>` : ''}
             ${dots ? `<span class="d-dots">${dots}</span>` : ''}
           </button>`;
@@ -1006,7 +1056,7 @@ const FORMS = {
       {k: 'symbol', t: 'text', label: 'Instrument', ph: 'z. B. NQ, DAX, EURUSD', list: 'dl-symbols', caps: true},
       {k: 'side', t: 'seg', label: 'Richtung', cls: 'side-seg', opts: [['long', '▲ Long'], ['short', '▼ Short']]},
       {k: 'result', t: 'seg', label: 'Ergebnis', cls: 'oc-seg', full: true, opts: [['tp', ICON.tp + '<b>TP</b><small>Take Profit</small>'], ['be', ICON.be + '<b>BE</b><small>Break Even</small>'], ['sl', ICON.sl + '<b>SL</b><small>Stop Loss</small>']]},
-      {k: 'setup', t: 'text', label: 'Setup', ph: 'z. B. Breakout, Liquidity Sweep', list: 'dl-setups', opt: true, full: true},
+      {k: 'setup', t: 'text', label: 'Setup', ph: 'z. B. Entry Model 1, 2 oder 3', list: 'dl-setups', opt: true, full: true},
       {k: 'note', t: 'area', label: 'Notizen', ph: 'Warum bist du rein? Was lief gut, was nicht?', opt: true, rows: 5},
       {k: 'shots', t: 'shots', label: 'Screenshots'}
     ],
@@ -1049,7 +1099,7 @@ function datalists(){
   const uniq = arr => Array.from(new Set(arr.map(x => (x || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, LOC));
   const opt = a => a.map(x => `<option value="${esc(x)}"></option>`).join('');
   return `<datalist id="dl-symbols">${opt(uniq(S.trades.map(t => t.symbol).concat(S.outlooks.map(o => o.symbol))))}</datalist>
-    <datalist id="dl-setups">${opt(uniq(S.trades.map(t => t.setup)))}</datalist>
+    <datalist id="dl-setups">${opt(uniq(['Entry Model 1', 'Entry Model 2', 'Entry Model 3'].concat(S.trades.map(t => t.setup))))}</datalist>
     <datalist id="dl-cats">${opt(uniq(['Psychologie', 'Risikomanagement', 'Entry', 'Exit', 'Setup', 'Disziplin', 'Marktstruktur'].concat(S.learnings.map(l => l.category))))}</datalist>`;
 }
 
@@ -1174,7 +1224,15 @@ function openForm(kind, entry, opts){
         shots: st.shots.map(s => s.ref),
         createdAt: (entry && entry.createdAt) || ts, updatedAt: ts
       });
-      if (kind === 'trades') { delete obj.pnl; delete obj.r; }
+      if (kind === 'trades') {
+        delete obj.pnl; delete obj.r;
+        const first = st.shots[0];
+        if (!first) { delete obj.thumb; delete obj.thumbRef; }
+        else if (!obj.thumb || obj.thumbRef !== first.ref) {
+          try { obj.thumb = await makeThumb(first.file || Store.imgSrc(first.ref)); obj.thumbRef = first.ref; }
+          catch (e) { delete obj.thumb; delete obj.thumbRef; }
+        }
+      }
       await Store.save(kind, obj);
       for (const ref of st.removed) Store.deleteImage(ref);
       if (kind === 'trades' && obj.account) { S.lastAccount = obj.account; lsSet('blotter.lastAccount', obj.account); }
