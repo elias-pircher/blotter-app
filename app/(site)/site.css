@@ -155,3 +155,15 @@ img{max-width:100%}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .inp.code{font-size:24px;letter-spacing:.35em;text-align:center;font-variant-numeric:tabular-nums}
+.msg.info{background:var(--gold-soft);border:1px solid var(--gold-line);color:var(--ink)}
+.msg a{color:var(--gold-hi)}
+.msg-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.row-actions{display:flex;flex-wrap:wrap;gap:8px}
+.row-actions .btn{flex:1 1 160px}
+.btn.ghost{background:transparent}
+.muted.small{font-size:14px}
+.muted a{color:var(--gold-hi)}
+.addr{overflow-wrap:anywhere;color:var(--ink)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:6px;vertical-align:1px}
+.dot.pulse{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}

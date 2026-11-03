@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { stripe } from '@/lib/stripe';
 import { secret } from '@/lib/secrets';
 import { SUPABASE_URL } from '@/lib/env';
+import dns from 'node:dns/promises';
 
 // Setup check: says for each secret whether it is missing, the wrong kind of key, or ok.
 // It never returns any part of a key.
@@ -81,13 +82,86 @@ function checkWebhook() {
   return { status: 'ok' };
 }
 
+// ---- e-mail sending -----------------------------------------------------------------------
+
+async function checkResendKey() {
+  if (!process.env.RESEND_API_KEY) return { status: 'fehlt' };
+  const key = secret('RESEND_API_KEY');
+  if (MASKED.test(key)) return { status: 'ungültig', hinweis: 'Nur die verdeckte Anzeige kopiert. Kopier den Schlüssel direkt nach dem Erstellen.' };
+  if (/^(v1,)?whsec_/.test(key)) return { status: 'ungültig', hinweis: 'Das ist ein Webhook-Geheimnis. Hier gehört der Resend-API-Schlüssel hin, der mit re_ beginnt.' };
+  if (!/^re_[A-Za-z0-9_]{10,}$/.test(key)) return { status: 'ungültig', hinweis: 'Kein Resend-API-Schlüssel erkannt. Er beginnt mit re_.' };
+  try {
+    const res = await fetch((process.env.RESEND_API_BASE || 'https://api.resend.com') + '/domains', {
+      headers: { Authorization: `Bearer ${key}` }, cache: 'no-store', signal: AbortSignal.timeout(4000),
+    });
+    if (res.ok) return { status: 'ok', recht: 'Vollzugriff' };
+    let name = '';
+    try { name = String((await res.json())?.name || ''); } catch {}
+    if (name === 'restricted_api_key') return { status: 'ok', recht: 'nur Senden' };
+    if (res.status === 401 || res.status === 403) return { status: 'ungültig', hinweis: 'Resend lehnt den Schlüssel ab: unvollständig kopiert oder gelöscht.', http: res.status };
+    return { status: 'unklar', http: res.status };
+  } catch {
+    return { status: 'Fehler beim Prüfen' };
+  }
+}
+
+function checkHookSecret(name, kind) {
+  if (!process.env[name]) return { status: 'fehlt' };
+  const v = secret(name);
+  if (MASKED.test(v)) return { status: 'ungültig', hinweis: 'Nur die verdeckte Anzeige kopiert.' };
+  if (/^re_/.test(v)) return { status: 'ungültig', hinweis: 'Das ist der Resend-API-Schlüssel, nicht das Geheimnis.' };
+  if (kind === 'supabase' && !/^(v1,)?whsec_[A-Za-z0-9+/=]{20,}$/.test(v)) return { status: 'ungültig', hinweis: 'Das Geheimnis aus Supabase beginnt mit v1,whsec_ und muss vollständig kopiert sein.' };
+  if (kind === 'resend' && !/^whsec_[A-Za-z0-9+/=]{20,}$/.test(v)) {
+    return { status: 'ungültig', hinweis: /^v1,/.test(v) ? 'Das ist das Geheimnis aus Supabase. Hier gehört das Signing Secret des Resend-Webhooks hin (whsec_…).' : 'Das Signing Secret aus Resend beginnt mit whsec_.' };
+  }
+  return { status: 'ok' };
+}
+
+async function txt(host) {
+  try { return (await dns.resolveTxt(host)).map((r) => r.join('')); } catch { return []; }
+}
+
+async function checkDns() {
+  const [dkim, spf, dmarc, mx] = await Promise.all([
+    txt('resend._domainkey.blotterjournal.com'),
+    txt('send.blotterjournal.com'),
+    txt('_dmarc.blotterjournal.com'),
+    dns.resolveMx('send.blotterjournal.com').catch(() => []),
+  ]);
+  return {
+    dkim: dkim.some((r) => r.includes('p=')) ? 'ok' : 'fehlt',
+    spf: spf.find((r) => r.startsWith('v=spf1')) || 'fehlt',
+    mx_send: mx.map((m) => m.exchange),
+    dmarc: dmarc.find((r) => r.startsWith('v=DMARC1')) || 'fehlt',
+  };
+}
+
+async function deliveryStats() {
+  try {
+    const since = new Date(Date.now() - 24 * 3600e3).toISOString();
+    const { data, error } = await createAdminClient().from('mail_log').select('status').gte('created_at', since).limit(1000);
+    if (error) return 'nicht lesbar';
+    return data.reduce((acc, r) => ({ ...acc, [r.status]: (acc[r.status] || 0) + 1 }), {});
+  } catch { return 'nicht lesbar'; }
+}
+
 export async function GET() {
-  const [supa, str] = await Promise.all([checkSupabase(), checkStripe()]);
+  const [supa, str, resendKey, dnsInfo, stats] = await Promise.all([checkSupabase(), checkStripe(), checkResendKey(), checkDns(), deliveryStats()]);
   const out = {
     SUPABASE_SERVICE_ROLE_KEY: supa,
     STRIPE_SECRET_KEY: str,
     STRIPE_WEBHOOK_SECRET: checkWebhook(),
   };
   out.alles_bereit = [supa, str, out.STRIPE_WEBHOOK_SECRET].every((c) => c.status === 'ok');
+  const mail = {
+    RESEND_API_KEY: resendKey,
+    SEND_EMAIL_HOOK_SECRET: checkHookSecret('SEND_EMAIL_HOOK_SECRET', 'supabase'),
+    RESEND_WEBHOOK_SECRET: checkHookSecret('RESEND_WEBHOOK_SECRET', 'resend'),
+  };
+  if (process.env.SEND_EMAIL_HOOK_SECRET && secret('SEND_EMAIL_HOOK_SECRET') === secret('RESEND_WEBHOOK_SECRET')) {
+    mail.RESEND_WEBHOOK_SECRET = { status: 'ungültig', hinweis: 'Gleicher Wert wie SEND_EMAIL_HOOK_SECRET. Die beiden Geheimnisse kommen aus verschiedenen Stellen.' };
+  }
+  out.mail = { ...mail, dns: dnsInfo, zustellungen_24h: stats };
+  out.mail_bereit = Object.values(mail).every((c) => c.status === 'ok');
   return NextResponse.json(out, { headers: { 'Cache-Control': 'no-store' } });
 }

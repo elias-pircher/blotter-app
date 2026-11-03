@@ -74,3 +74,20 @@ create policy "shots: eigene hochladen" on storage.objects
   for insert to authenticated with check (bucket_id = 'shots' and (storage.foldername(name))[1] = (select auth.uid())::text and (select private.has_active_sub()));
 create policy "shots: eigene löschen" on storage.objects
   for delete to authenticated using (bucket_id = 'shots' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+-- Zustellprotokoll der Anmelde-E-Mails (nur Server mit Service-Key, Einträge werden nach 30 Tagen gelöscht)
+create table if not exists public.mail_log (
+  id bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  rid text,
+  email text not null default '',
+  kind text not null default 'login',
+  resend_id text unique,
+  status text not null default 'sent',
+  detail text
+);
+create index if not exists mail_log_rid_idx on public.mail_log (rid);
+create index if not exists mail_log_created_idx on public.mail_log (created_at);
+alter table public.mail_log enable row level security;
+revoke all on table public.mail_log from anon, authenticated;
