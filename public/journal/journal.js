@@ -580,7 +580,7 @@ function ldPrice(u){
   const noise = (Math.sin(u * 61) * 4 + Math.sin(u * 23 + 1.3) * 3) * Math.pow(1 - u, 1.2) * Math.min(1, u * 8);
   return a[1] + (b[1] - a[1]) * s + noise;
 }
-const LD_NAMES = {kalender: ['Kal', 'ender'], learnings: ['Lear', 'nings'], outlooks: ['Out', 'looks']};
+const LD_NAMES = {kalender: ['', 'Kalender'], learnings: ['', 'Learnings'], outlooks: ['', 'Outlooks']};
 const easeOut = k => 1 - Math.pow(1 - k, 3);
 const easeInOut = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
 const Loader = {
@@ -823,16 +823,16 @@ const Views = {
       el.innerHTML = `
       <section class="hero" aria-label="Übersicht">
         <div class="hero-txt" id="hero-txt" data-rv="${M}:hero-t">
-          <span class="eyebrow gold" id="hero-date"></span>
+          <p class="hero-date" id="hero-date"></p>
           <h1 class="mantra" id="mantra"></h1>
           <p class="hero-sub">Jeder eingetragene Trade macht dich besser. Wähle einen Tag im Kalender und halte fest, was passiert ist.</p>
         </div>
         <div class="equity spot" id="equity" data-rv="${M}:hero-e" style="--rd:180ms">
           <div class="eq-head"><span class="eyebrow gold" id="eq-label">Bilanz</span><span class="eq-n" id="eq-n"></span></div>
-          <div class="eq-row"><span class="eq-v gold-t" id="eq-v">–</span><span class="eq-vl">Win-Rate<small>TP ÷ (TP + SL)</small></span></div>
+          <div class="eq-row"><span class="eq-big"><span class="eq-v gold-t" id="eq-v">–</span><span class="eq-u gold-t" id="eq-u" hidden>%</span></span><span class="eq-vl">Win-Rate<small>TP ÷ (TP + SL)</small></span></div>
           <div class="ratio" id="ratio" aria-hidden="true"><span class="r tp"></span><span class="r be"></span><span class="r sl"></span></div>
           <div class="ratio-l" id="ratio-l"></div>
-          <div class="tape-h"><span class="eyebrow">Trade-Tape</span><span class="tape-hint">ältester → neuester</span></div>
+          <div class="tape-h"><span class="eyebrow">Trade-Tape</span><span class="tape-hint">älteste zuerst</span></div>
           <div class="tape" id="tape"></div>
           <div class="eq-foot" id="eq-foot"></div>
         </div>
@@ -852,8 +852,8 @@ const Views = {
         <button type="button" class="btn primary" data-action="new-trade">${ICON.plus}Trade eintragen</button>
       </div>
       <div class="stats" data-rv="${M}:stats" style="--rd:320ms">
-        ${[['n','Trades',''],['tp','Take Profit','tp'],['sl','Stop Loss','sl'],['be','Break Even','be'],['best','Beste Serie','']].map(([k, l, c]) =>
-          `<div class="stat"><span class="k">${c ? `<i class="sw ${c}"></i>` : ''}${l}</span><span class="v" id="st-${k}">–</span><span class="s" id="st-${k}-s">&nbsp;</span>${c ? `<span class="meter"><i class="${c}" id="st-${k}-m"></i></span>` : (k === 'best' ? '<span class="streak" id="st-streak"></span>' : '<span class="meter" style="visibility:hidden"></span>')}</div>`).join('')}
+        ${[['n','Trades','Trades',''],['tp','Take Profit','TP','tp'],['sl','Stop Loss','SL','sl'],['be','Break Even','BE','be'],['best','Beste TP-Serie','Serie','']].map(([k, l, sh, c]) =>
+          `<div class="stat"><span class="k">${c ? `<i class="sw ${c}"></i>` : ''}<span class="kl">${l}</span><span class="ks">${sh}</span></span><span class="v" id="st-${k}">–</span><span class="s" id="st-${k}-s">&nbsp;</span>${c ? `<span class="meter"><i class="${c}" id="st-${k}-m"></i></span>` : (k === 'best' ? '<span class="streak" id="st-streak"></span>' : '<span class="meter" style="visibility:hidden"></span>')}</div>`).join('')}
       </div>
       <div class="cal-wrap spot" data-rv="${M}:calwrap" style="--rd:420ms"><div class="cal" id="cal"></div></div>
       <div class="weeks" id="weeks"></div>
@@ -862,13 +862,13 @@ const Views = {
         <span><span class="pill be"><b>BE</b></span>Break Even</span>
         <span><span class="pill sl"><b>SL</b></span>Stop Loss</span>
         ${accts().map(a => `<span>${adot(a.id)}${esc(a.name)}</span>`).join('')}
-        ${modOn('outlooks') ? '<span><span class="mk">O</span>Outlook</span>' : ''}
-        ${modOn('learnings') ? '<span><span class="mk">L</span>Learning</span>' : ''}
+        ${modOn('outlooks') ? `<span><span class="mk">${MI.outlooks}</span>Outlook</span>` : ''}
+        ${modOn('learnings') ? `<span><span class="mk">${MI.learnings}</span>Learning</span>` : ''}
       </div>
       <p class="hint" id="cal-hint" hidden><b>Noch keine Trades.</b> Klick auf einen Tag im Kalender oder auf „Trade eintragen“, um deinen ersten Trade mit Konto, Ergebnis (TP, BE oder SL) und Screenshot festzuhalten.</p>`;
       const n = new Date();
       const hr = n.getHours(), greet = hr < 5 ? 'Gute Nacht' : hr < 11 ? 'Guten Morgen' : hr < 18 ? 'Guten Tag' : 'Guten Abend';
-      $('#hero-date').textContent = (S.settings.name ? greet + ', ' + S.settings.name + ' · ' : '') + fLong.format(n) + ' · KW ' + isoWeek(n);
+      $('#hero-date').innerHTML = (S.settings.name ? `<b>${esc(greet + ', ' + S.settings.name)}.</b> ` : '') + `<span>${esc(fLong.format(n))}</span><span class="hd-kw">, KW ${isoWeek(n)}</span>`;
       Mantra.mount($('#mantra'));
       const af = $('#acct-filter'), afEdge = () => af.classList.toggle('more', af.scrollLeft + af.clientWidth < af.scrollWidth - 2);
       af.addEventListener('scroll', afEdge, {passive: true}); requestAnimationFrame(afEdge);
@@ -890,9 +890,9 @@ const Views = {
       const int = v => String(Math.round(v));
 
       // hero balance
-      $('#eq-label').textContent = 'Bilanz · ' + fMonth.format(m);
+      $('#eq-label').innerHTML = '<b>Bilanz</b> ' + esc(fMonth.format(m));
       $('#eq-n').textContent = ready ? s.n + (s.n === 1 ? ' Trade' : ' Trades') : '';
-      if (ready) setNum($('#eq-v'), s.wr, v => Math.round(v * 100) + ' %');
+      if (ready) { setNum($('#eq-v'), s.wr, v => String(Math.round(v * 100))); $('#eq-u').hidden = !(s.wr != null && isFinite(s.wr)); }
       const tot = s.tp + s.be + s.sl;
       const rs = $$('#ratio .r');
       rs[0].style.width = ratioW(s.tp, tot); rs[1].style.width = ratioW(s.be, tot); rs[2].style.width = ratioW(s.sl, tot);
@@ -913,7 +913,7 @@ const Views = {
         setNum($('#st-be'), s.be, int); $('#st-be-s').textContent = s.n ? pct(s.be, s.n) + ' der Trades' : 'noch keine Trades';
         for (const k of ['tp', 'sl', 'be']) $('#st-' + k + '-m').style.width = s.n ? (s[k] / s.n * 100).toFixed(2) + '%' : '0%';
         $('#st-streak').innerHTML = Array.from({length: Math.min(s.best, 12)}, () => '<i></i>').join('');
-        setNum($('#st-best'), s.best, v => Math.round(v) + '× TP'); $('#st-best-s').textContent = 'längste TP-Serie im Monat';
+        setNum($('#st-best'), s.best, v => Math.round(v) + '×'); $('#st-best-s').textContent = 'TP in Folge';
       }
 
       // grid
@@ -950,7 +950,7 @@ const Views = {
             const src = tradeThumb(shotT[0]);
             if (src !== false) shot = `<span class="d-shot${src ? '' : ' wait'}">${src ? `<img src="${esc(src)}" alt="" decoding="async">` : ''}${nShots > 1 ? `<b>${nShots}</b>` : ''}</span>`;
           }
-          const marks = (o ? '<span class="mk" title="Outlook">O</span>' : '') + (l ? '<span class="mk" title="Learning">L</span>' : '');
+          const marks = (o ? `<span class="mk" title="Outlook">${MI.outlooks}</span>` : '') + (l ? `<span class="mk" title="Learning">${MI.learnings}</span>` : '');
           const pills = list.slice(0, 4).map(t => {
             const rr = resOf(t) || 'na';
             return `<span class="pill ${rr}" title="${esc((t.symbol || 'Trade') + ' · ' + (RES_NAME[rr] || 'ohne Ergebnis') + ' · ' + an(t.account))}">${adot(acctOf(t))}<b>${RES_LABEL[rr] || '–'}</b>${t.symbol ? `<span class="sym">${esc(t.symbol)}</span>` : ''}</span>`;
@@ -982,7 +982,7 @@ const Views = {
       el.innerHTML = `
       <section aria-label="Learnings">
         <div class="page-head" data-rv="${M}:ph">
-          <div class="grow"><span class="eyebrow gold">Journal · Lernen</span><h1>Lear<span class="gold-t">nings</span></h1><p id="l-sub">Jeder Fehler, den du aufschreibst, kostet dich nur einmal Geld.</p></div>
+          <div class="grow"><h1>Learnings</h1><p id="l-sub">Jeder Fehler, den du aufschreibst, kostet dich nur einmal Geld.</p></div>
           <button type="button" class="btn primary" data-action="new-learning">${ICON.plus}Learning eintragen</button>
         </div>
         <div class="toolbar" data-rv="${M}:tb" style="--rd:120ms">
@@ -1024,7 +1024,7 @@ const Views = {
       el.innerHTML = `
       <section aria-label="Outlooks">
         <div class="page-head" data-rv="${M}:ph">
-          <div class="grow"><span class="eyebrow gold">Journal · Vorbereitung</span><h1>Out<span class="gold-t">looks</span></h1><p id="o-sub">Wer vorbereitet ist, reagiert nicht, er handelt nach Plan.</p></div>
+          <div class="grow"><h1>Outlooks</h1><p id="o-sub">Wer vorbereitet ist, reagiert nicht, er handelt nach Plan.</p></div>
           <button type="button" class="btn primary" data-action="new-outlook">${ICON.plus}Outlook eintragen</button>
         </div>
         <div class="toolbar" data-rv="${M}:tb" style="--rd:120ms">
@@ -1130,11 +1130,13 @@ function openDay(key){
     const card = t => {
       const r = resOf(t), ak = acctOf(t);
       return `<article class="tcard ${r || ''}">
-        <div class="tc-row">
-          <span class="acc" style="--ac:${acVar(ak)}">${esc(an(ak))}</span>
-          <span class="tc-sym">${esc(t.symbol || '—')}</span>
-          ${t.side ? `<span class="side ${t.side === 'short' ? 'short' : 'long'}">${t.side === 'short' ? '▼ Short' : '▲ Long'}</span>` : ''}
-          ${t.time ? `<span class="tc-time">${esc(t.time)} Uhr</span>` : ''}
+        <div class="tc-head">
+          <div class="tc-meta">
+            <span class="tc-sym">${esc(t.symbol || '—')}</span>
+            ${t.side ? `<span class="side ${t.side === 'short' ? 'short' : 'long'}">${t.side === 'short' ? '▼ Short' : '▲ Long'}</span>` : ''}
+            <span class="acc" style="--ac:${acVar(ak)}">${esc(an(ak))}</span>
+            ${t.time ? `<span class="tc-time">${esc(t.time)} Uhr</span>` : ''}
+          </div>
           <span class="oc-big ${r || 'na'}">${r ? RES_LABEL[r] + `<small>${RES_NAME[r]}</small>` : 'Kein Ergebnis'}</span>
         </div>
         ${t.setup ? `<div class="tc-row tc-sub"><span class="tag">${esc(t.setup)}</span></div>` : ''}
@@ -1282,7 +1284,7 @@ function openForm(kind, entry, opts){
   const back = opts.fromDay ? () => openDay(opts.fromDay) : null;
 
   const builder = () => `
-    <div class="p-head"><div class="ph-t"><span class="eyebrow">${kind === 'trades' ? 'Trade' : kind === 'learnings' ? 'Learning' : 'Outlook'}</span><h2 id="modal-title">${isNew ? def.newTitle : def.editTitle}</h2></div>
+    <div class="p-head"><div class="ph-t"><h2 id="modal-title">${isNew ? def.newTitle : def.editTitle}</h2></div>
       <button type="button" class="btn icon ghost" data-action="close-modal" aria-label="Schließen">${ICON.x}</button></div>
     <form class="p-body" id="entry-form" novalidate>
       <div class="form">${def.fields.map(f => fieldHtml(f, v)).join('')}</div>
@@ -1702,7 +1704,7 @@ function openSettings(){
   const draft = JSON.parse(JSON.stringify(S.settings));
   let saved = false;
   const builder = () => `
-    <div class="p-head"><div class="ph-t"><span class="eyebrow">Personalisierung</span><h2 id="modal-title">Einstellungen</h2></div>
+    <div class="p-head"><div class="ph-t"><h2 id="modal-title">Einstellungen</h2></div>
       <button type="button" class="btn icon ghost" data-action="close-modal" aria-label="Schließen">${ICON.x}</button></div>
     <div class="p-body">
       <section class="set-sec"><h3>Dein Name</h3><input class="inp" id="set-name" maxlength="30" autocomplete="given-name" placeholder="Dein Vorname" value="${esc(draft.name)}"></section>

@@ -693,6 +693,135 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;line
   *,*::before,*::after{animation:none!important;transition:none!important}
   .rv-wait{opacity:1;transform:none}
 }
+
+/* ===== Design pass: calmer and cleaner. Gold marks actions, today and the key figures; labels are quiet. ===== */
+.eyebrow,.eyebrow.gold,.p-head .eyebrow{font-family:var(--f-body);font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)}
+.eyebrow b{color:var(--ink);font-weight:600}
+.brand .sub{color:var(--muted);opacity:1}
+.brand svg{filter:drop-shadow(0 0 6px rgba(var(--acc-rgb),.3))}
+.status.ok i{box-shadow:none}
+.tab-ind{box-shadow:0 2px 12px rgba(var(--acc-rgb),.22),inset 0 1px 0 rgba(255,255,255,.4)}
+.btn.primary{box-shadow:0 4px 16px rgba(var(--acc-rgb),.2)}
+.btn.primary:hover{box-shadow:0 8px 24px rgba(var(--acc-rgb),.3)}
+
+/* hero: tighter, so the month shows sooner */
+.hero{padding-block:18px 26px;gap:24px 40px}
+.hero-txt{gap:12px}
+.hero-date{margin:0;font-size:14px;color:var(--muted)}
+.hero-date b{color:var(--ink-2);font-weight:600}
+.mantra{font-size:clamp(30px,4.6vw,58px)}
+.hero-sub{font-size:14.5px;max-width:48ch}
+
+/* balance card */
+.equity{padding:18px 20px 16px;border-color:rgba(var(--acc-rgb),.3)}
+.eq-n{font-family:var(--f-body);font-size:13px}
+.eq-row{align-items:flex-end;gap:6px 16px;margin-top:10px}
+.eq-big{display:inline-flex;align-items:flex-start}
+.eq-v{font-family:var(--f-display);font-stretch:110%;font-weight:800;font-size:clamp(46px,4.8vw,62px);letter-spacing:-.015em;line-height:.92;font-variant-numeric:tabular-nums lining-nums}
+.eq-u{font-family:var(--f-display);font-stretch:110%;font-weight:800;font-size:clamp(20px,2vw,26px);line-height:1;margin:.12em 0 0 .08em}
+.eq-vl{padding-bottom:2px}
+.ratio{height:8px;margin-top:16px}
+.ratio-l{font-size:12.5px;font-family:var(--f-body)}
+.ratio-l .cnts{font-family:var(--f-mono)}
+.tape-empty{font-family:var(--f-body);font-size:13px}
+.tape-h{margin-top:18px}
+.tape-hint{font-family:var(--f-body);font-size:12px}
+.tape{gap:3px}
+.tk{width:12px;height:12px;border-radius:3px}
+.tk.tp,.tk.sl{box-shadow:none}
+.eq-foot{font-family:var(--f-body);font-size:13px;gap:6px 16px}
+.eq-foot b{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* month bar and stats */
+.cal-head{margin-bottom:14px}
+.cal-head .seg{background:rgba(var(--panel-rgb),.9)}
+.stats{margin-bottom:14px;border-radius:16px}
+.stat{padding:14px 16px 13px;gap:3px}
+.stat .k{font-family:var(--f-body);font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)}
+.stat .ks{display:none}
+.stat .v{font-size:clamp(22px,2.1vw,28px)}
+.stat .s{font-family:var(--f-body);font-size:12px}
+.streak i{box-shadow:none}
+
+/* calendar: one clear signal per day */
+.cal-wrap{border-radius:18px}
+.wd{font-family:var(--f-body);font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)}
+.wd.we{color:var(--faint)}
+.wd.now{color:var(--ink)}
+.wd.now::after{box-shadow:none}
+.day{border-radius:11px}
+.day:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,calc(.3 * var(--sh)))}
+.day.pos,.day.neg,.day.flat{border-color:var(--line)}
+.day.pos::before,.day.neg::before,.day.flat::before{left:14px;right:14px}
+.day.pos::before,.day.neg::before{box-shadow:none}
+.day.out{border-style:solid;border-color:transparent;background:transparent}
+.day.out > *,.day.out::before{opacity:.35}
+.day.today{box-shadow:inset 0 0 0 1px var(--gold)}
+.pill{font-size:11px;line-height:20px;padding:0 7px;border-radius:5px;gap:5px}
+.pill.tp,.pill.sl,.pill.be{box-shadow:none}
+.pill .ad{width:6px;height:6px}
+.mk{display:inline-grid;place-items:center;width:20px;height:20px;min-width:0;padding:0;border:0;border-radius:6px;background:var(--gold-soft);color:var(--gold)}
+.mk svg{width:13px;height:13px}
+.d-shot{box-shadow:0 0 0 1px rgba(var(--fg-rgb),.14)}
+.wk{background:rgba(var(--fg-rgb),.03);border-color:var(--line);border-radius:11px}
+.wk .kw{font-family:var(--f-body);font-size:12.5px;font-weight:500;letter-spacing:0;color:var(--muted)}
+.wk-n{font-family:var(--f-body);font-size:13px}
+.legend{font-size:13px}
+.legend .pill{line-height:19px}
+
+/* day sheet, entries and dialogs */
+.day-sum > div{padding:10px 12px}
+.day-sum .k{font-family:var(--f-body);font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)}
+.day-sum .v{font-size:17px}
+.tcard.tp,.tcard.sl,.tcard.be{border-color:var(--line)}
+.tc-head{display:flex;align-items:flex-start;gap:10px}
+.tc-meta{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding-top:3px}
+.tc-sym{font-size:16px}
+.oc-big{margin-left:0;flex:none}
+.side{font-family:var(--f-body);font-size:12.5px;letter-spacing:0;text-transform:none}
+.acc{font-family:var(--f-body);font-size:12px;font-weight:600;line-height:20px;padding:0 8px;border-radius:6px;letter-spacing:0;text-transform:none}
+.tag{font-family:var(--f-body);font-size:12px;line-height:20px;padding:0 9px}
+.sec,.set-sec h3{font-family:var(--f-body);font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+.mod-card .tg{font-family:var(--f-body);font-size:12.5px;letter-spacing:0;text-transform:none}
+.page-head{padding-block:26px 20px}
+.e-meta{font-family:var(--f-body);font-size:13px}
+.res,.bias{font-family:var(--f-body);font-size:12px}
+.ol-tf{font-family:var(--f-body);font-size:12.5px;letter-spacing:0;text-transform:none}
+.tl-date{font-family:var(--f-body)}
+.tl-date b{font-family:var(--f-display);font-stretch:110%;font-weight:800;font-size:28px}
+.tl-date span{font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)}
+.tl-date small{font-size:12px;color:var(--faint)}
+.tl-fill{box-shadow:none}
+.tl-item.lit .tl-node{box-shadow:0 0 0 4px rgba(var(--acc-rgb),.16)}
+
+@media (max-width:760px){
+  .hero{padding-block:14px 22px;gap:18px}
+  .hd-kw{display:none}
+  .cal-head{gap:10px}
+  .cal-head .month{flex:1 1 auto;font-size:23px}
+  .cal-head .spacer{display:none}
+  #acct-filter{flex:1 1 100%;order:5}
+  #acct-filter button{flex:1 0 auto}
+  .cal-head .btn.primary{order:6}
+  .stats{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .stat,.stat:nth-child(n+4),.stat:last-child{grid-column:auto}
+  .stat{padding:10px 8px 9px;gap:2px}
+  .stat .kl,.stat .s{display:none}
+  .stat .ks{display:inline}
+  .stat .k{font-size:12px}
+  .stat .v{font-size:19px}
+  .streak i{width:6px}
+  .weeks .wrow{font-family:var(--f-body);padding:10px 12px}
+  .weeks .wrow .kw{color:var(--ink-2);font-weight:600}
+  .weeks .wrow .p{font-family:var(--f-mono);font-size:12px}
+  .tl-date b{font-size:20px}
+}
+@media (max-width:600px){
+  .p-foot .spacer{display:none}
+  .p-foot > .btn,.p-foot > .confirm{flex:1 1 auto}
+  .p-foot > .btn{height:44px;justify-content:center}
+  .oc-big small{display:none}
+}
 </style>
 <script>try{var k=localStorage.getItem("blotter.skin"),o={ocean:"slate",royal:"navy",copper:"mocha",arctic:"paper"};if(k&&/^[a-z]+$/.test(k))document.documentElement.setAttribute("data-skin",o[k]||k)}catch(e){}</script>
 
@@ -1367,7 +1496,7 @@ function ldPrice(u){
   const noise = (Math.sin(u * 61) * 4 + Math.sin(u * 23 + 1.3) * 3) * Math.pow(1 - u, 1.2) * Math.min(1, u * 8);
   return a[1] + (b[1] - a[1]) * s + noise;
 }
-const LD_NAMES = {kalender: ['Kal', 'ender'], learnings: ['Lear', 'nings'], outlooks: ['Out', 'looks']};
+const LD_NAMES = {kalender: ['', 'Kalender'], learnings: ['', 'Learnings'], outlooks: ['', 'Outlooks']};
 const easeOut = k => 1 - Math.pow(1 - k, 3);
 const easeInOut = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
 const Loader = {
@@ -1610,16 +1739,16 @@ const Views = {
       el.innerHTML = `
       <section class="hero" aria-label="Übersicht">
         <div class="hero-txt" id="hero-txt" data-rv="${M}:hero-t">
-          <span class="eyebrow gold" id="hero-date"></span>
+          <p class="hero-date" id="hero-date"></p>
           <h1 class="mantra" id="mantra"></h1>
           <p class="hero-sub">Jeder eingetragene Trade macht dich besser. Wähle einen Tag im Kalender und halte fest, was passiert ist.</p>
         </div>
         <div class="equity spot" id="equity" data-rv="${M}:hero-e" style="--rd:180ms">
           <div class="eq-head"><span class="eyebrow gold" id="eq-label">Bilanz</span><span class="eq-n" id="eq-n"></span></div>
-          <div class="eq-row"><span class="eq-v gold-t" id="eq-v">–</span><span class="eq-vl">Win-Rate<small>TP ÷ (TP + SL)</small></span></div>
+          <div class="eq-row"><span class="eq-big"><span class="eq-v gold-t" id="eq-v">–</span><span class="eq-u gold-t" id="eq-u" hidden>%</span></span><span class="eq-vl">Win-Rate<small>TP ÷ (TP + SL)</small></span></div>
           <div class="ratio" id="ratio" aria-hidden="true"><span class="r tp"></span><span class="r be"></span><span class="r sl"></span></div>
           <div class="ratio-l" id="ratio-l"></div>
-          <div class="tape-h"><span class="eyebrow">Trade-Tape</span><span class="tape-hint">ältester → neuester</span></div>
+          <div class="tape-h"><span class="eyebrow">Trade-Tape</span><span class="tape-hint">älteste zuerst</span></div>
           <div class="tape" id="tape"></div>
           <div class="eq-foot" id="eq-foot"></div>
         </div>
@@ -1639,8 +1768,8 @@ const Views = {
         <button type="button" class="btn primary" data-action="new-trade">${ICON.plus}Trade eintragen</button>
       </div>
       <div class="stats" data-rv="${M}:stats" style="--rd:320ms">
-        ${[['n','Trades',''],['tp','Take Profit','tp'],['sl','Stop Loss','sl'],['be','Break Even','be'],['best','Beste Serie','']].map(([k, l, c]) =>
-          `<div class="stat"><span class="k">${c ? `<i class="sw ${c}"></i>` : ''}${l}</span><span class="v" id="st-${k}">–</span><span class="s" id="st-${k}-s">&nbsp;</span>${c ? `<span class="meter"><i class="${c}" id="st-${k}-m"></i></span>` : (k === 'best' ? '<span class="streak" id="st-streak"></span>' : '<span class="meter" style="visibility:hidden"></span>')}</div>`).join('')}
+        ${[['n','Trades','Trades',''],['tp','Take Profit','TP','tp'],['sl','Stop Loss','SL','sl'],['be','Break Even','BE','be'],['best','Beste TP-Serie','Serie','']].map(([k, l, sh, c]) =>
+          `<div class="stat"><span class="k">${c ? `<i class="sw ${c}"></i>` : ''}<span class="kl">${l}</span><span class="ks">${sh}</span></span><span class="v" id="st-${k}">–</span><span class="s" id="st-${k}-s">&nbsp;</span>${c ? `<span class="meter"><i class="${c}" id="st-${k}-m"></i></span>` : (k === 'best' ? '<span class="streak" id="st-streak"></span>' : '<span class="meter" style="visibility:hidden"></span>')}</div>`).join('')}
       </div>
       <div class="cal-wrap spot" data-rv="${M}:calwrap" style="--rd:420ms"><div class="cal" id="cal"></div></div>
       <div class="weeks" id="weeks"></div>
@@ -1649,13 +1778,13 @@ const Views = {
         <span><span class="pill be"><b>BE</b></span>Break Even</span>
         <span><span class="pill sl"><b>SL</b></span>Stop Loss</span>
         ${accts().map(a => `<span>${adot(a.id)}${esc(a.name)}</span>`).join('')}
-        ${modOn('outlooks') ? '<span><span class="mk">O</span>Outlook</span>' : ''}
-        ${modOn('learnings') ? '<span><span class="mk">L</span>Learning</span>' : ''}
+        ${modOn('outlooks') ? `<span><span class="mk">${MI.outlooks}</span>Outlook</span>` : ''}
+        ${modOn('learnings') ? `<span><span class="mk">${MI.learnings}</span>Learning</span>` : ''}
       </div>
       <p class="hint" id="cal-hint" hidden><b>Noch keine Trades.</b> Klick auf einen Tag im Kalender oder auf „Trade eintragen“, um deinen ersten Trade mit Konto, Ergebnis (TP, BE oder SL) und Screenshot festzuhalten.</p>`;
       const n = new Date();
       const hr = n.getHours(), greet = hr < 5 ? 'Gute Nacht' : hr < 11 ? 'Guten Morgen' : hr < 18 ? 'Guten Tag' : 'Guten Abend';
-      $('#hero-date').textContent = (S.settings.name ? greet + ', ' + S.settings.name + ' · ' : '') + fLong.format(n) + ' · KW ' + isoWeek(n);
+      $('#hero-date').innerHTML = (S.settings.name ? `<b>${esc(greet + ', ' + S.settings.name)}.</b> ` : '') + `<span>${esc(fLong.format(n))}</span><span class="hd-kw">, KW ${isoWeek(n)}</span>`;
       Mantra.mount($('#mantra'));
       const af = $('#acct-filter'), afEdge = () => af.classList.toggle('more', af.scrollLeft + af.clientWidth < af.scrollWidth - 2);
       af.addEventListener('scroll', afEdge, {passive: true}); requestAnimationFrame(afEdge);
@@ -1677,9 +1806,9 @@ const Views = {
       const int = v => String(Math.round(v));
 
       // hero balance
-      $('#eq-label').textContent = 'Bilanz · ' + fMonth.format(m);
+      $('#eq-label').innerHTML = '<b>Bilanz</b> ' + esc(fMonth.format(m));
       $('#eq-n').textContent = ready ? s.n + (s.n === 1 ? ' Trade' : ' Trades') : '';
-      if (ready) setNum($('#eq-v'), s.wr, v => Math.round(v * 100) + ' %');
+      if (ready) { setNum($('#eq-v'), s.wr, v => String(Math.round(v * 100))); $('#eq-u').hidden = !(s.wr != null && isFinite(s.wr)); }
       const tot = s.tp + s.be + s.sl;
       const rs = $$('#ratio .r');
       rs[0].style.width = ratioW(s.tp, tot); rs[1].style.width = ratioW(s.be, tot); rs[2].style.width = ratioW(s.sl, tot);
@@ -1700,7 +1829,7 @@ const Views = {
         setNum($('#st-be'), s.be, int); $('#st-be-s').textContent = s.n ? pct(s.be, s.n) + ' der Trades' : 'noch keine Trades';
         for (const k of ['tp', 'sl', 'be']) $('#st-' + k + '-m').style.width = s.n ? (s[k] / s.n * 100).toFixed(2) + '%' : '0%';
         $('#st-streak').innerHTML = Array.from({length: Math.min(s.best, 12)}, () => '<i></i>').join('');
-        setNum($('#st-best'), s.best, v => Math.round(v) + '× TP'); $('#st-best-s').textContent = 'längste TP-Serie im Monat';
+        setNum($('#st-best'), s.best, v => Math.round(v) + '×'); $('#st-best-s').textContent = 'TP in Folge';
       }
 
       // grid
@@ -1737,7 +1866,7 @@ const Views = {
             const src = tradeThumb(shotT[0]);
             if (src !== false) shot = `<span class="d-shot${src ? '' : ' wait'}">${src ? `<img src="${esc(src)}" alt="" decoding="async">` : ''}${nShots > 1 ? `<b>${nShots}</b>` : ''}</span>`;
           }
-          const marks = (o ? '<span class="mk" title="Outlook">O</span>' : '') + (l ? '<span class="mk" title="Learning">L</span>' : '');
+          const marks = (o ? `<span class="mk" title="Outlook">${MI.outlooks}</span>` : '') + (l ? `<span class="mk" title="Learning">${MI.learnings}</span>` : '');
           const pills = list.slice(0, 4).map(t => {
             const rr = resOf(t) || 'na';
             return `<span class="pill ${rr}" title="${esc((t.symbol || 'Trade') + ' · ' + (RES_NAME[rr] || 'ohne Ergebnis') + ' · ' + an(t.account))}">${adot(acctOf(t))}<b>${RES_LABEL[rr] || '–'}</b>${t.symbol ? `<span class="sym">${esc(t.symbol)}</span>` : ''}</span>`;
@@ -1769,7 +1898,7 @@ const Views = {
       el.innerHTML = `
       <section aria-label="Learnings">
         <div class="page-head" data-rv="${M}:ph">
-          <div class="grow"><span class="eyebrow gold">Journal · Lernen</span><h1>Lear<span class="gold-t">nings</span></h1><p id="l-sub">Jeder Fehler, den du aufschreibst, kostet dich nur einmal Geld.</p></div>
+          <div class="grow"><h1>Learnings</h1><p id="l-sub">Jeder Fehler, den du aufschreibst, kostet dich nur einmal Geld.</p></div>
           <button type="button" class="btn primary" data-action="new-learning">${ICON.plus}Learning eintragen</button>
         </div>
         <div class="toolbar" data-rv="${M}:tb" style="--rd:120ms">
@@ -1811,7 +1940,7 @@ const Views = {
       el.innerHTML = `
       <section aria-label="Outlooks">
         <div class="page-head" data-rv="${M}:ph">
-          <div class="grow"><span class="eyebrow gold">Journal · Vorbereitung</span><h1>Out<span class="gold-t">looks</span></h1><p id="o-sub">Wer vorbereitet ist, reagiert nicht, er handelt nach Plan.</p></div>
+          <div class="grow"><h1>Outlooks</h1><p id="o-sub">Wer vorbereitet ist, reagiert nicht, er handelt nach Plan.</p></div>
           <button type="button" class="btn primary" data-action="new-outlook">${ICON.plus}Outlook eintragen</button>
         </div>
         <div class="toolbar" data-rv="${M}:tb" style="--rd:120ms">
@@ -1917,11 +2046,13 @@ function openDay(key){
     const card = t => {
       const r = resOf(t), ak = acctOf(t);
       return `<article class="tcard ${r || ''}">
-        <div class="tc-row">
-          <span class="acc" style="--ac:${acVar(ak)}">${esc(an(ak))}</span>
-          <span class="tc-sym">${esc(t.symbol || '—')}</span>
-          ${t.side ? `<span class="side ${t.side === 'short' ? 'short' : 'long'}">${t.side === 'short' ? '▼ Short' : '▲ Long'}</span>` : ''}
-          ${t.time ? `<span class="tc-time">${esc(t.time)} Uhr</span>` : ''}
+        <div class="tc-head">
+          <div class="tc-meta">
+            <span class="tc-sym">${esc(t.symbol || '—')}</span>
+            ${t.side ? `<span class="side ${t.side === 'short' ? 'short' : 'long'}">${t.side === 'short' ? '▼ Short' : '▲ Long'}</span>` : ''}
+            <span class="acc" style="--ac:${acVar(ak)}">${esc(an(ak))}</span>
+            ${t.time ? `<span class="tc-time">${esc(t.time)} Uhr</span>` : ''}
+          </div>
           <span class="oc-big ${r || 'na'}">${r ? RES_LABEL[r] + `<small>${RES_NAME[r]}</small>` : 'Kein Ergebnis'}</span>
         </div>
         ${t.setup ? `<div class="tc-row tc-sub"><span class="tag">${esc(t.setup)}</span></div>` : ''}
@@ -2069,7 +2200,7 @@ function openForm(kind, entry, opts){
   const back = opts.fromDay ? () => openDay(opts.fromDay) : null;
 
   const builder = () => `
-    <div class="p-head"><div class="ph-t"><span class="eyebrow">${kind === 'trades' ? 'Trade' : kind === 'learnings' ? 'Learning' : 'Outlook'}</span><h2 id="modal-title">${isNew ? def.newTitle : def.editTitle}</h2></div>
+    <div class="p-head"><div class="ph-t"><h2 id="modal-title">${isNew ? def.newTitle : def.editTitle}</h2></div>
       <button type="button" class="btn icon ghost" data-action="close-modal" aria-label="Schließen">${ICON.x}</button></div>
     <form class="p-body" id="entry-form" novalidate>
       <div class="form">${def.fields.map(f => fieldHtml(f, v)).join('')}</div>
@@ -2489,7 +2620,7 @@ function openSettings(){
   const draft = JSON.parse(JSON.stringify(S.settings));
   let saved = false;
   const builder = () => `
-    <div class="p-head"><div class="ph-t"><span class="eyebrow">Personalisierung</span><h2 id="modal-title">Einstellungen</h2></div>
+    <div class="p-head"><div class="ph-t"><h2 id="modal-title">Einstellungen</h2></div>
       <button type="button" class="btn icon ghost" data-action="close-modal" aria-label="Schließen">${ICON.x}</button></div>
     <div class="p-body">
       <section class="set-sec"><h3>Dein Name</h3><input class="inp" id="set-name" maxlength="30" autocomplete="given-name" placeholder="Dein Vorname" value="${esc(draft.name)}"></section>
