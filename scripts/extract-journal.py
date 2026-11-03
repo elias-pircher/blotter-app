@@ -9,7 +9,7 @@ s = open(SRC, encoding='utf-8').read()
 
 css = s[s.index('<style>') + len('<style>'):s.index('</style>')]
 main_start = s.index('<script>\n(function(){')
-markup_start = s.index('<canvas id="bg"')
+markup_start = s.index('<div id="bg-wrap"')
 markup = s[markup_start:main_start].strip()
 js = s[main_start + len('<script>'):s.rindex('</script>')]
 

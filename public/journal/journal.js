@@ -256,144 +256,235 @@ function tradeThumb(t){
 }
 
 /* ---------- motion: background chart ---------- */
+// The chart is drawn off the main thread (OffscreenCanvas in a worker) where the browser supports it,
+// so scrolling, typing and page animations never wait for it. Other browsers draw it here.
+// It pauses while the tab is hidden or an overlay (dialog, image view, setup, page change) covers it.
+// bgEngine must stay self-contained: its source text also runs inside the worker.
+function bgEngine(G){
+  const clock = () => G.performance.now();
+  const frame = G.requestAnimationFrame ? cb => G.requestAnimationFrame(cb) : cb => G.setTimeout(() => cb(clock()), 33);
+  const E = {
+    c: null, x: null, w: 0, h: 0, dpr: 1, gap: 17, headX: 0, cs: [], live: null, period: 1600, born: 0,
+    min: null, max: null, scrollY: 0, t0: 0, last: 0, glow: 0, P: null, still: false, paused: false, running: false, pausedAt: 0, lf: 0,
+    init(o){
+      this.c = o.canvas; this.x = this.c.getContext('2d');
+      if (!this.x) return;
+      this.P = o.pal; this.still = !!o.still; this.scrollY = o.scrollY || 0; this.paused = !!o.paused;
+      this.t0 = clock(); this.born = this.t0; this.pausedAt = this.t0;
+      this.resize(o);
+      if (!this.still && !this.paused) this.start();
+    },
+    gen(o){
+      const vol = 1.7, drift = 0.42;
+      const c = o + drift + (Math.random() - 0.44) * vol * 2.3;
+      return {o, c, h: Math.max(o, c) + Math.random() * vol * 0.9, l: Math.min(o, c) - Math.random() * vol * 0.9};
+    },
+    resize(o){
+      if (!this.x) return;
+      this.dpr = o.dpr; this.w = o.w; this.h = o.h;
+      this.c.width = Math.round(this.w * this.dpr); this.c.height = Math.round(this.h * this.dpr);
+      const narrow = this.w < 640;
+      this.gap = narrow ? 13 : 17;
+      this.headX = this.w * (narrow ? 0.93 : 0.86);
+      const need = Math.ceil(this.headX / this.gap) + 12;
+      if (this.cs.length < need) {
+        this.cs = []; let p = 100;
+        for (let i = 0; i < need; i++) { const k = this.gen(p); this.cs.push(k); p = k.c; }
+        this.newLive(clock());
+      } else if (this.cs.length > need + 20) this.cs = this.cs.slice(-need);
+      this.min = this.max = null;
+      this.redraw();
+    },
+    newLive(now){
+      const o = this.cs.length ? this.cs[this.cs.length - 1].c : 100;
+      const t = this.gen(o);
+      this.live = {o, c: o, h: o, l: o, tc: t.c, th: t.h, tl: t.l};
+      this.born = now;
+    },
+    // a single frame when nothing animates (reduced motion, paused, after a resize or colour change)
+    redraw(){ if (this.x && (this.still || this.paused)) this.draw(this.still ? this.t0 + 9999 : this.pausedAt, this.lf); },
+    setPal(P){ this.P = P; this.redraw(); },
+    setScroll(y){ if (Math.abs(y - this.scrollY) > 2) this.glow = 1; this.scrollY = y; },
+    setPaused(p){
+      p = !!p;
+      if (p === this.paused || this.still) { this.paused = p; return; }
+      this.paused = p;
+      if (p) { this.pausedAt = clock(); return; }
+      const gap = clock() - this.pausedAt; this.born += gap; this.t0 += gap;   // continue where it stopped
+      this.start();
+    },
+    start(){ if (this.running || this.still || this.paused || !this.x) return; this.running = true; this.last = 0; frame(this.tick); },
+    tick(now){
+      if (this.paused) { this.running = false; return; }
+      frame(this.tick);
+      if (now - this.last < 32) return;
+      this.last = now;
+      let f = (now - this.born) / this.period;
+      if (f >= 1) {
+        const L = this.live; L.c = L.tc; L.h = Math.max(L.h, L.th, L.o, L.c); L.l = Math.min(L.l, L.tl, L.o, L.c);
+        this.cs.push({o: L.o, c: L.c, h: L.h, l: L.l}); this.cs.shift();
+        this.newLive(now); f = 0;
+      } else {
+        const L = this.live, e = 1 - Math.pow(1 - f, 2);
+        L.c = L.o + (L.tc - L.o) * e + Math.sin(now / 140) * 0.35 * (1 - f);
+        L.h = Math.max(L.h, L.c, L.o + (L.th - L.o) * e); L.l = Math.min(L.l, L.c, L.o + (L.tl - L.o) * e);
+      }
+      this.glow *= 0.9;
+      this.lf = f;
+      this.draw(now, f);
+    },
+    draw(now, f){
+      const x = this.x, w = this.w, h = this.h, gap = this.gap, p = this.P;
+      if (!x || !p) return;
+      f = f || 0;
+      x.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      x.clearRect(0, 0, w, h);
+      const par = -Math.min(this.scrollY * 0.16, h * 0.24);
+      const off = f * gap;
+      const rg = (c, al) => 'rgba(' + c + ',' + al + ')';
+      // grid
+      x.lineWidth = 1; x.strokeStyle = rg(p.fg, p.light ? 0.06 : 0.035); x.beginPath();
+      for (let gy = ((par % 72) + 72) % 72; gy < h; gy += 72) { x.moveTo(0, Math.round(gy) + .5); x.lineTo(w, Math.round(gy) + .5); }
+      for (let gx = this.headX - off; gx > -10; gx -= gap * 6) { x.moveTo(Math.round(gx) + .5, 0); x.lineTo(Math.round(gx) + .5, h); }
+      x.stroke();
+      // series
+      const all = this.cs.concat([this.live]);
+      const n = all.length;
+      const xs = i => this.headX - (n - 1 - i) * gap - off;
+      let tmin = Infinity, tmax = -Infinity;
+      for (let i = 0; i < n; i++) { if (xs(i) < -gap) continue; tmin = Math.min(tmin, all[i].l); tmax = Math.max(tmax, all[i].h); }
+      if (this.min == null) { this.min = tmin; this.max = tmax; } else { this.min += (tmin - this.min) * 0.06; this.max += (tmax - this.max) * 0.06; }
+      const top = h * 0.2 + par, bot = h * 0.94 + par, span = Math.max(1e-6, this.max - this.min);
+      const Y = v => top + (1 - (v - this.min) / span) * (bot - top);
+      const intro = this.still ? 1 : Math.min(1, (now - this.t0) / 2000);
+      const ie = 1 - Math.pow(1 - intro, 3);
+      const sweep = -gap + ie * (this.headX + gap * 3);
+      const bw = Math.max(3, gap * 0.56);
+      for (let i = 0; i < n; i++) {
+        const cx = xs(i); if (cx < -gap || cx > w + gap) continue;
+        const a = Math.max(0, Math.min(1, (sweep - cx) / 140)); if (!a) continue;
+        const k = all[i], up = k.c >= k.o, isLive = i === n - 1;
+        x.globalAlpha = a;
+        x.strokeStyle = up ? (isLive ? rg(p.light ? p.acc : p.hi, 0.9) : rg(p.acc, 0.42)) : (isLive ? rg(p.fg, 0.6) : rg(p.fg, 0.16));
+        x.fillStyle = up ? (isLive ? rg(p.acc, 0.55) : rg(p.acc, 0.16)) : (isLive ? rg(p.fg, 0.25) : rg(p.fg, 0.045));
+        x.beginPath(); x.moveTo(Math.round(cx) + .5, Y(k.h)); x.lineTo(Math.round(cx) + .5, Y(k.l)); x.stroke();
+        const y1 = Y(Math.max(k.o, k.c)), y2 = Y(Math.min(k.o, k.c));
+        x.fillRect(cx - bw / 2, y1, bw, Math.max(1.2, y2 - y1));
+        x.strokeRect(cx - bw / 2 + .5, y1 + .5, bw - 1, Math.max(1, y2 - y1 - 1));
+      }
+      x.globalAlpha = 1;
+      // moving average
+      const P = 9, pts = [];
+      for (let i = 0; i < n; i++) {
+        const cx = xs(i); if (cx < -gap * 2) continue;
+        let s = 0, m = 0; for (let j = Math.max(0, i - P + 1); j <= i; j++) { s += all[j].c; m++; }
+        if (cx <= sweep) pts.push([cx, Y(s / m)]);
+      }
+      if (pts.length > 1) {
+        const grad = x.createLinearGradient(0, top, 0, bot);
+        grad.addColorStop(0, rg(p.acc, 0.16)); grad.addColorStop(1, rg(p.acc, 0));
+        x.beginPath(); x.moveTo(pts[0][0], bot);
+        for (const q of pts) x.lineTo(q[0], q[1]);
+        x.lineTo(pts[pts.length - 1][0], bot); x.closePath(); x.fillStyle = grad; x.fill();
+        x.beginPath(); pts.forEach((q, i) => i ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1]));
+        // glow from two soft strokes instead of a shadow blur (same look, a fraction of the work)
+        const gl = 1 + this.glow * 1.6;
+        x.lineJoin = 'round'; x.lineCap = 'round';
+        x.lineWidth = 12; x.strokeStyle = rg(p.acc, (0.07 * gl).toFixed(3)); x.stroke();
+        x.lineWidth = 6; x.strokeStyle = rg(p.acc, (0.14 * gl).toFixed(3)); x.stroke();
+        x.lineWidth = 2.2; x.strokeStyle = rg(p.light ? p.acc : p.hi, 0.85); x.stroke();
+        x.lineJoin = 'miter'; x.lineCap = 'butt';
+      }
+      // live price marker
+      if (intro >= 1) {
+        const lx = xs(n - 1), ly = Y(this.live.c);
+        x.setLineDash([4, 6]); x.lineWidth = 1; x.strokeStyle = rg(p.acc, 0.5);
+        x.beginPath(); x.moveTo(lx + 6, Math.round(ly) + .5); x.lineTo(w, Math.round(ly) + .5); x.stroke(); x.setLineDash([]);
+        const ph = this.still ? 0.3 : (now % 1800) / 1800;
+        x.beginPath(); x.arc(lx, ly, 4 + ph * 16, 0, Math.PI * 2); x.strokeStyle = rg(p.acc, (0.7 * (1 - ph)).toFixed(3)); x.lineWidth = 1.5; x.stroke();
+        x.fillStyle = rg(p.acc, 0.16); x.beginPath(); x.arc(lx, ly, 10, 0, Math.PI * 2); x.fill();
+        x.fillStyle = rg(p.acc, 0.3); x.beginPath(); x.arc(lx, ly, 6.5, 0, Math.PI * 2); x.fill();
+        x.beginPath(); x.arc(lx, ly, 3.6, 0, Math.PI * 2); x.fillStyle = rg(p.light ? p.acc : p.hi, 1); x.fill();
+      }
+      // the readability veil sits on top as a still CSS layer (#bg-veil), so it is not repainted every frame
+    }
+  };
+  E.tick = E.tick.bind(E);
+  return E;
+}
+
 const BG = {
-  c: null, x: null, w: 0, h: 0, dpr: 1, gap: 17, headX: 0, cs: [], live: null, period: 1600, born: 0,
-  min: null, max: null, scrollY: 0, t0: 0, last: 0, raf: 0, glow: 0, P: null,
+  eng: null, worker: null, P: null, scrollY: 0, paused: false, rz: 0,
   pal(){
     const cs = getComputedStyle(document.documentElement), g = (n, d) => (cs.getPropertyValue(n) || '').trim() || d;
     this.P = {acc: g('--acc-rgb', '217,180,80'), hi: g('--acc-hi-rgb', '246,226,160'), fg: g('--fg-rgb', '255,255,255'), bg: g('--bg-rgb', '6,15,39'), light: g('--is-light', '0') === '1'};
     return this.P;
   },
+  size(){
+    const w = innerWidth, h = innerHeight;
+    // sharp on phones and laptops, but never more than ~2.6 million pixels per frame on big monitors
+    const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(2.6e6 / Math.max(1, w * h))));
+    return {w, h, dpr};
+  },
+  covered(){
+    if (document.hidden) return true;
+    for (const id of ['modal', 'lightbox', 'setup', 'loader']) { const el = document.getElementById(id); if (el && !el.hidden) return true; }
+    return false;
+  },
   init(){
-    this.c = $('#bg'); this.x = this.c && this.c.getContext && this.c.getContext('2d');
-    if (!this.x) return;
-    this.t0 = performance.now(); this.born = this.t0;
-    this.resize();
-    addEventListener('resize', () => { this.resize(); if (reduce) this.draw(performance.now() + 9999); });
-    if (reduce) { this.draw(this.t0 + 9999); return; }
-    this.tick = this.tick.bind(this);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.start(); });
-    this.start();
-  },
-  gen(o){
-    const vol = 1.7, drift = 0.42;
-    const c = o + drift + (Math.random() - 0.44) * vol * 2.3;
-    return {o, c, h: Math.max(o, c) + Math.random() * vol * 0.9, l: Math.min(o, c) - Math.random() * vol * 0.9};
-  },
-  resize(){
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    this.dpr = dpr; this.w = innerWidth; this.h = innerHeight;
-    this.c.width = Math.round(this.w * dpr); this.c.height = Math.round(this.h * dpr);
-    const narrow = this.w < 640;
-    this.gap = narrow ? 13 : 17;
-    this.headX = this.w * (narrow ? 0.93 : 0.86);
-    const need = Math.ceil(this.headX / this.gap) + 12;
-    if (this.cs.length < need) {
-      this.cs = []; let p = 100;
-      for (let i = 0; i < need; i++) { const k = this.gen(p); this.cs.push(k); p = k.c; }
-      this.newLive(performance.now());
-    } else if (this.cs.length > need + 20) this.cs = this.cs.slice(-need);
-    this.min = this.max = null;
-  },
-  newLive(now){
-    const o = this.cs.length ? this.cs[this.cs.length - 1].c : 100;
-    const t = this.gen(o);
-    this.live = {o, c: o, h: o, l: o, tc: t.c, th: t.h, tl: t.l};
-    this.born = now;
-  },
-  start(){ if (!this.raf) this.raf = requestAnimationFrame(this.tick); },
-  tick(now){
-    if (document.hidden) { this.raf = 0; return; }
-    this.raf = requestAnimationFrame(this.tick);
-    if (now - this.last < 32) return;
-    this.last = now;
-    let f = (now - this.born) / this.period;
-    if (f >= 1) {
-      const L = this.live; L.c = L.tc; L.h = Math.max(L.h, L.th, L.o, L.c); L.l = Math.min(L.l, L.tl, L.o, L.c);
-      this.cs.push({o: L.o, c: L.c, h: L.h, l: L.l}); this.cs.shift();
-      this.newLive(now); f = 0;
-    } else {
-      const L = this.live, e = 1 - Math.pow(1 - f, 2);
-      L.c = L.o + (L.tc - L.o) * e + Math.sin(now / 140) * 0.35 * (1 - f);
-      L.h = Math.max(L.h, L.c, L.o + (L.th - L.o) * e); L.l = Math.min(L.l, L.c, L.o + (L.tl - L.o) * e);
+    const c = $('#bg');
+    if (!c || !c.getContext) return;
+    this.scrollY = window.scrollY || 0;
+    this.paused = this.covered();
+    const opts = () => Object.assign(this.size(), {pal: this.P || this.pal(), still: reduce, scrollY: this.scrollY, paused: this.paused});
+    const local = cv => { this.worker = null; this.eng = bgEngine(window); this.eng.init(Object.assign(opts(), {canvas: cv})); };
+    let viaWorker = false;
+    if (!reduce && typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined' && 'transferControlToOffscreen' in c && window.URL && URL.createObjectURL) {
+      try {
+        const src = 'var ok=false;try{ok=!!new OffscreenCanvas(1,1).getContext("2d")}catch(e){}\n'
+          + 'if(!ok){postMessage("no")}else{var E=(' + bgEngine.toString() + ')(self);'
+          + 'onmessage=function(e){try{var m=e.data;if(m.t==="init")E.init(m.o);else if(E[m.t])E[m.t](m.v)}catch(err){postMessage("err")}};postMessage("ready")}';
+        const url = URL.createObjectURL(new Blob([src], {type: 'text/javascript'}));
+        const w = new Worker(url);
+        let done = false;
+        const fail = () => { if (done) return; done = true; clearTimeout(timer); try { w.terminate(); } catch (e) {} URL.revokeObjectURL(url); local(c); };
+        const timer = setTimeout(fail, 2500);
+        w.onerror = ev => { try { ev.preventDefault(); } catch (e) {} fail(); };
+        w.onmessage = e => {
+          if (done) {
+            // the worker broke after taking over the canvas: draw on a fresh canvas here instead
+            if (e.data === 'err' && this.worker === w) {
+              try { w.terminate(); } catch (e2) {}
+              const fresh = document.createElement('canvas'); fresh.id = 'bg'; fresh.setAttribute('aria-hidden', 'true');
+              const old = $('#bg'); if (old) old.replaceWith(fresh);
+              local(fresh);
+            }
+            return;
+          }
+          if (e.data !== 'ready') { fail(); return; }
+          done = true; clearTimeout(timer); URL.revokeObjectURL(url);
+          try {
+            const off = c.transferControlToOffscreen();
+            this.worker = w;
+            w.postMessage({t: 'init', o: Object.assign(opts(), {canvas: off})}, [off]);
+            w.onerror = null;
+          } catch (err) { try { w.terminate(); } catch (e2) {} local(c); }
+        };
+        viaWorker = true;
+      } catch (e) { viaWorker = false; }
     }
-    this.glow *= 0.9;
-    this.draw(now, f);
+    if (!viaWorker) local(c);
+    addEventListener('resize', () => { if (!this.rz) this.rz = requestAnimationFrame(() => { this.rz = 0; this.send('resize', this.size()); }); });
+    document.addEventListener('visibilitychange', () => this.sync());
+    if ('MutationObserver' in window) {
+      const mo = new MutationObserver(() => this.sync());
+      for (const id of ['modal', 'lightbox', 'setup', 'loader']) { const el = document.getElementById(id); if (el) mo.observe(el, {attributes: true, attributeFilter: ['hidden']}); }
+    }
   },
-  draw(now, f){
-    const x = this.x, w = this.w, h = this.h, gap = this.gap;
-    f = f || 0;
-    x.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    x.clearRect(0, 0, w, h);
-    const par = -Math.min(this.scrollY * 0.16, h * 0.24);
-    const off = f * gap;
-    // grid
-    const p = this.P || this.pal(), rg = (c, al) => 'rgba(' + c + ',' + al + ')';
-    x.lineWidth = 1; x.strokeStyle = rg(p.fg, p.light ? 0.06 : 0.035); x.beginPath();
-    for (let gy = ((par % 72) + 72) % 72; gy < h; gy += 72) { x.moveTo(0, Math.round(gy) + .5); x.lineTo(w, Math.round(gy) + .5); }
-    for (let gx = this.headX - off; gx > -10; gx -= gap * 6) { x.moveTo(Math.round(gx) + .5, 0); x.lineTo(Math.round(gx) + .5, h); }
-    x.stroke();
-    // series
-    const all = this.cs.concat([this.live]);
-    const n = all.length;
-    const xs = i => this.headX - (n - 1 - i) * gap - off;
-    let tmin = Infinity, tmax = -Infinity;
-    for (let i = 0; i < n; i++) { if (xs(i) < -gap) continue; tmin = Math.min(tmin, all[i].l); tmax = Math.max(tmax, all[i].h); }
-    if (this.min == null) { this.min = tmin; this.max = tmax; } else { this.min += (tmin - this.min) * 0.06; this.max += (tmax - this.max) * 0.06; }
-    const top = h * 0.2 + par, bot = h * 0.94 + par, span = Math.max(1e-6, this.max - this.min);
-    const Y = v => top + (1 - (v - this.min) / span) * (bot - top);
-    const intro = reduce ? 1 : Math.min(1, (now - this.t0) / 2000);
-    const ie = 1 - Math.pow(1 - intro, 3);
-    const sweep = -gap + ie * (this.headX + gap * 3);
-    const bw = Math.max(3, gap * 0.56);
-    for (let i = 0; i < n; i++) {
-      const cx = xs(i); if (cx < -gap || cx > w + gap) continue;
-      const a = Math.max(0, Math.min(1, (sweep - cx) / 140)); if (!a) continue;
-      const k = all[i], up = k.c >= k.o, isLive = i === n - 1;
-      x.globalAlpha = a;
-      x.strokeStyle = up ? (isLive ? rg(p.light ? p.acc : p.hi, 0.9) : rg(p.acc, 0.42)) : (isLive ? rg(p.fg, 0.6) : rg(p.fg, 0.16));
-      x.fillStyle = up ? (isLive ? rg(p.acc, 0.55) : rg(p.acc, 0.16)) : (isLive ? rg(p.fg, 0.25) : rg(p.fg, 0.045));
-      x.beginPath(); x.moveTo(Math.round(cx) + .5, Y(k.h)); x.lineTo(Math.round(cx) + .5, Y(k.l)); x.stroke();
-      const y1 = Y(Math.max(k.o, k.c)), y2 = Y(Math.min(k.o, k.c));
-      x.fillRect(cx - bw / 2, y1, bw, Math.max(1.2, y2 - y1));
-      x.strokeRect(cx - bw / 2 + .5, y1 + .5, bw - 1, Math.max(1, y2 - y1 - 1));
-    }
-    x.globalAlpha = 1;
-    // moving average
-    const P = 9, pts = [];
-    for (let i = 0; i < n; i++) {
-      const cx = xs(i); if (cx < -gap * 2) continue;
-      let s = 0, m = 0; for (let j = Math.max(0, i - P + 1); j <= i; j++) { s += all[j].c; m++; }
-      if (cx <= sweep) pts.push([cx, Y(s / m)]);
-    }
-    if (pts.length > 1) {
-      const grad = x.createLinearGradient(0, top, 0, bot);
-      grad.addColorStop(0, rg(p.acc, 0.16)); grad.addColorStop(1, rg(p.acc, 0));
-      x.beginPath(); x.moveTo(pts[0][0], bot);
-      for (const p of pts) x.lineTo(p[0], p[1]);
-      x.lineTo(pts[pts.length - 1][0], bot); x.closePath(); x.fillStyle = grad; x.fill();
-      x.beginPath(); pts.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1]));
-      x.lineWidth = 2.2; x.strokeStyle = rg(p.light ? p.acc : p.hi, 0.85);
-      x.shadowColor = rg(p.acc, 0.9); x.shadowBlur = 14 + this.glow * 26;
-      x.stroke(); x.shadowBlur = 0;
-    }
-    // live price marker
-    if (intro >= 1) {
-      const lx = xs(n - 1), ly = Y(this.live.c);
-      x.setLineDash([4, 6]); x.lineWidth = 1; x.strokeStyle = rg(p.acc, 0.5);
-      x.beginPath(); x.moveTo(lx + 6, Math.round(ly) + .5); x.lineTo(w, Math.round(ly) + .5); x.stroke(); x.setLineDash([]);
-      const ph = reduce ? 0.3 : (now % 1800) / 1800;
-      x.beginPath(); x.arc(lx, ly, 4 + ph * 16, 0, Math.PI * 2); x.strokeStyle = rg(p.acc, (0.7 * (1 - ph)).toFixed(3)); x.lineWidth = 1.5; x.stroke();
-      x.beginPath(); x.arc(lx, ly, 3.6, 0, Math.PI * 2); x.fillStyle = rg(p.light ? p.acc : p.hi, 1); x.shadowColor = rg(p.acc, 1); x.shadowBlur = 16; x.fill(); x.shadowBlur = 0;
-    }
-    // readability veil on the content side
-    const veil = x.createLinearGradient(0, 0, w, 0);
-    veil.addColorStop(0, rg(p.bg, 0.62)); veil.addColorStop(0.55, rg(p.bg, 0.25)); veil.addColorStop(1, rg(p.bg, 0));
-    x.fillStyle = veil; x.fillRect(0, 0, w, h);
-    const vg = x.createLinearGradient(0, h * 0.45, 0, h);
-    vg.addColorStop(0, rg(p.bg, 0)); vg.addColorStop(1, rg(p.bg, 0.6));
-    x.fillStyle = vg; x.fillRect(0, h * 0.45, w, h * 0.55);
-  }
+  send(t, v){ if (this.worker) this.worker.postMessage({t, v}); else if (this.eng) this.eng[t](v); },
+  sync(){ const p = this.covered(); if (p !== this.paused) { this.paused = p; this.send('setPaused', p); } },
+  scroll(y){ if (y === this.scrollY) return; this.scrollY = y; this.send('setScroll', y); },
+  repal(){ this.send('setPal', this.pal()); }
 };
 
 /* ---------- motion: reveal on scroll ---------- */
@@ -497,7 +588,7 @@ const Loader = {
   T: {enter: 240, liveStart: 120, live: 640, swap: 900, exit: 430},
   init(){
     this.el = $('#loader'); this.inner = $('#ld-inner');
-    this.body = $('#ld-body'); this.wick = $('#ld-wick'); this.pl = $('#ld-pl'); this.dot = $('#ld-dot');
+    this.body = $('#ld-body'); this.wick = $('#ld-wick'); this.pl = $('#ld-pl'); this.dot = $('#ld-dot'); this.glows = $$('.ld-glow', this.el);
     this.title = $('#ld-title'); this.st = $('#ld-st');
     this.tick = this.tick.bind(this);
     this.el.addEventListener('click', () => this.skipNow());
@@ -514,8 +605,8 @@ const Loader = {
     for (let s = 0; s < u; s += 0.01) { const p = ldPrice(s); if (p < hi) hi = p; if (p > lo) lo = p; }
     const bull = y < LD_OPEN - 0.5, ext = u > 0 ? 5 : 0;
     const top = Math.min(LD_OPEN, y), h = Math.max(2, Math.abs(y - LD_OPEN));
-    this.body.setAttribute('y', top.toFixed(1)); this.body.setAttribute('height', h.toFixed(1));
-    for (const el of [this.body, this.wick, this.pl, this.dot]) el.classList.toggle('bull', bull);
+    for (const el of [this.body].concat(this.glows)) { el.setAttribute('y', top.toFixed(1)); el.setAttribute('height', h.toFixed(1)); }
+    for (const el of [this.body, this.wick, this.pl, this.dot].concat(this.glows)) el.classList.toggle('bull', bull);
     this.wick.setAttribute('y1', (hi - ext).toFixed(1)); this.wick.setAttribute('y2', (lo + ext).toFixed(1));
     this.pl.setAttribute('y1', y.toFixed(1)); this.pl.setAttribute('y2', y.toFixed(1));
     this.dot.setAttribute('cy', y.toFixed(1));
@@ -546,8 +637,23 @@ const Loader = {
     if (!this.swapped) this.draw(u);
     if (u >= 1 && !this.hitDone) { this.hitDone = true; this.el.classList.add('hit'); this.st.textContent = '✓ Take Profit erreicht'; }
     if (e >= T.swap) {
-      if (!this.swapped) { this.swapped = true; goView(this.target); }
-      const k = Math.min(1, (e - T.swap) / T.exit), ek = easeInOut(k);
+      if (!this.swapped) {
+        this.swapped = true; goView(this.target);
+        this.exitT0 = performance.now();
+        if (this.el.animate) {
+          try {
+            const o = {duration: T.exit, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards'};
+            this.exitAnims = [
+              this.el.animate([{transform: 'translate3d(0,0,0)'}, {transform: 'translate3d(0,-100%,0)'}], o),
+              this.inner.animate([{transform: 'translate3d(0,0,0)'}, {transform: 'translate3d(0,60px,0)'}], o),
+              this.inner.animate([{opacity: 1}, {opacity: 0, offset: 0.714}, {opacity: 0}], {duration: T.exit, easing: 'linear', fill: 'forwards'})
+            ];
+            this.exitAnims[0].onfinish = () => { if (this.exitAnims) this.finish(); };
+            return;
+          } catch (err) { this.stopExit(); }
+        }
+      }
+      const k = Math.min(1, (now - this.exitT0) / T.exit), ek = easeInOut(k);
       this.el.style.transform = 'translate3d(0,' + (-ek * 100).toFixed(2) + '%,0)';
       this.inner.style.transform = 'translate3d(0,' + (ek * 60).toFixed(1) + 'px,0)';
       this.inner.style.opacity = Math.max(0, 1 - k * 1.4).toFixed(3);
@@ -555,7 +661,12 @@ const Loader = {
     }
     this.raf = requestAnimationFrame(this.tick);
   },
+  stopExit(){
+    if (this.exitAnims) { this.exitAnims.forEach(a => { try { a.cancel(); } catch (e) {} }); this.exitAnims = null; }
+  },
   finish(){
+    this.stopExit();
+    this.el.style.transform = 'translate3d(0,-100%,0)'; this.inner.style.opacity = '0';
     this.el.hidden = true; this.el.classList.remove('run', 'hit');
     this.active = false;
     const p = this.pending; this.pending = null;
@@ -564,31 +675,50 @@ const Loader = {
 };
 
 /* ---------- scroll-linked effects ---------- */
+// One pass per frame: all measurements first, then all style changes, so the browser never has to
+// lay out the page twice in a frame. Timeline item positions are cached until the list changes size.
 let sq = 0;
-function onScroll(){
-  if (sq) return;
-  sq = requestAnimationFrame(() => {
-    sq = 0;
-    const y = window.scrollY || 0;
-    $('#topbar').classList.toggle('scrolled', y > 6);
-    const max = document.documentElement.scrollHeight - innerHeight;
-    $('#progress').style.transform = 'scaleX(' + (max > 0 ? Math.min(1, y / max) : 0).toFixed(4) + ')';
-    if (Math.abs(y - BG.scrollY) > 2) BG.glow = 1;
-    BG.scrollY = y;
-    if (!reduce) {
-      const ht = $('#hero-txt');
-      if (ht) { ht.style.transform = 'translate3d(0,' + (y * 0.16).toFixed(1) + 'px,0)'; ht.style.opacity = Math.max(0.12, 1 - y / 560).toFixed(3); }
-      const eq = $('#equity');
-      if (eq) eq.style.transform = 'translate3d(0,' + (y * 0.06).toFixed(1) + 'px,0)';
-      const cv = $('#bg'); if (cv) cv.style.opacity = (1 - Math.min(1, y / 700) * 0.45).toFixed(3);
-    }
-    const fill = $('.tl-fill');
-    if (fill) {
-      const feed = fill.closest('.feed'), r = feed.getBoundingClientRect(), mid = innerHeight * 0.62;
-      fill.style.transform = 'scaleY(' + Math.max(0, Math.min(1, (mid - r.top) / Math.max(1, r.height))).toFixed(4) + ')';
-      feed.querySelectorAll('.tl-item').forEach(it => it.classList.toggle('lit', it.getBoundingClientRect().top + 28 < mid));
-    }
-  });
+const tlPos = new WeakMap();
+const tlRO = 'ResizeObserver' in window ? new ResizeObserver(es => { for (const e of es) tlPos.delete(e.target); onScroll(); }) : null;
+function tlItems(feed, fr){
+  const first = feed.querySelector('.tl-item');
+  let c = tlPos.get(feed);
+  if (!c || c.first !== first) {
+    const list = [];
+    feed.querySelectorAll('.tl-item').forEach(it => {
+      list.push({it, off: it.offsetParent === feed ? it.offsetTop : it.getBoundingClientRect().top - fr.top});
+    });
+    c = {first, list};
+    tlPos.set(feed, c);
+    if (tlRO && !feed._tlObs) { feed._tlObs = true; tlRO.observe(feed); }
+  }
+  return c.list;
+}
+function onScroll(){ if (!sq) sq = requestAnimationFrame(scrollFx); }
+function scrollFx(){
+  sq = 0;
+  // read
+  const y = window.scrollY || 0, vh = innerHeight;
+  const max = document.documentElement.scrollHeight - vh;
+  const fill = $('.tl-fill');
+  let fr = null, items = null;
+  if (fill) { const feed = fill.closest('.feed'); fr = feed.getBoundingClientRect(); items = tlItems(feed, fr); }
+  // write
+  $('#topbar').classList.toggle('scrolled', y > 6);
+  $('#progress').style.transform = 'scaleX(' + (max > 0 ? Math.min(1, y / max) : 0).toFixed(4) + ')';
+  BG.scroll(y);
+  if (!reduce) {
+    const ht = $('#hero-txt');
+    if (ht) { ht.style.transform = 'translate3d(0,' + (y * 0.16).toFixed(1) + 'px,0)'; ht.style.opacity = Math.max(0.12, 1 - y / 560).toFixed(3); }
+    const eq = $('#equity');
+    if (eq) eq.style.transform = 'translate3d(0,' + (y * 0.06).toFixed(1) + 'px,0)';
+    const bw = $('#bg-wrap'); if (bw) bw.style.opacity = (1 - Math.min(1, y / 700) * 0.45).toFixed(3);
+  }
+  if (fill) {
+    const mid = vh * 0.62;
+    fill.style.transform = 'scaleY(' + Math.max(0, Math.min(1, (mid - fr.top) / Math.max(1, fr.height))).toFixed(4) + ')';
+    for (const o of items) o.it.classList.toggle('lit', fr.top + o.off + 28 < mid);
+  }
 }
 
 /* ---------- ui chrome ---------- */
@@ -670,7 +800,7 @@ function tlItem(date, rv, i, inner){
 function shotsHtml(refs){
   if (!refs || !refs.length) return '';
   return '<div class="shots">' + refs.map((r, i) =>
-    `<button type="button" class="thumb" data-lb="${i}" aria-label="Screenshot ${i + 1} vergrößern"><img loading="lazy" src="${esc(Store.imgSrc(r))}" alt=""></button>`).join('') + '</div>';
+    `<button type="button" class="thumb" data-lb="${i}" aria-label="Screenshot ${i + 1} vergrößern"><img loading="lazy" decoding="async" src="${esc(Store.imgSrc(r))}" alt=""></button>`).join('') + '</div>';
 }
 
 /* trade tape for the hero */
@@ -1172,7 +1302,7 @@ function openForm(kind, entry, opts){
 
   const renderThumbs = () => {
     const el = panel.querySelector('#thumbs'); if (!el) return;
-    el.innerHTML = st.shots.map((s, i) => `<div class="thumb"><img src="${esc(s.ref ? Store.imgSrc(s.ref) : s.url)}" alt=""><button type="button" class="tv" data-lb="${i}" aria-label="Screenshot ${i + 1} ansehen"></button>${s.ref ? '' : '<span class="nb">neu</span>'}<button type="button" class="rm" data-rm="${i}" aria-label="Screenshot ${i + 1} entfernen">×</button></div>`).join('');
+    el.innerHTML = st.shots.map((s, i) => `<div class="thumb"><img decoding="async" src="${esc(s.ref ? Store.imgSrc(s.ref) : s.url)}" alt=""><button type="button" class="tv" data-lb="${i}" aria-label="Screenshot ${i + 1} ansehen"></button>${s.ref ? '' : '<span class="nb">neu</span>'}<button type="button" class="rm" data-rm="${i}" aria-label="Screenshot ${i + 1} entfernen">×</button></div>`).join('');
     el.hidden = !st.shots.length;
   };
   const addFiles = files => {
@@ -1383,7 +1513,7 @@ function applySkin(id, persist){
   id = skinId(id);
   if (!SKIN_IDS.includes(id)) id = 'navy';
   const r = document.documentElement;
-  if (r.getAttribute('data-skin') !== id) { r.setAttribute('data-skin', id); BG.P = null; if (reduce) BG.draw(performance.now() + 1e5); }
+  if (r.getAttribute('data-skin') !== id) { r.setAttribute('data-skin', id); BG.repal(); }
   if (persist) lsSet('blotter.skin', id);
 }
 function applySettings(){
@@ -1644,12 +1774,25 @@ document.addEventListener('keydown', e => {
 });
 try {
   if (!reduce && matchMedia('(hover: hover)').matches) {
+    // the glow is its own small layer that only gets moved, so nothing else on the card is restyled or repainted
+    let spEl = null, spX = 0, spY = 0, spQ = 0;
+    const spotFx = () => {
+      spQ = 0;
+      const el = spEl;
+      if (!el || !el.isConnected) return;
+      const r = el.getBoundingClientRect();
+      let g = el._glow;
+      if (!g || !g.isConnected || g.parentNode.parentNode !== el) {
+        const wrap = document.createElement('span'); wrap.className = 'spot-fx'; wrap.setAttribute('aria-hidden', 'true');
+        g = document.createElement('i'); wrap.appendChild(g); el.insertBefore(wrap, el.firstChild); el._glow = g;
+      }
+      g.style.transform = 'translate3d(' + (spX - r.left - 380).toFixed(0) + 'px,' + (spY - r.top - 380).toFixed(0) + 'px,0)';
+    };
     document.addEventListener('pointermove', e => {
       const el = e.target && e.target.closest ? e.target.closest('.spot') : null;
       if (!el) return;
-      const r = el.getBoundingClientRect();
-      el.style.setProperty('--mx', (e.clientX - r.left).toFixed(0) + 'px');
-      el.style.setProperty('--my', (e.clientY - r.top).toFixed(0) + 'px');
+      spEl = el; spX = e.clientX; spY = e.clientY;
+      if (!spQ) spQ = requestAnimationFrame(spotFx);
     }, {passive: true});
   }
 } catch (e) {}
