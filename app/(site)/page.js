@@ -70,7 +70,7 @@ export default async function Home() {
             {FEATURES.map(([ic, h, p]) => <div className="f" key={h}><span className="ic">{ic}</span><h3>{h}</h3><p>{p}</p></div>)}
           </div>
           <div className="skins" aria-label="Farbschemen">
-            {[['Navy & Gold', '#060F27', '#D9B450'], ['Graphit', '#0B0C0E', '#D6DAE1'], ['Schiefer', '#0D131A', '#9DBBDD'], ['Mokka', '#12100E', '#CDAA84'], ['Hell', '#F4F5F7', '#1F2B46'], ['Sand', '#F5F1EA', '#94703F']].map(([n, a, b]) => (
+            {[['Navy & Gold', '#060F27', '#D9B450'], ['Graphit', '#0B0C0E', '#D6DAE1'], ['Schiefer', '#0D131A', '#9DBBDD'], ['Mokka', '#12100E', '#CDAA84'], ['Wald', '#08130F', '#D2BC86'], ['Mitternacht', '#0C0B1A', '#B7AAF2'], ['Petrol', '#071417', '#DDA176'], ['Bordeaux', '#140A0E', '#E4B6A3'], ['Hell', '#F4F5F7', '#1F2B46'], ['Sand', '#F5F1EA', '#94703F'], ['Nebel', '#EDF1F5', '#2F5D8C'], ['Salbei', '#EDF1EA', '#2E3B33']].map(([n, a, b]) => (
               <span className="skin" key={n}><i style={{ background: `linear-gradient(135deg, ${a} 50%, ${b} 50%)` }} />{n}</span>
             ))}
           </div>
@@ -90,7 +90,7 @@ export default async function Home() {
               <ul>
                 <li>Unbegrenzt Trades, Learnings und Outlooks</li>
                 <li>Screenshots zu jedem Eintrag</li>
-                <li>Bis zu 10 Konten, 6 Farbschemen</li>
+                <li>Bis zu 10 Konten, 12 Farbschemen</li>
                 <li>Synchron auf Laptop, Tablet und Handy</li>
                 <li>Deine Daten sind nur für dich sichtbar</li>
               </ul>

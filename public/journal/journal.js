@@ -1458,8 +1458,14 @@ const SKINS = [
   {id: 'onyx', name: 'Graphit', sub: 'Schwarz und Weiß, ganz schlicht'},
   {id: 'slate', name: 'Schiefer', sub: 'Blaugrau und ruhig'},
   {id: 'mocha', name: 'Mokka', sub: 'Dunkel und warm'},
+  {id: 'forest', name: 'Wald', sub: 'Tiefgrün und Champagner'},
+  {id: 'midnight', name: 'Mitternacht', sub: 'Indigo und Lavendel'},
+  {id: 'petrol', name: 'Petrol', sub: 'Petrol und Kupfer'},
+  {id: 'bordeaux', name: 'Bordeaux', sub: 'Weinrot und Roségold'},
   {id: 'paper', name: 'Hell', sub: 'Weiß und Anthrazit'},
-  {id: 'sand', name: 'Sand', sub: 'Hell und warm'}
+  {id: 'sand', name: 'Sand', sub: 'Hell und warm'},
+  {id: 'mist', name: 'Nebel', sub: 'Hellgrau und Stahlblau'},
+  {id: 'sage', name: 'Salbei', sub: 'Hell und naturgrün'}
 ];
 const SKIN_IDS = SKINS.map(k => k.id);
 // schemes that were replaced by calmer ones
