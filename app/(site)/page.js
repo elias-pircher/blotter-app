@@ -18,7 +18,7 @@ const FEATURES = [
   [I.wallet, 'Alle Konten in einem Journal', 'Bis zu 10 Konten mit eigenem Namen und eigener Farbe: Broker, Prop-Firm-Challenges, Demo. Filtern mit einem Klick.'],
   [I.img, 'Screenshots dazu', 'Chart einfügen per Drag & Drop oder direkt aus der Zwischenablage. Groß ansehen mit einem Klick.'],
   [I.bulb, 'Learnings als Timeline', 'Schreib auf, was du gelernt hast. Fehler, die du aufschreibst, kosten dich nur einmal Geld.'],
-  [I.compass, 'Outlooks mit Trefferquote', 'Plane Bias und Key Levels vor der Session und markiere danach, ob es eingetreten ist.'],
+  [I.compass, 'Outlooks mit Trefferquote', 'Halte HTF- und LTF-Bias und deine Key Levels vor der Session fest und markiere danach, ob es eingetreten ist.'],
 ];
 
 const DAYS = [

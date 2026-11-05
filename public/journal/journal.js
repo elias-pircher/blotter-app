@@ -1030,7 +1030,7 @@ const Views = {
         <div class="toolbar" data-rv="${M}:tb" style="--rd:120ms">
           <input type="search" class="search" id="o-search" placeholder="Nach Instrument oder Text suchen" aria-label="Outlooks durchsuchen" value="${esc(S.oq)}">
           <div class="chips" id="o-bias">
-            ${[['all','Alle'],['bull','▲ Bullish'],['bear','▼ Bearish'],['neutral','● Neutral']].map(([v, l]) => `<button type="button" class="chip" data-obias="${v}">${l}</button>`).join('')}
+            ${[['all','Alle'],['bull','HTF ▲ Bullish'],['bear','HTF ▼ Bearish']].map(([v, l]) => `<button type="button" class="chip" data-obias="${v}">${l}</button>`).join('')}
           </div>
         </div>
         <div class="feed" id="o-feed"></div>
@@ -1045,7 +1045,7 @@ const Views = {
         ? all.length + (all.length === 1 ? ' Outlook' : ' Outlooks') + (hit + miss ? ' · Trefferquote ' + Math.round(hit / (hit + miss) * 100) + ' % (' + hit + ' von ' + (hit + miss) + ' bewertet)' : ' · noch keiner bewertet') + '. Wer vorbereitet ist, handelt nach Plan.'
         : 'Wer vorbereitet ist, reagiert nicht, er handelt nach Plan.';
       const q = S.oq.trim().toLowerCase();
-      const list = sortEntries(all.filter(o => (S.obias === 'all' || (o.bias || 'neutral') === S.obias) && (!q || [o.symbol, o.title, o.text].join(' ').toLowerCase().includes(q))));
+      const list = sortEntries(all.filter(o => (S.obias === 'all' || olTf(o).htf === S.obias) && (!q || [o.symbol, o.title, o.text].join(' ').toLowerCase().includes(q))));
       const feed = $('#o-feed');
       feed.classList.remove('tl');
       if (!S.loaded.outlooks) { feed.innerHTML = '<div class="empty sm"><p>Outlooks werden geladen…</p></div>'; return; }
@@ -1053,13 +1053,12 @@ const Views = {
       if (!list.length) { feed.innerHTML = '<div class="empty sm"><p>Keine Outlooks passen zu deinem Filter.</p></div>'; return; }
       feed.classList.add('tl');
       feed.innerHTML = '<div class="tl-rail" aria-hidden="true"><i class="tl-fill"></i></div>' + list.map((o, i) => {
-        const b = o.bias || 'neutral';
-        const bl = b === 'bull' ? '▲ Bullish' : b === 'bear' ? '▼ Bearish' : '● Neutral';
-        const tf = {intraday: 'Intraday', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly'}[o.tf] || '';
+        const tfs = olTf(o);
+        const tfRows = [['HTF', tfs.htf], ['LTF', tfs.ltf]].filter(([, v]) => v).map(([k, v]) => `<span class="ol-tfr"><small>${k}</small><span class="bias ${v}">${v === 'bull' ? '▲ Bullish' : '▼ Bearish'}</span></span>`).join('');
         const res = o.result === 'hit' ? '<span class="res hit">Eingetreten</span>' : o.result === 'miss' ? '<span class="res miss">Nicht eingetreten</span>' : '<span class="res">Offen</span>';
         return tlItem(o.date, `${M}:o:${esc(o.id)}`, i, `
         <article class="entry ol spot">
-          <div class="ol-side"><span class="ol-sym">${esc(o.symbol || '—')}</span><span class="bias ${b === 'bull' ? 'bull' : b === 'bear' ? 'bear' : ''}">${bl}</span>${tf ? `<span class="ol-tf">${tf}</span>` : ''}</div>
+          <div class="ol-side"><span class="ol-sym">${esc(o.symbol || '—')}</span>${tfRows ? `<div class="ol-tfs">${tfRows}</div>` : ''}</div>
           <div class="ol-main">
             <div class="e-meta"><span>Outlook</span>${res}<span class="spacer"></span>
               <button type="button" class="btn sm ghost" data-action="edit-outlook" data-id="${esc(o.id)}">Bearbeiten</button></div>
@@ -1174,6 +1173,15 @@ function openDay(key){
   Modal.show(builder, {live: true, focus: '.p-foot .btn.primary'});
 }
 
+/* HTF / LTF of an outlook. Older outlooks stored one bias plus a timeframe:
+   intraday counts as LTF, everything else as HTF. */
+function olTf(o){
+  const ok = v => (v === 'bull' || v === 'bear') ? v : '';
+  if (o.htf !== undefined || o.ltf !== undefined) return {htf: ok(o.htf), ltf: ok(o.ltf)};
+  const b = ok(o.bias);
+  return o.tf === 'intraday' ? {htf: '', ltf: b} : {htf: b, ltf: ''};
+}
+
 /* ---------- forms ---------- */
 const FORMS = {
   trades: {
@@ -1210,12 +1218,12 @@ const FORMS = {
   },
   outlooks: {
     newTitle: 'Outlook eintragen', editTitle: 'Outlook bearbeiten', saved: 'Outlook gespeichert', deleted: 'Outlook gelöscht', what: 'diesen Outlook',
-    defaults: o => ({date: o.date || todayStr(), bias: 'neutral', tf: 'daily', result: 'open'}),
+    defaults: o => ({date: o.date || todayStr(), htf: '', ltf: '', result: 'open'}),
     fields: [
       {k: 'date', t: 'date', label: 'Gilt für'},
       {k: 'symbol', t: 'text', label: 'Instrument', ph: 'z. B. NQ, DAX, EURUSD', list: 'dl-symbols', caps: true},
-      {k: 'bias', t: 'seg', label: 'Bias', cls: 'bias-seg', full: true, opts: [['bull', '▲ Bullish'], ['bear', '▼ Bearish'], ['neutral', '● Neutral']]},
-      {k: 'tf', t: 'seg', label: 'Zeitrahmen', full: true, opts: [['intraday', 'Intraday'], ['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly']]},
+      {k: 'htf', t: 'seg', label: 'HTF', hint: 'Higher Timeframe', cls: 'bias-seg', opts: [['bull', '▲ Bullish'], ['bear', '▼ Bearish']]},
+      {k: 'ltf', t: 'seg', label: 'LTF', hint: 'Lower Timeframe', cls: 'bias-seg', opts: [['bull', '▲ Bullish'], ['bear', '▼ Bearish']]},
       {k: 'title', t: 'text', label: 'Titel', ph: 'z. B. Wochenausblick NQ', full: true, opt: true},
       {k: 'text', t: 'area', label: 'Analyse', ph: 'Key Levels, Szenarien, Plan für die Session…', rows: 8},
       {k: 'result', t: 'seg', label: 'Review', cls: 'res-seg', full: true, opts: [['open', 'Offen'], ['hit', 'Eingetreten'], ['miss', 'Nicht eingetreten']]},
@@ -1246,7 +1254,7 @@ function fieldHtml(f, v){
             `<button type="button" role="radio" data-val="${esc(a.id)}" data-c="${a.color}" style="--ac:${acVar(a.id)}" aria-checked="${a.id === cur}"><span class="dot"></span><span><b>${esc(a.name)}</b><small>Konto ${i + 1}</small></span></button>`).join(''); })()}
         </div></div>`;
     case 'seg':
-      return `<div class="fld${full}"><span class="lbl" id="${id}-l">${f.label}${opt}</span>
+      return `<div class="fld${full}"><span class="lbl" id="${id}-l">${f.label}${f.hint ? `<span class="opt">${f.hint}</span>` : ''}${opt}</span>
         <div class="seg wide ${f.cls || ''}" role="radiogroup" aria-labelledby="${id}-l" data-field="${f.k}">
           ${f.opts.map(([k, l]) => `<button type="button" role="radio" data-val="${k}" aria-checked="${val === k}">${l}</button>`).join('')}
         </div></div>`;
@@ -1280,6 +1288,7 @@ function openForm(kind, entry, opts){
   const isNew = !entry;
   const v = Object.assign({}, def.defaults(opts), entry || {});
   if (kind === 'trades' && entry && !entry.result) v.result = resOf(entry) || '';
+  if (kind === 'outlooks' && entry) Object.assign(v, olTf(entry));
   const st = {shots: (v.shots || []).map(ref => ({ref})), removed: [], busy: false};
   const back = opts.fromDay ? () => openDay(opts.fromDay) : null;
 
@@ -1363,6 +1372,7 @@ function openForm(kind, entry, opts){
           catch (e) { delete obj.thumb; delete obj.thumbRef; }
         }
       }
+      if (kind === 'outlooks') { delete obj.bias; delete obj.tf; }
       await Store.save(kind, obj);
       for (const ref of st.removed) Store.deleteImage(ref);
       if (kind === 'trades' && obj.account) { S.lastAccount = obj.account; lsSet('blotter.lastAccount', obj.account); }
@@ -1672,6 +1682,7 @@ const Setup = {
       () => `<div class="su-h"><span class="eyebrow gold">Konten</span><h2 id="su-title">Welche Konten tradest du?</h2><p>Leg so viele an, wie du brauchst, zum Beispiel deinen Broker und deine Prop-Firm-Challenges. Mit einem Klick auf das Farbfeld wählst du die Farbe, an der du das Konto im Kalender erkennst.</p></div>${acctEditor(d.accounts, 'su')}`
     ];
     $('#su-body').innerHTML = `<div class="su-step${dir < 0 ? ' back' : ''}">${steps[i]()}</div>`;
+    $('#su-body').scrollTop = 0;
     const f = $('#su-body input') || $('#su-body [aria-checked="true"]:not(.locked)') || $('#su-next');
     if (f) { try { f.focus({preventScroll: true}); } catch (e) {} }
     $('.su-card').scrollTop = 0;
