@@ -1028,7 +1028,7 @@ const Views = {
           <button type="button" class="btn primary" data-action="new-outlook">${ICON.plus}Outlook eintragen</button>
         </div>
         <div class="toolbar" data-rv="${M}:tb" style="--rd:120ms">
-          <input type="search" class="search" id="o-search" placeholder="Nach Instrument oder Text suchen" aria-label="Outlooks durchsuchen" value="${esc(S.oq)}">
+          <input type="search" class="search" id="o-search" placeholder="Instrument oder Text suchen" aria-label="Outlooks durchsuchen" value="${esc(S.oq)}">
           <div class="chips" id="o-bias">
             ${[['all','Alle'],['bull','HTF ▲ Bullish'],['bear','HTF ▼ Bearish']].map(([v, l]) => `<button type="button" class="chip" data-obias="${v}">${l}</button>`).join('')}
           </div>
@@ -1080,7 +1080,7 @@ const Modal = {
     if (this.cur && this.cur.cleanup) this.cur.cleanup();
     if (!this.cur) this.opener = document.activeElement;
     this.cur = {builder, live: !!opts.live, back: opts.back || null, cleanup: opts.cleanup || null, dirty: false};
-    const panel = $('#panel');
+    const panel = this.freshPanel();
     panel.innerHTML = builder();
     panel.scrollTop = 0;
     $('#modal').hidden = false;
@@ -1089,6 +1089,11 @@ const Modal = {
     if (opts.onMount) opts.onMount(panel);
     const f = panel.querySelector(opts.focus || '.p-body button, .p-body input, .p-body textarea, .p-foot button');
     if (f) { try { f.focus({preventScroll: true}); } catch (e) { f.focus(); } }
+  },
+  freshPanel(){
+    const old = $('#panel'), panel = old.cloneNode(false);
+    old.parentNode.replaceChild(panel, old);
+    return panel;
   },
   refresh(){
     if (!this.cur || !this.cur.live) return;
@@ -1100,7 +1105,7 @@ const Modal = {
     if (!this.cur) return;
     if (this.cur.cleanup) this.cur.cleanup();
     this.cur = null;
-    $('#modal').hidden = true; $('#panel').innerHTML = '';
+    $('#modal').hidden = true; this.freshPanel();
     document.documentElement.style.overflow = '';
     if (this.opener && document.contains(this.opener)) { try { this.opener.focus({preventScroll: true}); } catch (e) {} }
     this.opener = null;
@@ -1274,7 +1279,7 @@ function fieldHtml(f, v){
     case 'shots': {
       const can = Store.canUpload();
       return `<div class="fld full"><span class="lbl">${f.label}<span class="opt">optional</span></span>
-        ${can ? `<label class="drop" for="f-file" id="drop">${ICON.img}<b>Screenshot hinzufügen</b><span>Klicken, Bild hierher ziehen oder mit <kbd>${isMac ? '⌘' : 'Strg'}+V</kbd> einfügen</span></label>
+        ${can ? `<label class="drop" for="f-file" id="drop" tabindex="0" role="button">${ICON.img}<b>Screenshot hinzufügen</b><span>Klicken, Bild hierher ziehen oder mit <kbd>${isMac ? '⌘' : 'Strg'}+V</kbd> einfügen</span></label>
         <input type="file" id="f-file" accept="image/*" multiple hidden>` : `<p class="lbl">Screenshots können in dieser Ansicht nicht hinzugefügt werden.</p>`}
         <div class="thumbs" id="thumbs" hidden></div></div>`;
     }
@@ -1436,6 +1441,7 @@ function openForm(kind, entry, opts){
       if (fi) fi.addEventListener('change', () => { addFiles(fi.files); fi.value = ''; });
       const drop = p.querySelector('#drop');
       if (drop) {
+        drop.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && fi) { e.preventDefault(); fi.click(); } });
         ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
         ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
         drop.addEventListener('drop', e => addFiles(e.dataTransfer && e.dataTransfer.files));
@@ -1450,7 +1456,8 @@ function openForm(kind, entry, opts){
 /* ---------- lightbox ---------- */
 const LB = {
   list: [], i: 0,
-  open(list, i){ if (!list.length) return; this.list = list; this.i = i; this.show(); $('#lightbox').hidden = false; $('.lb-close').focus(); },
+  opener: null,
+  open(list, i){ if (!list.length) return; this.opener = document.activeElement; this.list = list; this.i = i; this.show(); $('#lightbox').hidden = false; $('.lb-close').focus(); },
   show(){
     $('#lb-img').src = this.list[this.i];
     const many = this.list.length > 1;
@@ -1458,9 +1465,25 @@ const LB = {
     $('#lb-count').textContent = many ? (this.i + 1) + ' / ' + this.list.length : '';
   },
   step(d){ this.i = (this.i + d + this.list.length) % this.list.length; this.show(); },
-  close(){ $('#lightbox').hidden = true; $('#lb-img').removeAttribute('src'); },
+  close(){
+    $('#lightbox').hidden = true; $('#lb-img').removeAttribute('src');
+    const o = this.opener; this.opener = null;
+    if (o && document.contains(o)) { try { o.focus({preventScroll: true}); } catch (e) {} }
+  },
   isOpen(){ return !$('#lightbox').hidden; }
 };
+(() => {
+  // swipe between screenshots on touch screens
+  const lb = $('#lightbox');
+  let sx = 0, sy = 0, on = false;
+  lb.addEventListener('pointerdown', e => { on = e.pointerType !== 'mouse' && !e.target.closest('button'); sx = e.clientX; sy = e.clientY; }, {passive: true});
+  lb.addEventListener('pointerup', e => {
+    if (!on) return; on = false;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (LB.list.length > 1 && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) LB.step(dx < 0 ? 1 : -1);
+  }, {passive: true});
+  lb.addEventListener('pointercancel', () => { on = false; }, {passive: true});
+})();
 
 /* ---------- personalisation ---------- */
 const SKINS = [
@@ -1860,7 +1883,19 @@ document.addEventListener('click', e => {
   }
 });
 
+/* keep keyboard focus inside the open dialog, lightbox or setup */
+function trapTab(e){
+  const root = LB.isOpen() ? $('#lightbox') : Modal.cur ? $('#panel') : Setup.isOpen ? $('#setup .su-card') : null;
+  if (!root) return false;
+  const f = $$('a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])', root)
+    .filter(el => !el.hidden && !el.closest('[hidden]') && el.getClientRects().length);
+  if (!f.length) { e.preventDefault(); return true; }
+  const first = f[0], last = f[f.length - 1], a = document.activeElement, inside = root.contains(a);
+  if (e.shiftKey ? (!inside || a === first) : (!inside || a === last)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); return true; }
+  return false;
+}
 document.addEventListener('keydown', e => {
+  if (e.key === 'Tab' && trapTab(e)) return;
   if (Loader.active && e.key === 'Escape') { e.preventDefault(); Loader.skipNow(); return; }
   if (LB.isOpen()) {
     if (e.key === 'Escape') { e.preventDefault(); LB.close(); }

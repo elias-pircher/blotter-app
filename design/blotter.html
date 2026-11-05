@@ -190,7 +190,7 @@ button{cursor:pointer}
 
 /* Header */
 .topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;border-bottom:1px solid transparent;transition:background .35s,border-color .35s}
-.topbar.scrolled{background:var(--header);border-bottom-color:var(--gold-line);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.topbar.scrolled{background:rgba(var(--bg-rgb),.95);border-bottom-color:var(--gold-line)}
 .topbar-in{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;transition:padding .35s var(--ease)}
 .topbar.scrolled .topbar-in{padding-block:10px}
 .brand{display:flex;align-items:center;gap:10px;min-width:0;text-decoration:none;color:inherit}
@@ -347,12 +347,12 @@ button{cursor:pointer}
 .wd.now::after{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);margin-left:6px;vertical-align:2px}
 .day.out > *{opacity:.4}
 .day.today{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold),0 0 26px rgba(var(--acc-rgb),.2)}
-.day .row1{display:flex;justify-content:space-between;align-items:center;gap:4px}
+.day .row1{display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap;row-gap:4px}
 .d-num{font-family:var(--f-mono);font-size:13px;font-weight:500;color:var(--ink-2);line-height:21px}
 .day.today .d-num{background:var(--gold-grad);color:var(--on-gold);font-weight:600;border-radius:999px;padding:0 8px}
 .marks{display:flex;gap:3px}
-.day .rt{display:flex;align-items:center;gap:5px;min-width:0}
-.d-shot{position:relative;flex:none;width:58px;height:38px;border-radius:7px;overflow:hidden;background:var(--surface-2);box-shadow:0 0 0 1px rgba(var(--fg-rgb),.16),0 4px 12px rgba(0,0,0,calc(.35 * var(--sh)))}
+.day .rt{display:flex;align-items:center;gap:5px;flex:none;max-width:100%;flex-wrap:wrap;row-gap:4px}
+.d-shot{position:relative;flex:none;width:58px;max-width:100%;height:38px;border-radius:7px;overflow:hidden;background:var(--surface-2);box-shadow:0 0 0 1px rgba(var(--fg-rgb),.16),0 4px 12px rgba(0,0,0,calc(.35 * var(--sh)))}
 .d-shot img{display:block;width:100%;height:100%;object-fit:cover;object-position:center;transition:transform .35s var(--ease)}
 .day:hover .d-shot img{transform:scale(1.1)}
 .d-shot b{position:absolute;right:2px;bottom:2px;min-width:14px;padding:0 3px;border-radius:4px;font:600 9.5px/14px var(--f-mono);text-align:center;color:var(--ink);background:rgba(var(--bg-rgb),.85)}
@@ -419,7 +419,7 @@ button{cursor:pointer}
 .e-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
 .e-title{font-family:var(--f-display);font-stretch:106%;font-weight:700;font-size:21px;line-height:1.25;margin:0;text-wrap:balance;overflow-wrap:anywhere}
 .e-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;max-width:72ch;line-height:1.65;color:var(--ink-2)}
-.tag{font-family:var(--f-mono);font-size:11px;padding:1px 9px;border-radius:999px;background:var(--gold-soft);border:1px solid var(--gold-line);color:var(--acc-text);white-space:nowrap;line-height:18px}
+.tag{font-family:var(--f-mono);font-size:11px;padding:1px 9px;border-radius:999px;background:var(--gold-soft);border:1px solid var(--gold-line);color:var(--acc-text);white-space:nowrap;line-height:18px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .bias{font-family:var(--f-mono);font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:6px;white-space:nowrap;background:var(--surface-2);color:var(--ink-2);letter-spacing:.03em}
 .bias.bull{background:var(--up-soft);color:var(--up)}
 .bias.bear{background:var(--down-soft);color:var(--down)}
@@ -458,7 +458,7 @@ kbd{font-family:var(--f-mono);font-size:11px;min-width:20px;text-align:center;pa
 
 /* Setup wizard & settings */
 .gear{color:var(--muted)} .gear:hover{color:var(--ink)}
-.setup{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:rgba(var(--bg-rgb),.55);-webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);animation:fadein2 .4s}
+.setup{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:rgba(var(--bg-rgb),.8);animation:fadein2 .4s}
 .setup.out{animation:suout .45s var(--ease) forwards}
 @keyframes suout{to{opacity:0}}
 .su-card{position:relative;width:min(780px,100%);max-height:100%;overflow:auto;overscroll-behavior:contain;background:var(--modal);border:1px solid var(--gold-line);border-radius:24px;box-shadow:var(--shadow-lg);padding:22px 26px 18px;display:flex;flex-direction:column;gap:18px;animation:pin .55s var(--ease)}
@@ -565,7 +565,7 @@ button.thumb:hover{transform:scale(1.02)}
 
 /* Modal */
 .modal{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
-.scrim{position:absolute;inset:0;background:var(--scrim);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);animation:fadein2 .2s}
+.scrim{position:absolute;inset:0;background:linear-gradient(var(--scrim),var(--scrim)),rgba(var(--bg-rgb),.42);animation:fadein2 .2s}
 @keyframes fadein2{from{opacity:0}}
 .panel{position:relative;width:min(720px,100%);max-height:100%;overflow:auto;background:var(--modal);border:1px solid var(--gold-line);border-radius:20px;box-shadow:var(--shadow-lg);overscroll-behavior:contain;animation:pin .3s var(--ease)}
 @keyframes pin{from{opacity:0;transform:translateY(16px) scale(.98)}to{opacity:1;transform:none}}
@@ -605,7 +605,7 @@ button.thumb:hover{transform:scale(1.02)}
 .fld{display:flex;flex-direction:column;gap:7px;min-width:0}
 .fld.full{grid-column:1/-1}
 .lbl{font-size:12px;font-weight:600;color:var(--ink-2);letter-spacing:.03em}
-.lbl .opt{font-weight:400;color:var(--faint);margin-left:6px}
+.lbl .opt{font-weight:400;color:var(--muted);margin-left:6px}
 .inp{height:42px;padding:0 12px;border:1px solid var(--line-strong);border-radius:10px;background:rgba(var(--fg-rgb),.04);width:100%;min-width:0}
 textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;line-height:1.55}
 .inp:focus{outline:2px solid var(--gold);outline-offset:-1px;border-color:var(--gold)}
@@ -637,14 +637,14 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;line
 .confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
 
 /* Lightbox */
-.lb{position:fixed;inset:0;z-index:80;background:var(--lb-bg);display:flex;align-items:center;justify-content:center;padding:max(56px,env(safe-area-inset-top,0px)) max(56px,env(safe-area-inset-right,0px)) max(56px,env(safe-area-inset-bottom,0px)) max(56px,env(safe-area-inset-left,0px));animation:fadein2 .2s}
+.lb{position:fixed;inset:0;z-index:80;touch-action:pinch-zoom;overscroll-behavior:contain;background:var(--lb-bg);display:flex;align-items:center;justify-content:center;padding:max(56px,env(safe-area-inset-top,0px)) max(56px,env(safe-area-inset-right,0px)) max(56px,env(safe-area-inset-bottom,0px)) max(56px,env(safe-area-inset-left,0px));animation:fadein2 .2s}
 .lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;box-shadow:0 0 0 1px var(--gold-line),0 30px 80px rgba(0,0,0,calc(.6 * var(--sh)))}
 .lb-btn{position:absolute;width:44px;height:44px;border-radius:12px;border:1px solid var(--gold-line);background:rgba(255,255,255,.06);color:var(--lb-fg);font-size:22px;display:flex;align-items:center;justify-content:center}
 .lb-btn:hover{background:var(--gold-soft)}
 .lb-close{top:calc(8px + env(safe-area-inset-top,0px));right:calc(8px + env(safe-area-inset-right,0px))}
 .lb-prev{left:calc(6px + env(safe-area-inset-left,0px));top:50%;transform:translateY(-50%)}
 .lb-next{right:calc(6px + env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%)}
-.lb-count{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:var(--gold);font-family:var(--f-mono);font-size:12px}
+.lb-count{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;pointer-events:none;color:var(--gold);font-family:var(--f-mono);font-size:12px}
 
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:90;background:var(--gold-grad);color:var(--on-gold);font-weight:600;padding:11px 18px;border-radius:12px;font-size:14px;box-shadow:0 14px 40px rgba(0,0,0,calc(.5 * var(--sh)));max-width:calc(100% - 32px);animation:toastin .35s var(--ease)}
 .toast.bad{background:var(--down);color:var(--on-gold)}
@@ -884,6 +884,9 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;line
   .weeks .wrow .kw{color:var(--ink-2);font-weight:600}
   .weeks .wrow .p{font-family:var(--f-mono);font-size:12px}
   .tl-date b{font-size:20px}
+}
+@media (pointer:coarse){
+  .inp,.search,.ig input,select{font-size:16px}
 }
 @media (max-width:600px){
   .p-foot .spacer{display:none}
@@ -2013,7 +2016,7 @@ const Views = {
           <button type="button" class="btn primary" data-action="new-outlook">${ICON.plus}Outlook eintragen</button>
         </div>
         <div class="toolbar" data-rv="${M}:tb" style="--rd:120ms">
-          <input type="search" class="search" id="o-search" placeholder="Nach Instrument oder Text suchen" aria-label="Outlooks durchsuchen" value="${esc(S.oq)}">
+          <input type="search" class="search" id="o-search" placeholder="Instrument oder Text suchen" aria-label="Outlooks durchsuchen" value="${esc(S.oq)}">
           <div class="chips" id="o-bias">
             ${[['all','Alle'],['bull','HTF ▲ Bullish'],['bear','HTF ▼ Bearish']].map(([v, l]) => `<button type="button" class="chip" data-obias="${v}">${l}</button>`).join('')}
           </div>
@@ -2065,7 +2068,7 @@ const Modal = {
     if (this.cur && this.cur.cleanup) this.cur.cleanup();
     if (!this.cur) this.opener = document.activeElement;
     this.cur = {builder, live: !!opts.live, back: opts.back || null, cleanup: opts.cleanup || null, dirty: false};
-    const panel = $('#panel');
+    const panel = this.freshPanel();
     panel.innerHTML = builder();
     panel.scrollTop = 0;
     $('#modal').hidden = false;
@@ -2074,6 +2077,11 @@ const Modal = {
     if (opts.onMount) opts.onMount(panel);
     const f = panel.querySelector(opts.focus || '.p-body button, .p-body input, .p-body textarea, .p-foot button');
     if (f) { try { f.focus({preventScroll: true}); } catch (e) { f.focus(); } }
+  },
+  freshPanel(){
+    const old = $('#panel'), panel = old.cloneNode(false);
+    old.parentNode.replaceChild(panel, old);
+    return panel;
   },
   refresh(){
     if (!this.cur || !this.cur.live) return;
@@ -2085,7 +2093,7 @@ const Modal = {
     if (!this.cur) return;
     if (this.cur.cleanup) this.cur.cleanup();
     this.cur = null;
-    $('#modal').hidden = true; $('#panel').innerHTML = '';
+    $('#modal').hidden = true; this.freshPanel();
     document.documentElement.style.overflow = '';
     if (this.opener && document.contains(this.opener)) { try { this.opener.focus({preventScroll: true}); } catch (e) {} }
     this.opener = null;
@@ -2259,7 +2267,7 @@ function fieldHtml(f, v){
     case 'shots': {
       const can = Store.canUpload();
       return `<div class="fld full"><span class="lbl">${f.label}<span class="opt">optional</span></span>
-        ${can ? `<label class="drop" for="f-file" id="drop">${ICON.img}<b>Screenshot hinzufügen</b><span>Klicken, Bild hierher ziehen oder mit <kbd>${isMac ? '⌘' : 'Strg'}+V</kbd> einfügen</span></label>
+        ${can ? `<label class="drop" for="f-file" id="drop" tabindex="0" role="button">${ICON.img}<b>Screenshot hinzufügen</b><span>Klicken, Bild hierher ziehen oder mit <kbd>${isMac ? '⌘' : 'Strg'}+V</kbd> einfügen</span></label>
         <input type="file" id="f-file" accept="image/*" multiple hidden>` : `<p class="lbl">Screenshots können in dieser Ansicht nicht hinzugefügt werden.</p>`}
         <div class="thumbs" id="thumbs" hidden></div></div>`;
     }
@@ -2421,6 +2429,7 @@ function openForm(kind, entry, opts){
       if (fi) fi.addEventListener('change', () => { addFiles(fi.files); fi.value = ''; });
       const drop = p.querySelector('#drop');
       if (drop) {
+        drop.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && fi) { e.preventDefault(); fi.click(); } });
         ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
         ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
         drop.addEventListener('drop', e => addFiles(e.dataTransfer && e.dataTransfer.files));
@@ -2435,7 +2444,8 @@ function openForm(kind, entry, opts){
 /* ---------- lightbox ---------- */
 const LB = {
   list: [], i: 0,
-  open(list, i){ if (!list.length) return; this.list = list; this.i = i; this.show(); $('#lightbox').hidden = false; $('.lb-close').focus(); },
+  opener: null,
+  open(list, i){ if (!list.length) return; this.opener = document.activeElement; this.list = list; this.i = i; this.show(); $('#lightbox').hidden = false; $('.lb-close').focus(); },
   show(){
     $('#lb-img').src = this.list[this.i];
     const many = this.list.length > 1;
@@ -2443,9 +2453,25 @@ const LB = {
     $('#lb-count').textContent = many ? (this.i + 1) + ' / ' + this.list.length : '';
   },
   step(d){ this.i = (this.i + d + this.list.length) % this.list.length; this.show(); },
-  close(){ $('#lightbox').hidden = true; $('#lb-img').removeAttribute('src'); },
+  close(){
+    $('#lightbox').hidden = true; $('#lb-img').removeAttribute('src');
+    const o = this.opener; this.opener = null;
+    if (o && document.contains(o)) { try { o.focus({preventScroll: true}); } catch (e) {} }
+  },
   isOpen(){ return !$('#lightbox').hidden; }
 };
+(() => {
+  // swipe between screenshots on touch screens
+  const lb = $('#lightbox');
+  let sx = 0, sy = 0, on = false;
+  lb.addEventListener('pointerdown', e => { on = e.pointerType !== 'mouse' && !e.target.closest('button'); sx = e.clientX; sy = e.clientY; }, {passive: true});
+  lb.addEventListener('pointerup', e => {
+    if (!on) return; on = false;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (LB.list.length > 1 && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) LB.step(dx < 0 ? 1 : -1);
+  }, {passive: true});
+  lb.addEventListener('pointercancel', () => { on = false; }, {passive: true});
+})();
 
 /* ---------- personalisation ---------- */
 const SKINS = [
@@ -2839,7 +2865,19 @@ document.addEventListener('click', e => {
   }
 });
 
+/* keep keyboard focus inside the open dialog, lightbox or setup */
+function trapTab(e){
+  const root = LB.isOpen() ? $('#lightbox') : Modal.cur ? $('#panel') : Setup.isOpen ? $('#setup .su-card') : null;
+  if (!root) return false;
+  const f = $$('a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])', root)
+    .filter(el => !el.hidden && !el.closest('[hidden]') && el.getClientRects().length);
+  if (!f.length) { e.preventDefault(); return true; }
+  const first = f[0], last = f[f.length - 1], a = document.activeElement, inside = root.contains(a);
+  if (e.shiftKey ? (!inside || a === first) : (!inside || a === last)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); return true; }
+  return false;
+}
 document.addEventListener('keydown', e => {
+  if (e.key === 'Tab' && trapTab(e)) return;
   if (Loader.active && e.key === 'Escape') { e.preventDefault(); Loader.skipNow(); return; }
   if (LB.isOpen()) {
     if (e.key === 'Escape') { e.preventDefault(); LB.close(); }
