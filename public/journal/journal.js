@@ -428,7 +428,7 @@ const BG = {
   },
   covered(){
     if (document.hidden) return true;
-    for (const id of ['modal', 'lightbox', 'setup', 'loader']) { const el = document.getElementById(id); if (el && !el.hidden) return true; }
+    for (const id of ['modal', 'lightbox', 'setup', 'loader', 'tour']) { const el = document.getElementById(id); if (el && !el.hidden) return true; }
     return false;
   },
   init(){
@@ -478,7 +478,7 @@ const BG = {
     document.addEventListener('visibilitychange', () => this.sync());
     if ('MutationObserver' in window) {
       const mo = new MutationObserver(() => this.sync());
-      for (const id of ['modal', 'lightbox', 'setup', 'loader']) { const el = document.getElementById(id); if (el) mo.observe(el, {attributes: true, attributeFilter: ['hidden']}); }
+      for (const id of ['modal', 'lightbox', 'setup', 'loader', 'tour']) { const el = document.getElementById(id); if (el) mo.observe(el, {attributes: true, attributeFilter: ['hidden']}); }
     }
   },
   send(t, v){ if (this.worker) this.worker.postMessage({t, v}); else if (this.eng) this.eng[t](v); },
@@ -1506,7 +1506,7 @@ const SKIN_OLD = {ocean: 'slate', royal: 'navy', copper: 'mocha', arctic: 'paper
 const skinId = id => SKIN_OLD[id] || id;
 function normSettings(d){
   d = d || {};
-  const o = {theme: 'navy', name: '', modules: {learnings: true, outlooks: true}, accounts: [], setupDone: !!d.setupDone};
+  const o = {theme: 'navy', name: '', modules: {learnings: true, outlooks: true}, accounts: [], setupDone: !!d.setupDone, tourDone: !!d.tourDone};
   if (SKIN_IDS.includes(skinId(d.theme))) o.theme = skinId(d.theme);
   if (typeof d.name === 'string') o.name = d.name.trim().slice(0, 30);
   if (d.modules && typeof d.modules === 'object') { o.modules.learnings = d.modules.learnings !== false; o.modules.outlooks = d.modules.outlooks !== false; }
@@ -1673,10 +1673,11 @@ const Setup = {
       this.next();
     });
   },
-  maybe(){ if (S.settingsLoaded && !S.settings.setupDone && !this.isOpen && !this.dismissed) this.start(); },
+  maybe(){ if (S.settingsLoaded && !S.settings.setupDone && !this.isOpen && !this.dismissed) this.start(); else if (S.settingsLoaded && S.settings.setupDone) Tour.maybe(); },
   start(){
     this.draft = JSON.parse(JSON.stringify(S.settings));
     this.isOpen = true; this.step = 0; this.failed = false;
+    if (Tour.on) Tour.end();
     if (Modal.cur) Modal.close();
     this.el.classList.remove('out'); this.el.hidden = false;
     document.documentElement.style.overflow = 'hidden';
@@ -1730,13 +1731,206 @@ const Setup = {
     this.busy = false; btn.disabled = false;
     this.close();
     applySettings();
-    toast(skip ? 'Du kannst alles jederzeit in den Einstellungen anpassen.' : (S.settings.name ? 'Willkommen, ' + S.settings.name + '. Dein Journal ist bereit.' : 'Dein Journal ist bereit.'));
+    if (!S.settings.tourDone) Tour.maybe(650);
+    else toast(skip ? 'Du kannst alles jederzeit in den Einstellungen anpassen.' : (S.settings.name ? 'Willkommen, ' + S.settings.name + '. Dein Journal ist bereit.' : 'Dein Journal ist bereit.'));
   },
   close(){
     this.isOpen = false; this.dismissed = true;
     this.el.classList.add('out');
     document.documentElement.style.overflow = '';
     setTimeout(() => { if (!this.isOpen) { this.el.hidden = true; this.el.classList.remove('out'); $('#su-body').innerHTML = ''; } }, 450);
+  }
+};
+
+/* ---------- guided tour: once after the setup, restart from the settings ---------- */
+const Tour = {
+  on: false, i: 0, steps: [], dismissed: false, raf: 0, until: 0, timer: 0, stepAt: 0, startView: null, prevFocus: null,
+  init(){
+    this.el = $('#tour'); this.hole = $('#tour-hole'); this.card = $('#tour-card');
+    this.el.addEventListener('click', e => {
+      const b = e.target.closest('[data-tour]');
+      if (!b) return;
+      const a = b.dataset.tour;
+      if (a === 'next') this.next(); else if (a === 'back') this.go(this.i - 1); else this.end();
+    });
+    const kick = () => { if (this.on) { this.foot(); this.follow(260); } };
+    addEventListener('resize', kick);
+    addEventListener('scroll', kick, {passive: true});
+  },
+  // first visit: after the setup, or when an existing journal has never seen the tour
+  maybe(delay){
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => {
+      if (this.on || this.dismissed || !S.settingsLoaded || !S.settings.setupDone || S.settings.tourDone) return;
+      if (Setup.isOpen || Modal.cur || LB.isOpen() || Loader.active || document.hidden) { this.maybe(1200); return; }
+      this.start();
+    }, delay == null ? 1400 : delay);
+  },
+  build(){
+    const L = modOn('learnings'), O = modOn('outlooks');
+    const touch = matchMedia('(hover: none)').matches;
+    const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    const wide = matchMedia('(min-width: 761px) and (hover: hover)').matches;
+    const phone = matchMedia('(max-width: 760px)').matches;
+    const nm = S.settings.name;
+    const pages = ['Kalender'].concat(L ? ['Learnings'] : [], O ? ['Outlooks'] : []);
+    const list = pages.length > 2 ? pages.slice(0, -1).join(', ') + ' und ' + pages[pages.length - 1] : pages.join(' und ');
+    const shots = touch ? 'Screenshots wählst du direkt aus deinen Fotos.' : 'Screenshots ziehst du einfach ins Formular oder fügst sie mit ' + (mac ? '⌘V' : 'Strg+V') + ' ein.';
+    const keys = ['N trägt etwas Neues ein', '← und → wechseln den Monat', 'T springt zu heute'].concat(pages.length > 1 ? [pages.map((p, k) => k + 1).join(', ') + ' öffnen die Seiten'] : []);
+    const hasTrades = S.trades.length > 0;
+    return [
+      {center: true, eyebrow: 'Kurze Tour · 1 Minute', t: nm ? 'Willkommen, ' + nm + '.' : 'Willkommen bei Blotter.', x: 'In einer Minute siehst du, wo alles ist und wie du das Meiste aus deinem Journal holst.', next: 'Tour starten'},
+      pages.length > 1 && {sel: '#topbar .tabs', t: 'Deine Bereiche', x: 'Oben wechselst du zwischen ' + list + '.'},
+      {view: 'kalender', sel: '#equity', t: 'Deine Bilanz', x: 'Win-Rate, die Verteilung von TP, BE und SL und dein Trade-Tape für den gewählten Monat. Alles rechnet sich von selbst.'},
+      {view: 'kalender', sel: '.cal-head', t: 'Monat und Konten', x: 'Mit den Pfeilen blätterst du durch die Monate, „Heute“ bringt dich zurück. Mit dem Konto-Filter siehst du nur die Trades eines Kontos.'},
+      {view: 'kalender', sel: '.cal-head [data-action="new-trade"]', t: 'Trade eintragen', x: 'Konto, Instrument, Long oder Short, Ergebnis (TP, BE oder SL), Setup und Notizen. ' + shots},
+      {view: 'kalender', sel: '.stats', t: 'Der Monat in Zahlen', x: 'Anzahl der Trades, Take Profits, Stop Losses und Break Evens mit ihrem Anteil, dazu deine beste TP-Serie.'},
+      {view: 'kalender', sel: '.cal-wrap', t: 'Dein Kalender', x: 'Jeder Tag zeigt seine Trades nach Ergebnis: grün für TP, grau für BE, rot für SL. Wähl einen Tag, um seine Einträge zu sehen oder für ihn etwas einzutragen.' + (phone ? ' Darunter siehst du jede Woche zusammengefasst.' : '')},
+      L && {view: 'learnings', sel: '#view .page-head', also: '#view .toolbar', t: 'Learnings', x: 'Schreib auf, was du aus deinen Trades gelernt hast, mit Kategorie und Screenshots. Über Suche und Kategorien findest du alles schnell wieder.'},
+      O && {view: 'outlooks', sel: '#view .page-head', also: '#view .toolbar', t: 'Outlooks', x: 'Plane vor der Session: HTF und LTF jeweils bullish oder bearish, dazu dein Szenario. Danach markierst du, ob es eingetreten ist, und siehst deine Trefferquote.'},
+      {view: 'kalender', sel: '#topbar [data-action="open-settings"]', pad: 6, t: 'Einstellungen', x: 'Name, Farbschema, Seiten und Konten' + (window.BlotterBackend ? ' sowie dein Abo' : '') + ' verwaltest du hier. Dort kannst du diese Tour auch jederzeit neu starten.'},
+      wide && {view: 'kalender', sel: '.foot .keys', t: 'Tastenkürzel', x: keys.join(', ') + '.'},
+      {center: true, view: 'kalender', eyebrow: 'Los geht’s', t: hasTrades ? 'Alles klar. Viel Erfolg beim Traden.' : 'Bereit für deinen ersten Trade?', x: (Store.db ? 'Alles speichert sich automatisch und ist auf all deinen Geräten da. ' : '') + (hasTrades ? 'Trag deinen nächsten Trade ein, solange alles frisch ist.' : 'Trag ihn gleich ein, solange alles frisch ist.'), next: hasTrades ? 'Trade eintragen' : 'Ersten Trade eintragen', alt: 'Fertig', cta: () => openForm('trades', null, {})},
+    ].filter(Boolean);
+  },
+  start(){
+    clearTimeout(this.timer);
+    if (Modal.cur) Modal.close();
+    if (LB.isOpen()) LB.close();
+    this.steps = this.build(); this.on = true; this.dismissed = false; this.startView = S.view;
+    this.prevFocus = document.activeElement;
+    this.el.classList.remove('out'); this.el.hidden = false;
+    document.documentElement.classList.add('touring');
+    this.show(0);
+  },
+  next(){
+    if (!this.on) return;
+    const s = this.steps[this.i];
+    if (this.i >= this.steps.length - 1) { this.end(true); if (s.cta) setTimeout(s.cta, 120); return; }
+    this.go(this.i + 1);
+  },
+  go(i){ if (this.on && i >= 0 && i < this.steps.length && i !== this.i) this.show(i); },
+  show(i){
+    const first = !this.el.dataset.shown;
+    this.el.dataset.shown = '1';
+    this.i = i; this.stepAt = performance.now();
+    const s = this.steps[i], n = this.steps.length, c = this.card;
+    c.classList.add('swap');
+    setTimeout(() => {
+      if (!this.on || this.i !== i) return;
+      if (s.view && s.view !== S.view && modOn(s.view)) { goView(s.view); try { history.replaceState(null, '', '#' + s.view); } catch (e) {} }
+      $('#tour-n').textContent = s.eyebrow || 'Schritt ' + i + ' von ' + (n - 2);
+      $('#tour-t').textContent = s.t;
+      $('#tour-d').textContent = s.x;
+      $('#tour-bar').style.width = (i / (n - 1) * 100) + '%';
+      this.foot();
+      $('#tour-skip').textContent = i === n - 1 ? (s.alt || 'Fertig') : 'Überspringen';
+      $('#tour-next').innerHTML = s.next ? esc(s.next) : 'Weiter' + ICON.next;
+      c.classList.toggle('center', !!s.center);
+      this.reveal(s);
+      this.place();
+      c.classList.remove('swap');
+      try { $('#tour-next').focus({preventScroll: true}); } catch (e) {}
+      this.follow(1600);
+    }, first ? 0 : 170);
+  },
+  // narrow phones: the corner × ends the tour, so the middle steps only show Zurück / Weiter
+  foot(){
+    const n = this.steps.length, i = this.i, narrow = innerWidth < 420;
+    $('#tour-back').hidden = i === 0 || (narrow && i === n - 1);
+    $('#tour-skip').hidden = narrow && i > 0 && i < n - 1;
+  },
+  els(s){ return [s.sel, s.also].filter(Boolean).map(q => $(q)).filter(el => el && el.getClientRects().length); },
+  rect(s){
+    const els = this.els(s);
+    if (!els.length) return null;
+    let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+    for (const el of els) { const q = el.getBoundingClientRect(); l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.right); b = Math.max(b, q.bottom); }
+    return {left: l, top: t, right: r, bottom: b, width: r - l, height: b - t};
+  },
+  docked(){ return innerWidth < 640; },
+  topSafe(){ const tb = $('#topbar'); return (tb ? Math.max(0, tb.getBoundingClientRect().bottom) : 0) + 14; },
+  // scroll the highlighted part into view, leaving room for the card
+  reveal(s){
+    if (s.center) return;
+    const els = this.els(s);
+    if (!els.length || els.every(el => el.closest('#topbar'))) return;
+    const r = this.rect(s), ch = this.card.offsetHeight + 28;
+    const top = this.topSafe(), bottom = innerHeight - (this.docked() ? ch : 16);
+    const avail = bottom - top, need = this.docked() ? r.height : r.height + ch;
+    let y;
+    if (need <= avail) y = r.top - top - (avail - need) / 2;
+    else if (r.height <= avail) y = r.top - top - (avail - r.height) / 2;
+    else y = r.top - top;
+    if (Math.abs(y) < 4) return;
+    // jump (the page is dimmed anyway); the spotlight glides to its new place
+    scrollTo(0, Math.max(0, Math.min(scrollY + y, document.documentElement.scrollHeight - innerHeight)));
+  },
+  place(){
+    const s = this.steps[this.i];
+    if (!s || !this.on) return;
+    const W = innerWidth, H = innerHeight, c = this.card, h = this.hole;
+    const docked = this.docked();
+    this.el.classList.toggle('docked', docked);
+    h.classList.toggle('snap', performance.now() - this.stepAt > 700);
+    const r = s.center ? null : this.rect(s);
+    let box = null;
+    if (r) {
+      const p = s.pad != null ? s.pad : 8;
+      const l = Math.max(4, r.left - p), t = Math.max(4, r.top - p);
+      box = {l, t, w: Math.max(0, Math.min(W - 4, r.right + p) - l), h: Math.max(0, Math.min(H - 4, r.bottom + p) - t)};
+    }
+    if (box && box.w > 0 && box.h > 0) {
+      h.classList.remove('none');
+      const el = this.els(s)[0];
+      const rad = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 8;
+      h.style.transform = `translate(${box.l}px,${box.t}px)`;
+      h.style.width = box.w + 'px'; h.style.height = box.h + 'px';
+      h.style.borderRadius = Math.min(28, rad + (s.pad != null ? s.pad : 8)) + 'px';
+    } else {
+      h.classList.add('none');
+      h.style.transform = `translate(${W / 2}px,${H / 2}px)`; h.style.width = '0px'; h.style.height = '0px';
+    }
+    if (docked && !s.center) { c.style.transform = ''; return; }
+    const cw = c.offsetWidth, chh = c.offsetHeight, gap = 14, m = 12;
+    let x = null, y;
+    if (!box || s.center) { x = (W - cw) / 2; y = (H - chh) / 2; }
+    else if (box.t + box.h + gap + chh <= H - m) y = box.t + box.h + gap;
+    else if (box.t - gap - chh >= m) y = box.t - gap - chh;
+    else if (box.l + box.w + gap + cw <= W - m) { x = box.l + box.w + gap; y = Math.min(Math.max(m, box.t), H - chh - m); }
+    else if (box.l - gap - cw >= m) { x = box.l - gap - cw; y = Math.min(Math.max(m, box.t), H - chh - m); }
+    else y = H - chh - m;
+    if (x == null) x = box.l + box.w / 2 - cw / 2;
+    x = Math.min(Math.max(m, x), W - cw - m);
+    y = Math.max(m, y);
+    c.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`;
+  },
+  // keep the spotlight on its target while the page scrolls or elements animate in
+  follow(ms){
+    this.until = Math.max(this.until, performance.now() + ms);
+    if (this.raf) return;
+    const f = () => {
+      if (!this.on) { this.raf = 0; return; }
+      this.place();
+      this.raf = performance.now() < this.until ? requestAnimationFrame(f) : 0;
+    };
+    this.raf = requestAnimationFrame(f);
+  },
+  end(){
+    if (!this.on) return;
+    this.on = false; this.dismissed = true; clearTimeout(this.timer);
+    document.documentElement.classList.remove('touring');
+    this.el.classList.add('out');
+    setTimeout(() => { if (!this.on) { this.el.hidden = true; this.el.classList.remove('out'); delete this.el.dataset.shown; this.hole.classList.add('none'); } }, 300);
+    const back = modOn(this.startView) ? this.startView : 'kalender';
+    if (S.view !== back) { goView(back); try { history.replaceState(null, '', '#' + back); } catch (e) {} }
+    else { try { scrollTo({top: 0, behavior: reduce ? 'auto' : 'smooth'}); } catch (e) { scrollTo(0, 0); } }
+    if (!S.settings.tourDone) {
+      S.settings = normSettings(Object.assign({}, S.settings, {tourDone: true}));
+      Store.saveSettings().catch(() => {});
+    }
+    const pf = this.prevFocus; this.prevFocus = null;
+    if (pf && pf !== document.body && document.contains(pf)) { try { pf.focus({preventScroll: true}); } catch (e) {} }
   }
 };
 
@@ -1752,6 +1946,7 @@ function openSettings(){
       <section class="set-sec"><h3>Seiten</h3>${modGrid(draft.modules)}</section>
       <section class="set-sec"><h3>Konten</h3>${acctEditor(draft.accounts, 'set')}</section>
       ${window.BlotterBackend ? `<section class="set-sec"><h3>Konto &amp; Abo</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p><div class="acct-btns"><button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button><button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}
+      <section class="set-sec"><h3>Hilfe</h3><p class="set-help">Die kurze Tour zeigt dir noch einmal alle Bereiche deines Journals.</p><div><button type="button" class="btn sm" data-action="set-tour">Tour starten</button></div></section>
       <p class="form-err" id="form-err" role="alert" hidden></p>
     </div>
     <div class="p-foot">
@@ -1776,6 +1971,7 @@ function openSettings(){
           catch (err) { a.disabled = false; const er = $('#form-err', p); er.textContent = errText(err); er.hidden = false; }
         }
         else if (act === 'set-wizard') { if (Modal.cur) Modal.cur.dirty = false; Modal.close(); Setup.dismissed = false; Setup.start(); }
+        else if (act === 'set-tour') { if (Modal.cur) Modal.cur.dirty = false; Modal.close(); setTimeout(() => Tour.start(), 260); }
         else if (act === 'set-save') {
           draft.name = ($('#set-name', p).value || '').trim().slice(0, 30);
           readNames(draft, 'set');
@@ -1802,7 +1998,7 @@ function openSettings(){
 /* ---------- shortcuts & pointer glow ---------- */
 document.addEventListener('keydown', e => {
   if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
-  if (Modal.cur || LB.isOpen() || Loader.active || Setup.isOpen) return;
+  if (Modal.cur || LB.isOpen() || Loader.active || Setup.isOpen || Tour.on) return;
   const tg = e.target;
   if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) return;
   const k = (e.key || '').toLowerCase();
@@ -1885,7 +2081,7 @@ document.addEventListener('click', e => {
 
 /* keep keyboard focus inside the open dialog, lightbox or setup */
 function trapTab(e){
-  const root = LB.isOpen() ? $('#lightbox') : Modal.cur ? $('#panel') : Setup.isOpen ? $('#setup .su-card') : null;
+  const root = Tour.on ? $('#tour-card') : LB.isOpen() ? $('#lightbox') : Modal.cur ? $('#panel') : Setup.isOpen ? $('#setup .su-card') : null;
   if (!root) return false;
   const f = $$('a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])', root)
     .filter(el => !el.hidden && !el.closest('[hidden]') && el.getClientRects().length);
@@ -1896,6 +2092,12 @@ function trapTab(e){
 }
 document.addEventListener('keydown', e => {
   if (e.key === 'Tab' && trapTab(e)) return;
+  if (Tour.on) {
+    if (e.key === 'Escape') { e.preventDefault(); Tour.end(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); Tour.next(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); Tour.go(Tour.i - 1); }
+    return;
+  }
   if (Loader.active && e.key === 'Escape') { e.preventDefault(); Loader.skipNow(); return; }
   if (LB.isOpen()) {
     if (e.key === 'Escape') { e.preventDefault(); LB.close(); }
@@ -1937,6 +2139,7 @@ readHash();
 Reveal.init();
 Loader.init();
 Setup.init();
+Tour.init();
 BG.init();
 render();
 Store.init();
