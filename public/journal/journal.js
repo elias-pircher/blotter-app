@@ -546,7 +546,7 @@ const Roll = {
     if (el._rt === text) return;
     const prev = el._digits || [];
     el._rt = text;
-    if (reduce || !el.isConnected) { el.classList.remove('roll'); el.textContent = text; el._digits = null; return; }
+    if (reduce || ViewFx.quiet || !el.isConnected) { el.classList.remove('roll'); el.textContent = text; el._digits = null; return; }
     el.classList.add('roll');
     const chars = Array.from(text), digits = [];
     let html = '<span class="sr">' + esc(text) + '</span><span class="rw" aria-hidden="true">';
@@ -610,7 +610,7 @@ const Dial = {
       });
     };
     // first values sweep in from zero, once the page has settled
-    if (!d._shown) { d._shown = true; setTimeout(() => requestAnimationFrame(apply), reduce ? 0 : ViewFx.still ? 900 : 420); } else apply();
+    if (!d._shown) { d._shown = true; if (ViewFx.quiet) apply(); else setTimeout(() => requestAnimationFrame(apply), reduce ? 0 : ViewFx.still ? 900 : 420); } else apply();
   }
 };
 
@@ -658,7 +658,9 @@ const phoneSheet = () => innerWidth <= 600;
 
 /* ---------- chronograph: page change ---------- */
 const ViewFx = {
-  busy: false, queued: null, target: null, still: false,
+  busy: false, queued: null, target: null, still: false, quiet: false, scrub: null,
+  // can a script drive the view-transition faces? (needed for the finger-driven turn)
+  canScrub: (() => { try { new KeyframeEffect(document.documentElement, null, {pseudoElement: '::view-transition-new(root)'}); return typeof document.startViewTransition === 'function'; } catch (e) { return false; } })(),
   go(next){
     if (this.busy) { this.queued = next; this.target = next; updateChrome(); return; }
     if (next === S.view) return;
@@ -705,6 +707,7 @@ const ViewFx = {
     try {
       vt = document.startViewTransition(() => {
         const to = this.queued || next; this.queued = null;
+        html.classList.add('vt-in');
         goView(to);
       });
     } catch (e) {
@@ -714,13 +717,105 @@ const ViewFx = {
     updateChrome();
     vt.ready.then(() => this.sweep(dir), () => {});
     const fin = () => {
-      html.classList.remove('vt3d', 'vt'); delete html.dataset.vtdir;
+      html.classList.remove('vt3d', 'vt', 'vt-in'); delete html.dataset.vtdir;
       this.still = false; this.busy = false; this.target = null;
       updateChrome();
       const q = this.queued; this.queued = null;
       if (q && q !== S.view) this.go(q);
     };
     vt.finished.then(fin, fin);
+  },
+  // ---- the same turn, driven by a finger ----
+  cfg(){
+    const cs = getComputedStyle(document.documentElement);
+    return {pp: (cs.getPropertyValue('--cube-p') || '').trim() || '1500px', dip: parseFloat(cs.getPropertyValue('--cube-dip')) || .2, tilt: parseFloat(cs.getPropertyValue('--cube-tilt')) || 4};
+  },
+  // one face at progress p (0 = old page in front, 1 = new page in front); matches the CSS keyframes
+  frame(face, dir, p, c){
+    const q = Math.max(0, Math.min(1, p)), sn = Math.sin(Math.PI * q);
+    const ang = (face === 'old' ? -90 * p : 90 * (1 - p)) * dir;
+    const op = .18 + .82 * Math.max(0, Math.cos(Math.min(90, Math.abs(ang)) * Math.PI / 180));
+    return {transform: `perspective(${c.pp}) scale(${(1 - c.dip * sn).toFixed(4)}) translateZ(-50vw) rotateX(${(c.tilt * sn).toFixed(3)}deg) rotateY(${ang.toFixed(3)}deg) translateZ(50vw)`, opacity: op.toFixed(3)};
+  },
+  faces(dir, from, to, curve, dur, n){
+    const html = document.documentElement, c = this.cfg();
+    return ['old', 'new'].map(face => {
+      const kf = [];
+      for (let i = 0; i <= n; i++) { const t = i / n; kf.push(Object.assign(this.frame(face, dir, from + (to - from) * curve(t), c), {offset: t})); }
+      return html.animate(kf, {pseudoElement: `::view-transition-${face}(root)`, duration: dur, fill: 'both', easing: 'linear'});
+    });
+  },
+  scrubStart(next, dir){
+    if (this.busy || !this.canScrub || next === S.view) return false;
+    const html = document.documentElement;
+    const sc = this.scrub = {next, dir, from: S.view, p: 0, ready: false, anims: null, done: null};
+    this.busy = true; this.target = null; this.still = true;
+    html.dataset.vtdir = dir > 0 ? 'fwd' : 'back';
+    html.classList.add('vt3d', 'vt', 'vtscrub');
+    let vt;
+    try { vt = document.startViewTransition(() => goView(next)); }
+    catch (e) {
+      html.classList.remove('vt3d', 'vt', 'vtscrub'); delete html.dataset.vtdir;
+      this.scrub = null; this.still = false; this.busy = false;
+      return false;
+    }
+    vt.ready.then(() => {
+      try { sc.anims = this.faces(dir, 0, 1, t => t, 1000, 12); sc.anims.forEach(a => { a.pause(); a.currentTime = sc.p * 1000; }); }
+      catch (e) { sc.anims = null; html.classList.remove('vtscrub'); this.sweep(dir); }
+      sc.ready = true;
+      if (sc.done) this.scrubLand();
+    }, () => {});
+    const fin = () => {
+      if (sc.done === 'cancel' && S.view !== sc.from) this.restore(sc.from);
+      // scripted faces must not outlive this turn (a filled animation would sit on the next turn's faces)
+      if (sc.anims) sc.anims.forEach(a => a.cancel());
+      html.classList.remove('vt3d', 'vt', 'vtscrub', 'vt-in'); delete html.dataset.vtdir; html.style.removeProperty('--glint-d');
+      this.scrub = null; this.still = false; this.busy = false; this.target = null;
+      updateChrome();
+      const q = this.queued; this.queued = null;
+      if (q && q !== S.view) this.go(q);
+    };
+    vt.finished.then(fin, fin);
+    return true;
+  },
+  scrubMove(p){
+    const sc = this.scrub;
+    if (!sc || sc.done) return;
+    sc.p = p;
+    if (sc.anims) sc.anims.forEach(a => { a.currentTime = p * 1000; });
+    moveTabInd();
+  },
+  scrubEnd(commit){
+    const sc = this.scrub;
+    if (!sc || sc.done) return;
+    sc.done = commit || !sc.anims && sc.ready ? 'commit' : 'cancel';
+    // same as tapping the tab: the hash change is queued behind the running turn and lands on the same page
+    if (sc.done === 'commit') location.hash = sc.next;
+    updateChrome();
+    if (sc.ready) this.scrubLand();
+  },
+  // after the finger lets go: click into place, or turn back
+  scrubLand(){
+    const sc = this.scrub, html = document.documentElement;
+    if (!sc || !sc.anims) return;
+    const p0 = sc.p, old = sc.anims;
+    if (sc.done === 'commit') {
+      const T = 1.0, back = t => { const u = t - 1; return u * u * ((T + 1) * u + T) + 1; };
+      html.style.setProperty('--glint-d', '20ms'); html.classList.add('vt-in');
+      sc.anims = this.faces(sc.dir, p0, 1, back, Math.round(300 + 480 * (1 - p0)), 20);
+      this.sweep(sc.dir);
+    } else {
+      const out = t => 1 - Math.pow(1 - t, 3);
+      sc.anims = this.faces(sc.dir, p0, 0, out, Math.round(200 + 360 * p0), 12);
+      // swap the page back in the same frame the turn ends, so the new page never flashes
+      sc.anims[0].onfinish = () => this.restore(sc.from);
+    }
+    old.forEach(a => a.cancel());
+  },
+  restore(view){
+    if (S.view === view) return;
+    this.quiet = true;
+    try { goView(view); } finally { this.quiet = false; }
   },
   sweep(dir){
     const sw = $('#vt-sweep'), tb = $('#topbar');
@@ -771,7 +866,7 @@ const Tilt = {
 
 /* ---------- chronograph: page titles roll in ---------- */
 function splitTitle(root){
-  if (reduce || !root) return;
+  if (reduce || ViewFx.quiet || !root) return;
   const h = root.querySelector('.page-head h1');
   if (!h || h.classList.contains('split')) return;
   const t = h.textContent;
@@ -779,6 +874,65 @@ function splitTitle(root){
   if (ViewFx.still) h.style.setProperty('--tl0', '430ms');
   h.innerHTML = Array.from(t).map((c, i) => `<span class="tl" aria-hidden="true" style="--i:${i}">${esc(c)}</span>`).join('');
 }
+
+/* ---------- chronograph: turn the cube with a finger (phones) ---------- */
+const CubeSwipe = {
+  g: null,
+  init(){
+    if (reduce || typeof document.startViewTransition !== 'function') return;
+    document.addEventListener('pointerdown', e => this.down(e), {passive: true});
+    document.addEventListener('pointermove', e => this.move(e), {passive: true});
+    document.addEventListener('pointerup', e => this.up(e), {passive: true});
+    document.addEventListener('pointercancel', e => this.up(e), {passive: true});
+  },
+  down(e){
+    this.g = null;
+    if (e.pointerType !== 'touch' || !e.isPrimary || pagesOn().length < 2) return;
+    if (Modal.cur || LB.isOpen() || Setup.isOpen || Tour.on || Loader.active || ViewFx.busy) return;
+    const t = e.target;
+    if (!t || !t.closest || !t.closest('#view') || t.closest('input,textarea,select,[contenteditable="true"]')) return;
+    // the screen edges belong to the browser's own back/forward swipe
+    if (e.clientX < 24 || e.clientX > innerWidth - 24) return;
+    // rows that scroll sideways keep their own swipe
+    for (let el = t; el && el.id !== 'view'; el = el.parentElement) {
+      if (el.scrollWidth > el.clientWidth + 2) { const ox = getComputedStyle(el).overflowX; if (ox === 'auto' || ox === 'scroll') return; }
+    }
+    this.g = {id: e.pointerId, x: e.clientX, y: e.clientY, on: false, p: 0, hist: [], raf: 0};
+  },
+  move(e){
+    const g = this.g;
+    if (!g || e.pointerId !== g.id) return;
+    const dx = e.clientX - g.x, dy = e.clientY - g.y;
+    if (!g.on) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) { this.g = null; return; }
+      if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      const pg = pagesOn(), dir = dx < 0 ? 1 : -1, next = pg[pg.indexOf(S.view) + dir];
+      if (!next) { this.g = null; return; }
+      if (!ViewFx.canScrub) { this.g = null; location.hash = next; return; }
+      if (!ViewFx.scrubStart(next, dir)) { this.g = null; return; }
+      g.on = true; g.dir = dir;
+      try { document.documentElement.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+    g.p = Math.max(0, Math.min(1, -g.dir * dx / (Math.min(innerWidth, 900) * .8)));
+    g.hist.push([e.timeStamp, g.p]); if (g.hist.length > 6) g.hist.shift();
+    if (!g.raf) g.raf = requestAnimationFrame(() => { g.raf = 0; ViewFx.scrubMove(g.p); });
+  },
+  up(e){
+    const g = this.g;
+    if (!g || e.pointerId !== g.id) return;
+    this.g = null;
+    if (!g.on) return;
+    cancelAnimationFrame(g.raf); g.raf = 0;
+    ViewFx.scrubMove(g.p);
+    // speed of the last moment before letting go (progress per ms); the page swap can hold up a
+    // move event or two, so the last pair counts when it is far enough apart
+    const h = g.hist, b = h[h.length - 1], a = h[h.length - 2];
+    let v = 0;
+    if (a && b[0] - a[0] >= 8) v = (b[1] - a[1]) / (b[0] - a[0]);
+    else if (h.length > 2 && b[0] > h[0][0]) v = (b[1] - h[0][1]) / (b[0] - h[0][0]);
+    ViewFx.scrubEnd(e.type !== 'pointercancel' ? v > .0009 || (g.p > .3 && v > -.0006) : g.p > .5);
+  }
+};
 
 /* ---------- motion: mantra ---------- */
 const MANTRAS = [
@@ -968,7 +1122,8 @@ let tT = 0;
 function toast(msg, bad){ const el = $('#toast'); el.textContent = msg; el.className = 'toast' + (bad ? ' bad' : ''); el.style.setProperty('--toast-t', (bad ? 5.2 : 2.6) + 's'); el.hidden = true; void el.offsetWidth; el.hidden = false; clearTimeout(tT); tT = setTimeout(() => { el.hidden = true; }, bad ? 5200 : 2600); }
 function setBanner(t){ const b = $('#banner'); b.textContent = t || ''; b.hidden = !t; }
 function updateChrome(){
-  const nav = ViewFx.target || S.view;
+  const sc = ViewFx.scrub;
+  const nav = sc ? (sc.done === 'commit' ? sc.next : sc.from) : (ViewFx.target || S.view);
   const pg = pagesOn();
   $$('.tabs a').forEach(a => { a.hidden = !pg.includes(a.dataset.tab); if (a.dataset.tab === nav) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   $('.tabs').hidden = pg.length < 2;
@@ -984,6 +1139,19 @@ function updateChrome(){
 function moveTabInd(){
   const ind = $('#tab-ind'), a = $('.tabs a[aria-current="page"]');
   if (!ind || !a || !a.offsetWidth) return;
+  const sc = ViewFx.scrub;
+  if (sc && !sc.done) {
+    const b = $(`.tabs a[data-tab="${sc.next}"]`);
+    if (b && b.offsetWidth) {
+      const p = sc.p;
+      ind.style.transition = 'none';
+      ind.style.width = (a.offsetWidth + (b.offsetWidth - a.offsetWidth) * p).toFixed(1) + 'px';
+      ind.style.transform = 'translateX(' + (a.offsetLeft + (b.offsetLeft - a.offsetLeft) * p).toFixed(1) + 'px)';
+      ind.style.opacity = '1';
+      return;
+    }
+  }
+  ind.style.transition = '';
   ind.style.width = a.offsetWidth + 'px';
   ind.style.transform = 'translateX(' + a.offsetLeft + 'px)';
   ind.style.opacity = '1';
@@ -2491,6 +2659,7 @@ Setup.init();
 Tour.init();
 Origin.init();
 Tilt.init();
+CubeSwipe.init();
 BG.init();
 render();
 Store.init();

@@ -1081,35 +1081,74 @@ html.vt #view{pointer-events:none}
 /* ===== Chronograph, part 3: the page turns like a glass cube ===== */
 html.vt3d #topbar{view-transition-name:blotter-top}
 html.vt3d #vt-sweep{view-transition-name:blotter-sweep}
-::view-transition{background:radial-gradient(1100px 760px at 50% 38%,rgba(var(--acc-rgb),.16),rgba(var(--acc-rgb),0) 64%),radial-gradient(900px 600px at 50% 120%,rgba(var(--glow2-rgb),.35),rgba(var(--glow2-rgb),0) 70%),var(--bg)}
+::view-transition{background:radial-gradient(64% 36% at 50% 106%,rgba(var(--acc-rgb),.26),rgba(var(--acc-rgb),0) 72%),radial-gradient(90% 64% at 50% 34%,rgba(var(--glow2-rgb),.32),rgba(var(--glow2-rgb),0) 72%),linear-gradient(var(--scrim),var(--scrim)),var(--bg)}
 ::view-transition-group(root){animation:none}
 ::view-transition-image-pair(root){isolation:auto}
 ::view-transition-old(root),::view-transition-new(root){
-  animation-duration:1s;animation-timing-function:cubic-bezier(.72,0,.24,1);animation-fill-mode:both;
+  animation-duration:1.1s;animation-timing-function:linear;animation-fill-mode:both;
   backface-visibility:hidden;mix-blend-mode:normal;transform-origin:50% 50%;
-  outline:1px solid rgba(var(--acc-rgb),.5);outline-offset:-1px;border-radius:2px}
-html[data-vtdir="fwd"]::view-transition-old(root){animation-name:cubeOutFwd}
-html[data-vtdir="fwd"]::view-transition-new(root){animation-name:cubeInFwd}
-html[data-vtdir="back"]::view-transition-old(root){animation-name:cubeOutBack}
-html[data-vtdir="back"]::view-transition-new(root){animation-name:cubeInBack}
-@keyframes cubeOutFwd{
-  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}
-  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(-45deg) translateZ(50vw);opacity:.9}
-  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(-90deg) translateZ(50vw);opacity:.35}}
-@keyframes cubeInFwd{
-  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(90deg) translateZ(50vw);opacity:.35}
-  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(45deg) translateZ(50vw);opacity:.9}
-  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}}
-@keyframes cubeOutBack{
-  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}
-  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(45deg) translateZ(50vw);opacity:.9}
-  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(90deg) translateZ(50vw);opacity:.35}}
-@keyframes cubeInBack{
-  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(-90deg) translateZ(50vw);opacity:.35}
-  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(-45deg) translateZ(50vw);opacity:.9}
-  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}}
-:root{--cube-p:1500px;--cube-s:.8}
-@media (max-width:760px){ :root{--cube-p:900px;--cube-s:.84} }
+  outline:1px solid rgba(var(--acc-rgb),.55);outline-offset:-1px;border-radius:2px;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,.6)}
+html[data-vtdir="fwd"]{--cube-dir:1}
+html[data-vtdir="back"]{--cube-dir:-1}
+html[data-vtdir]::view-transition-old(root){animation-name:cubeOut}
+html[data-vtdir]::view-transition-new(root){animation-name:cubeIn}
+/* finger-driven turn: script owns the faces */
+html.vtscrub::view-transition-old(root),html.vtscrub::view-transition-new(root){animation:none}
+@keyframes cubeOut{
+  0%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -0.000deg)) translateZ(50vw);opacity:1.000}
+  4.17%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0218)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0218)) rotateY(calc(var(--cube-dir) * -0.624deg)) translateZ(50vw);opacity:1.000}
+  8.33%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0864)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0864)) rotateY(calc(var(--cube-dir) * -2.478deg)) translateZ(50vw);opacity:0.999}
+  12.5%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.1914)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.1914)) rotateY(calc(var(--cube-dir) * -5.516deg)) translateZ(50vw);opacity:0.996}
+  16.67%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.3307)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.3307)) rotateY(calc(var(--cube-dir) * -9.657deg)) translateZ(50vw);opacity:0.988}
+  20.83%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.4937)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.4937)) rotateY(calc(var(--cube-dir) * -14.792deg)) translateZ(50vw);opacity:0.973}
+  25%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.6636)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.6636)) rotateY(calc(var(--cube-dir) * -20.786deg)) translateZ(50vw);opacity:0.947}
+  29.17%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.8187)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.8187)) rotateY(calc(var(--cube-dir) * -27.479deg)) translateZ(50vw);opacity:0.907}
+  33.33%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.9360)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.9360)) rotateY(calc(var(--cube-dir) * -34.691deg)) translateZ(50vw);opacity:0.854}
+  37.5%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.9953)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.9953)) rotateY(calc(var(--cube-dir) * -42.227deg)) translateZ(50vw);opacity:0.787}
+  41.67%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.9855)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.9855)) rotateY(calc(var(--cube-dir) * -49.879deg)) translateZ(50vw);opacity:0.708}
+  45.83%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.9073)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.9073)) rotateY(calc(var(--cube-dir) * -57.436deg)) translateZ(50vw);opacity:0.621}
+  50%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.7730)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.7730)) rotateY(calc(var(--cube-dir) * -64.688deg)) translateZ(50vw);opacity:0.531}
+  54.17%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.6037)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.6037)) rotateY(calc(var(--cube-dir) * -71.433deg)) translateZ(50vw);opacity:0.441}
+  58.33%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.4230)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.4230)) rotateY(calc(var(--cube-dir) * -77.487deg)) translateZ(50vw);opacity:0.358}
+  62.5%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.2524)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.2524)) rotateY(calc(var(--cube-dir) * -82.689deg)) translateZ(50vw);opacity:0.284}
+  66.67%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.1075)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.1075)) rotateY(calc(var(--cube-dir) * -86.914deg)) translateZ(50vw);opacity:0.224}
+  70.83%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -90.078deg)) translateZ(50vw);opacity:0.180}
+  75%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -92.153deg)) translateZ(50vw);opacity:0.180}
+  79.17%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -93.178deg)) translateZ(50vw);opacity:0.180}
+  83.33%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -93.268deg)) translateZ(50vw);opacity:0.180}
+  87.5%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -92.626deg)) translateZ(50vw);opacity:0.180}
+  91.67%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -91.563deg)) translateZ(50vw);opacity:0.180}
+  95.83%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -90.501deg)) translateZ(50vw);opacity:0.180}
+  100%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -90.000deg)) translateZ(50vw);opacity:0.180}}
+@keyframes cubeIn{
+  0%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * 90.000deg)) translateZ(50vw);opacity:0.180}
+  4.17%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0218)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0218)) rotateY(calc(var(--cube-dir) * 89.376deg)) translateZ(50vw);opacity:0.189}
+  8.33%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0864)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0864)) rotateY(calc(var(--cube-dir) * 87.522deg)) translateZ(50vw);opacity:0.215}
+  12.5%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.1914)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.1914)) rotateY(calc(var(--cube-dir) * 84.484deg)) translateZ(50vw);opacity:0.259}
+  16.67%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.3307)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.3307)) rotateY(calc(var(--cube-dir) * 80.343deg)) translateZ(50vw);opacity:0.318}
+  20.83%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.4937)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.4937)) rotateY(calc(var(--cube-dir) * 75.208deg)) translateZ(50vw);opacity:0.389}
+  25%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.6636)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.6636)) rotateY(calc(var(--cube-dir) * 69.214deg)) translateZ(50vw);opacity:0.471}
+  29.17%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.8187)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.8187)) rotateY(calc(var(--cube-dir) * 62.521deg)) translateZ(50vw);opacity:0.558}
+  33.33%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.9360)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.9360)) rotateY(calc(var(--cube-dir) * 55.309deg)) translateZ(50vw);opacity:0.647}
+  37.5%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.9953)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.9953)) rotateY(calc(var(--cube-dir) * 47.773deg)) translateZ(50vw);opacity:0.731}
+  41.67%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.9855)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.9855)) rotateY(calc(var(--cube-dir) * 40.121deg)) translateZ(50vw);opacity:0.807}
+  45.83%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.9073)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.9073)) rotateY(calc(var(--cube-dir) * 32.564deg)) translateZ(50vw);opacity:0.871}
+  50%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.7730)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.7730)) rotateY(calc(var(--cube-dir) * 25.312deg)) translateZ(50vw);opacity:0.921}
+  54.17%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.6037)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.6037)) rotateY(calc(var(--cube-dir) * 18.567deg)) translateZ(50vw);opacity:0.957}
+  58.33%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.4230)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.4230)) rotateY(calc(var(--cube-dir) * 12.513deg)) translateZ(50vw);opacity:0.981}
+  62.5%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.2524)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.2524)) rotateY(calc(var(--cube-dir) * 7.311deg)) translateZ(50vw);opacity:0.993}
+  66.67%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.1075)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.1075)) rotateY(calc(var(--cube-dir) * 3.086deg)) translateZ(50vw);opacity:0.999}
+  70.83%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -0.078deg)) translateZ(50vw);opacity:1.000}
+  75%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -2.153deg)) translateZ(50vw);opacity:0.999}
+  79.17%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -3.178deg)) translateZ(50vw);opacity:0.999}
+  83.33%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -3.268deg)) translateZ(50vw);opacity:0.999}
+  87.5%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -2.626deg)) translateZ(50vw);opacity:0.999}
+  91.67%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -1.563deg)) translateZ(50vw);opacity:1.000}
+  95.83%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * -0.501deg)) translateZ(50vw);opacity:1.000}
+  100%{transform:perspective(var(--cube-p)) scale(calc(1 - var(--cube-dip) * 0.0000)) translateZ(-50vw) rotateX(calc(var(--cube-tilt) * 0.0000)) rotateY(calc(var(--cube-dir) * 0.000deg)) translateZ(50vw);opacity:1.000}}
+:root{--cube-p:1500px;--cube-dip:.2;--cube-tilt:4deg;--cube-dir:1}
+@media (max-width:760px){ :root{--cube-p:900px;--cube-dip:.16;--cube-tilt:3deg} }
 /* header and the gold second hand stay flat above the turning cube */
 ::view-transition-group(blotter-top),::view-transition-group(blotter-sweep){animation:none}
 ::view-transition-old(blotter-top),::view-transition-old(blotter-sweep){display:none}
@@ -1117,6 +1156,24 @@ html[data-vtdir="back"]::view-transition-new(root){animation-name:cubeInBack}
 @media (prefers-reduced-motion:reduce){
   ::view-transition-old(root),::view-transition-new(root){animation:none}
 }
+
+/* ===== Chronograph, part 5 ===== */
+/* a glint crosses the arriving glass face as it lands (lives inside the new face, so it turns with it) */
+#vt-glint{position:fixed;inset:0;z-index:95;pointer-events:none;overflow:hidden;display:none}
+html.vt-in #vt-glint{display:block}
+#vt-glint i{position:absolute;top:-25%;bottom:-25%;left:0;width:60%;opacity:0;
+  background:linear-gradient(102deg,rgba(255,255,255,0) 18%,rgba(var(--acc-hi-rgb),.08) 40%,rgba(255,255,255,.17) 50%,rgba(var(--acc-hi-rgb),.08) 60%,rgba(255,255,255,0) 82%)}
+html.vt-in #vt-glint i{animation:vglint .95s cubic-bezier(.3,.12,.25,1) var(--glint-d,.42s) both}
+html[data-vtdir="back"] #vt-glint i{animation-name:vglintb}
+@keyframes vglint{0%{transform:translate3d(190%,0,0);opacity:0}22%{opacity:1}100%{transform:translate3d(-110%,0,0);opacity:0}}
+@keyframes vglintb{0%{transform:translate3d(-110%,0,0);opacity:0}22%{opacity:1}100%{transform:translate3d(190%,0,0);opacity:0}}
+/* the header becomes a solid bar while the cube turns (the cube's near edge reaches up behind it) */
+/* (an opacity layer, so the browser fades it without repainting the header) */
+.topbar::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:rgba(var(--bg-rgb),.95);box-shadow:inset 0 -1px 0 var(--gold-line);opacity:0;transition:opacity .35s}
+html.vt3d .topbar::before{opacity:1}
+/* phones: horizontal swipes on the page belong to the cube, vertical ones still scroll */
+@media (pointer:coarse){ #view{touch-action:pan-y;touch-action:pan-y pinch-zoom} }
+@media (prefers-reduced-motion:reduce){ #vt-glint{display:none!important} }
 </style>
 <script>try{var k=localStorage.getItem("blotter.skin"),o={ocean:"slate",royal:"navy",copper:"mocha",arctic:"paper"};if(k&&/^[a-z]+$/.test(k))document.documentElement.setAttribute("data-skin",o[k]||k)}catch(e){}</script>
 
@@ -1210,6 +1267,7 @@ html[data-vtdir="back"]::view-transition-new(root){animation-name:cubeInBack}
 </div>
 
 <div class="vt-veil" id="vt-veil" aria-hidden="true"></div>
+<div id="vt-glint" aria-hidden="true"><i></i></div>
 <div class="vt-sweep" id="vt-sweep" aria-hidden="true"></div>
 <div class="tour" id="tour" hidden>
   <div class="tour-hole none" id="tour-hole" aria-hidden="true"></div>
@@ -1775,7 +1833,7 @@ const Roll = {
     if (el._rt === text) return;
     const prev = el._digits || [];
     el._rt = text;
-    if (reduce || !el.isConnected) { el.classList.remove('roll'); el.textContent = text; el._digits = null; return; }
+    if (reduce || ViewFx.quiet || !el.isConnected) { el.classList.remove('roll'); el.textContent = text; el._digits = null; return; }
     el.classList.add('roll');
     const chars = Array.from(text), digits = [];
     let html = '<span class="sr">' + esc(text) + '</span><span class="rw" aria-hidden="true">';
@@ -1839,7 +1897,7 @@ const Dial = {
       });
     };
     // first values sweep in from zero, once the page has settled
-    if (!d._shown) { d._shown = true; setTimeout(() => requestAnimationFrame(apply), reduce ? 0 : ViewFx.still ? 900 : 420); } else apply();
+    if (!d._shown) { d._shown = true; if (ViewFx.quiet) apply(); else setTimeout(() => requestAnimationFrame(apply), reduce ? 0 : ViewFx.still ? 900 : 420); } else apply();
   }
 };
 
@@ -1887,7 +1945,9 @@ const phoneSheet = () => innerWidth <= 600;
 
 /* ---------- chronograph: page change ---------- */
 const ViewFx = {
-  busy: false, queued: null, target: null, still: false,
+  busy: false, queued: null, target: null, still: false, quiet: false, scrub: null,
+  // can a script drive the view-transition faces? (needed for the finger-driven turn)
+  canScrub: (() => { try { new KeyframeEffect(document.documentElement, null, {pseudoElement: '::view-transition-new(root)'}); return typeof document.startViewTransition === 'function'; } catch (e) { return false; } })(),
   go(next){
     if (this.busy) { this.queued = next; this.target = next; updateChrome(); return; }
     if (next === S.view) return;
@@ -1934,6 +1994,7 @@ const ViewFx = {
     try {
       vt = document.startViewTransition(() => {
         const to = this.queued || next; this.queued = null;
+        html.classList.add('vt-in');
         goView(to);
       });
     } catch (e) {
@@ -1943,13 +2004,105 @@ const ViewFx = {
     updateChrome();
     vt.ready.then(() => this.sweep(dir), () => {});
     const fin = () => {
-      html.classList.remove('vt3d', 'vt'); delete html.dataset.vtdir;
+      html.classList.remove('vt3d', 'vt', 'vt-in'); delete html.dataset.vtdir;
       this.still = false; this.busy = false; this.target = null;
       updateChrome();
       const q = this.queued; this.queued = null;
       if (q && q !== S.view) this.go(q);
     };
     vt.finished.then(fin, fin);
+  },
+  // ---- the same turn, driven by a finger ----
+  cfg(){
+    const cs = getComputedStyle(document.documentElement);
+    return {pp: (cs.getPropertyValue('--cube-p') || '').trim() || '1500px', dip: parseFloat(cs.getPropertyValue('--cube-dip')) || .2, tilt: parseFloat(cs.getPropertyValue('--cube-tilt')) || 4};
+  },
+  // one face at progress p (0 = old page in front, 1 = new page in front); matches the CSS keyframes
+  frame(face, dir, p, c){
+    const q = Math.max(0, Math.min(1, p)), sn = Math.sin(Math.PI * q);
+    const ang = (face === 'old' ? -90 * p : 90 * (1 - p)) * dir;
+    const op = .18 + .82 * Math.max(0, Math.cos(Math.min(90, Math.abs(ang)) * Math.PI / 180));
+    return {transform: `perspective(${c.pp}) scale(${(1 - c.dip * sn).toFixed(4)}) translateZ(-50vw) rotateX(${(c.tilt * sn).toFixed(3)}deg) rotateY(${ang.toFixed(3)}deg) translateZ(50vw)`, opacity: op.toFixed(3)};
+  },
+  faces(dir, from, to, curve, dur, n){
+    const html = document.documentElement, c = this.cfg();
+    return ['old', 'new'].map(face => {
+      const kf = [];
+      for (let i = 0; i <= n; i++) { const t = i / n; kf.push(Object.assign(this.frame(face, dir, from + (to - from) * curve(t), c), {offset: t})); }
+      return html.animate(kf, {pseudoElement: `::view-transition-${face}(root)`, duration: dur, fill: 'both', easing: 'linear'});
+    });
+  },
+  scrubStart(next, dir){
+    if (this.busy || !this.canScrub || next === S.view) return false;
+    const html = document.documentElement;
+    const sc = this.scrub = {next, dir, from: S.view, p: 0, ready: false, anims: null, done: null};
+    this.busy = true; this.target = null; this.still = true;
+    html.dataset.vtdir = dir > 0 ? 'fwd' : 'back';
+    html.classList.add('vt3d', 'vt', 'vtscrub');
+    let vt;
+    try { vt = document.startViewTransition(() => goView(next)); }
+    catch (e) {
+      html.classList.remove('vt3d', 'vt', 'vtscrub'); delete html.dataset.vtdir;
+      this.scrub = null; this.still = false; this.busy = false;
+      return false;
+    }
+    vt.ready.then(() => {
+      try { sc.anims = this.faces(dir, 0, 1, t => t, 1000, 12); sc.anims.forEach(a => { a.pause(); a.currentTime = sc.p * 1000; }); }
+      catch (e) { sc.anims = null; html.classList.remove('vtscrub'); this.sweep(dir); }
+      sc.ready = true;
+      if (sc.done) this.scrubLand();
+    }, () => {});
+    const fin = () => {
+      if (sc.done === 'cancel' && S.view !== sc.from) this.restore(sc.from);
+      // scripted faces must not outlive this turn (a filled animation would sit on the next turn's faces)
+      if (sc.anims) sc.anims.forEach(a => a.cancel());
+      html.classList.remove('vt3d', 'vt', 'vtscrub', 'vt-in'); delete html.dataset.vtdir; html.style.removeProperty('--glint-d');
+      this.scrub = null; this.still = false; this.busy = false; this.target = null;
+      updateChrome();
+      const q = this.queued; this.queued = null;
+      if (q && q !== S.view) this.go(q);
+    };
+    vt.finished.then(fin, fin);
+    return true;
+  },
+  scrubMove(p){
+    const sc = this.scrub;
+    if (!sc || sc.done) return;
+    sc.p = p;
+    if (sc.anims) sc.anims.forEach(a => { a.currentTime = p * 1000; });
+    moveTabInd();
+  },
+  scrubEnd(commit){
+    const sc = this.scrub;
+    if (!sc || sc.done) return;
+    sc.done = commit || !sc.anims && sc.ready ? 'commit' : 'cancel';
+    // same as tapping the tab: the hash change is queued behind the running turn and lands on the same page
+    if (sc.done === 'commit') location.hash = sc.next;
+    updateChrome();
+    if (sc.ready) this.scrubLand();
+  },
+  // after the finger lets go: click into place, or turn back
+  scrubLand(){
+    const sc = this.scrub, html = document.documentElement;
+    if (!sc || !sc.anims) return;
+    const p0 = sc.p, old = sc.anims;
+    if (sc.done === 'commit') {
+      const T = 1.0, back = t => { const u = t - 1; return u * u * ((T + 1) * u + T) + 1; };
+      html.style.setProperty('--glint-d', '20ms'); html.classList.add('vt-in');
+      sc.anims = this.faces(sc.dir, p0, 1, back, Math.round(300 + 480 * (1 - p0)), 20);
+      this.sweep(sc.dir);
+    } else {
+      const out = t => 1 - Math.pow(1 - t, 3);
+      sc.anims = this.faces(sc.dir, p0, 0, out, Math.round(200 + 360 * p0), 12);
+      // swap the page back in the same frame the turn ends, so the new page never flashes
+      sc.anims[0].onfinish = () => this.restore(sc.from);
+    }
+    old.forEach(a => a.cancel());
+  },
+  restore(view){
+    if (S.view === view) return;
+    this.quiet = true;
+    try { goView(view); } finally { this.quiet = false; }
   },
   sweep(dir){
     const sw = $('#vt-sweep'), tb = $('#topbar');
@@ -2000,7 +2153,7 @@ const Tilt = {
 
 /* ---------- chronograph: page titles roll in ---------- */
 function splitTitle(root){
-  if (reduce || !root) return;
+  if (reduce || ViewFx.quiet || !root) return;
   const h = root.querySelector('.page-head h1');
   if (!h || h.classList.contains('split')) return;
   const t = h.textContent;
@@ -2008,6 +2161,65 @@ function splitTitle(root){
   if (ViewFx.still) h.style.setProperty('--tl0', '430ms');
   h.innerHTML = Array.from(t).map((c, i) => `<span class="tl" aria-hidden="true" style="--i:${i}">${esc(c)}</span>`).join('');
 }
+
+/* ---------- chronograph: turn the cube with a finger (phones) ---------- */
+const CubeSwipe = {
+  g: null,
+  init(){
+    if (reduce || typeof document.startViewTransition !== 'function') return;
+    document.addEventListener('pointerdown', e => this.down(e), {passive: true});
+    document.addEventListener('pointermove', e => this.move(e), {passive: true});
+    document.addEventListener('pointerup', e => this.up(e), {passive: true});
+    document.addEventListener('pointercancel', e => this.up(e), {passive: true});
+  },
+  down(e){
+    this.g = null;
+    if (e.pointerType !== 'touch' || !e.isPrimary || pagesOn().length < 2) return;
+    if (Modal.cur || LB.isOpen() || Setup.isOpen || Tour.on || Loader.active || ViewFx.busy) return;
+    const t = e.target;
+    if (!t || !t.closest || !t.closest('#view') || t.closest('input,textarea,select,[contenteditable="true"]')) return;
+    // the screen edges belong to the browser's own back/forward swipe
+    if (e.clientX < 24 || e.clientX > innerWidth - 24) return;
+    // rows that scroll sideways keep their own swipe
+    for (let el = t; el && el.id !== 'view'; el = el.parentElement) {
+      if (el.scrollWidth > el.clientWidth + 2) { const ox = getComputedStyle(el).overflowX; if (ox === 'auto' || ox === 'scroll') return; }
+    }
+    this.g = {id: e.pointerId, x: e.clientX, y: e.clientY, on: false, p: 0, hist: [], raf: 0};
+  },
+  move(e){
+    const g = this.g;
+    if (!g || e.pointerId !== g.id) return;
+    const dx = e.clientX - g.x, dy = e.clientY - g.y;
+    if (!g.on) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) { this.g = null; return; }
+      if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      const pg = pagesOn(), dir = dx < 0 ? 1 : -1, next = pg[pg.indexOf(S.view) + dir];
+      if (!next) { this.g = null; return; }
+      if (!ViewFx.canScrub) { this.g = null; location.hash = next; return; }
+      if (!ViewFx.scrubStart(next, dir)) { this.g = null; return; }
+      g.on = true; g.dir = dir;
+      try { document.documentElement.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+    g.p = Math.max(0, Math.min(1, -g.dir * dx / (Math.min(innerWidth, 900) * .8)));
+    g.hist.push([e.timeStamp, g.p]); if (g.hist.length > 6) g.hist.shift();
+    if (!g.raf) g.raf = requestAnimationFrame(() => { g.raf = 0; ViewFx.scrubMove(g.p); });
+  },
+  up(e){
+    const g = this.g;
+    if (!g || e.pointerId !== g.id) return;
+    this.g = null;
+    if (!g.on) return;
+    cancelAnimationFrame(g.raf); g.raf = 0;
+    ViewFx.scrubMove(g.p);
+    // speed of the last moment before letting go (progress per ms); the page swap can hold up a
+    // move event or two, so the last pair counts when it is far enough apart
+    const h = g.hist, b = h[h.length - 1], a = h[h.length - 2];
+    let v = 0;
+    if (a && b[0] - a[0] >= 8) v = (b[1] - a[1]) / (b[0] - a[0]);
+    else if (h.length > 2 && b[0] > h[0][0]) v = (b[1] - h[0][1]) / (b[0] - h[0][0]);
+    ViewFx.scrubEnd(e.type !== 'pointercancel' ? v > .0009 || (g.p > .3 && v > -.0006) : g.p > .5);
+  }
+};
 
 /* ---------- motion: mantra ---------- */
 const MANTRAS = [
@@ -2197,7 +2409,8 @@ let tT = 0;
 function toast(msg, bad){ const el = $('#toast'); el.textContent = msg; el.className = 'toast' + (bad ? ' bad' : ''); el.style.setProperty('--toast-t', (bad ? 5.2 : 2.6) + 's'); el.hidden = true; void el.offsetWidth; el.hidden = false; clearTimeout(tT); tT = setTimeout(() => { el.hidden = true; }, bad ? 5200 : 2600); }
 function setBanner(t){ const b = $('#banner'); b.textContent = t || ''; b.hidden = !t; }
 function updateChrome(){
-  const nav = ViewFx.target || S.view;
+  const sc = ViewFx.scrub;
+  const nav = sc ? (sc.done === 'commit' ? sc.next : sc.from) : (ViewFx.target || S.view);
   const pg = pagesOn();
   $$('.tabs a').forEach(a => { a.hidden = !pg.includes(a.dataset.tab); if (a.dataset.tab === nav) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   $('.tabs').hidden = pg.length < 2;
@@ -2213,6 +2426,19 @@ function updateChrome(){
 function moveTabInd(){
   const ind = $('#tab-ind'), a = $('.tabs a[aria-current="page"]');
   if (!ind || !a || !a.offsetWidth) return;
+  const sc = ViewFx.scrub;
+  if (sc && !sc.done) {
+    const b = $(`.tabs a[data-tab="${sc.next}"]`);
+    if (b && b.offsetWidth) {
+      const p = sc.p;
+      ind.style.transition = 'none';
+      ind.style.width = (a.offsetWidth + (b.offsetWidth - a.offsetWidth) * p).toFixed(1) + 'px';
+      ind.style.transform = 'translateX(' + (a.offsetLeft + (b.offsetLeft - a.offsetLeft) * p).toFixed(1) + 'px)';
+      ind.style.opacity = '1';
+      return;
+    }
+  }
+  ind.style.transition = '';
   ind.style.width = a.offsetWidth + 'px';
   ind.style.transform = 'translateX(' + a.offsetLeft + 'px)';
   ind.style.opacity = '1';
@@ -3714,6 +3940,7 @@ Setup.init();
 Tour.init();
 Origin.init();
 Tilt.init();
+CubeSwipe.init();
 BG.init();
 render();
 Store.init();
