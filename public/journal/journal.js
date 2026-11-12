@@ -510,6 +510,7 @@ const Reveal = {
       }
       const r = el.getBoundingClientRect();
       if (r.height && r.top > vh * 0.95) { this.seen.set(k, 'wait'); el.classList.add('rv-wait'); this.io.observe(el); }
+      else if (ViewFx.still) this.seen.set(k, now - 5000);
       else { this.seen.set(k, now); el.classList.add('rv-pop'); }
     });
   },
@@ -534,6 +535,249 @@ function setNum(el, v, fmt){
   cancelAnimationFrame(el._raf);
   const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(from + (v - from) * e); if (k < 1) el._raf = requestAnimationFrame(step); };
   el._raf = requestAnimationFrame(step);
+}
+
+/* ---------- chronograph: date-wheel digits ---------- */
+const Roll = {
+  // text: the value as it should read ("75", "4×", "–"); delay: ms before this number starts rolling
+  set(el, text, delay){
+    if (!el) return;
+    text = String(text);
+    if (el._rt === text) return;
+    const prev = el._digits || [];
+    el._rt = text;
+    if (reduce || !el.isConnected) { el.classList.remove('roll'); el.textContent = text; el._digits = null; return; }
+    el.classList.add('roll');
+    const chars = Array.from(text), digits = [];
+    let html = '<span class="sr">' + esc(text) + '</span><span class="rw" aria-hidden="true">';
+    chars.forEach((ch, i) => {
+      if (ch >= '0' && ch <= '9') {
+        const k = chars.length - 1 - i; // position from the right
+        digits[k] = +ch;
+        html += '<span class="rd"><span class="rs now" data-k="' + k + '" style="--d:' + (prev[k] != null ? prev[k] : 0) + '"></span></span>';
+      } else html += '<span class="rx" data-c="' + esc(ch) + '"></span>';
+    });
+    el.innerHTML = html + '</span>';
+    el._digits = digits;
+    const strips = el.querySelectorAll('.rs');
+    void el.offsetWidth;
+    requestAnimationFrame(() => {
+      strips.forEach((st, i) => {
+        const k = +st.dataset.k;
+        st.classList.remove('now');
+        st.style.setProperty('--dl', ((delay || 0) + i * 55) + 'ms');
+        st.style.setProperty('--d', digits[k]);
+      });
+    });
+  }
+};
+
+/* ---------- chronograph: win-rate dial ---------- */
+const Dial = {
+  svg(){
+    let t = '';
+    for (let i = 0; i < 60; i++) {
+      const a = i / 60 * Math.PI * 2, h = i % 5 === 0, r1 = h ? 35.5 : 37.5, r2 = 40;
+      const x1 = 60 + Math.sin(a) * r1, y1 = 60 - Math.cos(a) * r1, x2 = 60 + Math.sin(a) * r2, y2 = 60 - Math.cos(a) * r2;
+      t += `<line${h ? ' class="h"' : ''} x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"/>`;
+    }
+    return `<svg viewBox="0 0 120 120" aria-hidden="true" focusable="false"><defs><linearGradient id="dl-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--gold-hi)"/><stop offset=".55" stop-color="var(--gold)"/><stop offset="1" stop-color="var(--gold-lo)"/></linearGradient></defs>
+      <g class="dl-ticks">${t}</g>
+      <circle class="dl-track" cx="60" cy="60" r="46"/>
+      <circle class="dl-arc" cx="60" cy="60" r="46" pathLength="1000"/>
+      <circle class="dl-seg tp" cx="60" cy="60" r="54.5" pathLength="1000"/><circle class="dl-seg be" cx="60" cy="60" r="54.5" pathLength="1000"/><circle class="dl-seg sl" cx="60" cy="60" r="54.5" pathLength="1000"/>
+      </svg><i class="dl-needle off" aria-hidden="true"></i>`;
+  },
+  set(wr, tp, be, sl){
+    const d = $('#dial');
+    if (!d) return;
+    const sig = [wr, tp, be, sl].join('|');
+    if (d._sig === sig) return;
+    d._sig = sig;
+    const apply = () => {
+      const arc = $('.dl-arc', d), hand = $('.dl-needle', d), segs = $$('.dl-seg', d);
+      const v = wr == null ? 0 : Math.max(0, Math.min(1, wr));
+      arc.style.strokeDasharray = (v * 1000).toFixed(1) + ' 1000';
+      hand.classList.toggle('off', wr == null);
+      hand.style.transform = 'rotate(' + (v * 360).toFixed(2) + 'deg)';
+      const tot = tp + be + sl, parts = [tp, be, sl].filter(x => x > 0).length, gap = parts > 1 ? 10 : 0;
+      let off = 0;
+      [tp, be, sl].forEach((n, i) => {
+        const len = tot ? Math.max(0, n / tot * 1000 - (n ? gap : 0)) : 0;
+        segs[i].style.strokeDasharray = len.toFixed(1) + ' 1000';
+        segs[i].style.strokeDashoffset = (-off).toFixed(1);
+        if (n) off += len + gap;
+      });
+    };
+    // first values sweep in from zero, once the page has settled
+    if (!d._shown) { d._shown = true; setTimeout(() => requestAnimationFrame(apply), reduce ? 0 : ViewFx.still ? 900 : 420); } else apply();
+  }
+};
+
+/* ---------- chronograph: where an interaction came from (for morphs) ---------- */
+const Origin = {
+  el: null, t: 0,
+  init(){
+    document.addEventListener('pointerdown', e => {
+      const el = e.target.closest && e.target.closest('button, a, [data-day], .thumb, label');
+      if (el) { this.el = el; this.t = performance.now(); }
+      const pb = e.target.closest && e.target.closest('.btn.primary');
+      if (pb && !reduce) {
+        const r = pb.getBoundingClientRect();
+        pb.style.setProperty('--rx', (e.clientX - r.left) + 'px'); pb.style.setProperty('--ry', (e.clientY - r.top) + 'px');
+        pb.classList.remove('press'); void pb.offsetWidth; pb.classList.add('press');
+      }
+    }, true);
+    let raf = 0, last = null;
+    document.addEventListener('pointermove', e => {
+      if (e.pointerType !== 'mouse') return;
+      last = e;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const b = last.target.closest && last.target.closest('.btn.primary');
+        if (!b) return;
+        const r = b.getBoundingClientRect();
+        b.style.setProperty('--px', (last.clientX - r.left) + 'px'); b.style.setProperty('--py', (last.clientY - r.top) + 'px');
+      });
+    }, {passive: true});
+  },
+  // the element that opened something, if it was just used and is still on screen
+  take(){
+    let el = performance.now() - this.t < 900 ? this.el : null;
+    if (!el || !document.contains(el)) { const a = document.activeElement; el = a && a !== document.body && a.matches && a.matches('button, a, [data-day]') ? a : null; }
+    this.el = null;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (!r.width || r.bottom < 0 || r.top > innerHeight) return null;
+    return {el, r};
+  }
+};
+const vis = el => { if (!el || !document.contains(el)) return null; const r = el.getBoundingClientRect(); return r.width && r.bottom > 0 && r.top < innerHeight ? r : null; };
+const phoneSheet = () => innerWidth <= 600;
+
+/* ---------- chronograph: page change ---------- */
+const ViewFx = {
+  busy: false, queued: null, target: null, still: false,
+  go(next){
+    if (this.busy) { this.queued = next; this.target = next; updateChrome(); return; }
+    if (next === S.view) return;
+    const v = $('#view'), veil = $('#vt-veil');
+    if (reduce || !veil.animate || S.mounted == null) { goView(next); return; }
+    const order = pagesOn(), dir = order.indexOf(next) >= order.indexOf(S.view) ? 1 : -1;
+    if (typeof document.startViewTransition === 'function' && !document.hidden) { this.cube(next, dir); return; }
+    this.busy = true; this.target = next;
+    document.documentElement.classList.add('vt');
+    updateChrome();
+    this.sweep(dir);
+    // a solid veil is cheap to fade; the page itself is never moved as one big picture
+    const out = veil.animate([{opacity: 0}, {opacity: 1}], {duration: 190, easing: 'cubic-bezier(.55,0,.75,.06)', fill: 'forwards'});
+    let done = false;
+    const swap = () => {
+      if (done) return; done = true;
+      const to = this.queued || next; this.queued = null;
+      v.style.setProperty('--vdir', dir);
+      v.classList.add('vin');
+      goView(to);
+      out.cancel();
+      const inn = veil.animate([{opacity: 1}, {opacity: 0}], {duration: 460, easing: 'cubic-bezier(.16,1,.3,1)'});
+      const fin = () => {
+        this.busy = false; this.target = null;
+        document.documentElement.classList.remove('vt');
+        updateChrome();
+        const q = this.queued; this.queued = null;
+        if (q && q !== S.view) this.go(q);
+      };
+      inn.onfinish = fin; inn.oncancel = fin;
+      clearTimeout(this.vinT); this.vinT = setTimeout(() => v.classList.remove('vin'), 1500);
+    };
+    out.onfinish = swap;
+    setTimeout(swap, 400); // safety if the animation never reports back
+  },
+  // the page turns like a cube in the direction of the tab; the browser animates two snapshots
+  cube(next, dir){
+    const html = document.documentElement;
+    this.busy = true; this.target = next;
+    html.dataset.vtdir = dir > 0 ? 'fwd' : 'back';
+    html.classList.add('vt3d', 'vt');
+    this.still = true;
+    let vt;
+    try {
+      vt = document.startViewTransition(() => {
+        const to = this.queued || next; this.queued = null;
+        goView(to);
+      });
+    } catch (e) {
+      html.classList.remove('vt3d', 'vt'); delete html.dataset.vtdir;
+      this.still = false; this.busy = false; this.target = null; goView(next); return;
+    }
+    updateChrome();
+    vt.ready.then(() => this.sweep(dir), () => {});
+    const fin = () => {
+      html.classList.remove('vt3d', 'vt'); delete html.dataset.vtdir;
+      this.still = false; this.busy = false; this.target = null;
+      updateChrome();
+      const q = this.queued; this.queued = null;
+      if (q && q !== S.view) this.go(q);
+    };
+    vt.finished.then(fin, fin);
+  },
+  sweep(dir){
+    const sw = $('#vt-sweep'), tb = $('#topbar');
+    if (!sw || !sw.animate) return;
+    sw.style.top = Math.max(0, tb ? tb.getBoundingClientRect().bottom - 1 : 0) + 'px';
+    sw.animate([
+      {opacity: 0, transform: `translate3d(${dir * -100}%,0,0) scaleX(.4)`},
+      {opacity: 1, offset: .25},
+      {opacity: 1, offset: .7},
+      {opacity: 0, transform: `translate3d(${dir * 100}%,0,0) scaleX(.4)`}
+    ], {duration: 760, easing: 'cubic-bezier(.65,0,.35,1)'});
+  }
+};
+
+/* ---------- chronograph: the Bilanz card catches the light ---------- */
+const Tilt = {
+  cur: null, raf: 0, ev: null,
+  init(){
+    if (reduce || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    document.addEventListener('pointermove', e => {
+      this.ev = e;
+      if (this.raf) return;
+      this.raf = requestAnimationFrame(() => {
+        this.raf = 0;
+        const ev = this.ev, eq = ev.target.closest && ev.target.closest('#equity');
+        if (this.cur && this.cur !== eq) this.reset();
+        if (!eq || Modal.cur || Tour.on) return;
+        this.cur = eq;
+        const r = eq.getBoundingClientRect();
+        const x = Math.max(-.5, Math.min(.5, (ev.clientX - r.left) / r.width - .5)), y = Math.max(-.5, Math.min(.5, (ev.clientY - r.top) / r.height - .5));
+        eq.classList.add('tilt'); eq.classList.remove('untilt');
+        eq._rot = `perspective(1000px) rotateX(${(-y * 6).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg)`;
+        eq.style.transform = eq._rot;
+        const gl = eq.querySelector('.eq-glare i'); if (gl) gl.style.transform = 'translate3d(' + (x * r.width * .9).toFixed(1) + 'px,0,0)';
+      });
+    }, {passive: true});
+    document.addEventListener('pointerleave', () => this.reset());
+  },
+  reset(){
+    const eq = this.cur; this.cur = null;
+    if (!eq) return;
+    eq._rot = '';
+    eq.classList.remove('tilt'); eq.classList.add('untilt');
+    eq.style.transform = '';
+    clearTimeout(this.ut); this.ut = setTimeout(() => eq.classList.remove('untilt'), 750);
+  }
+};
+
+/* ---------- chronograph: page titles roll in ---------- */
+function splitTitle(root){
+  if (reduce || !root) return;
+  const h = root.querySelector('.page-head h1');
+  if (!h || h.classList.contains('split')) return;
+  const t = h.textContent;
+  h.classList.add('split'); h.setAttribute('aria-label', t);
+  if (ViewFx.still) h.style.setProperty('--tl0', '430ms');
+  h.innerHTML = Array.from(t).map((c, i) => `<span class="tl" aria-hidden="true" style="--i:${i}">${esc(c)}</span>`).join('');
 }
 
 /* ---------- motion: mantra ---------- */
@@ -584,7 +828,7 @@ const LD_NAMES = {kalender: ['', 'Kalender'], learnings: ['', 'Learnings'], outl
 const easeOut = k => 1 - Math.pow(1 - k, 3);
 const easeInOut = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
 const Loader = {
-  on: !reduce, active: false, swapped: false, hitDone: false, target: null, pending: null, raf: 0, t0: 0,
+  on: false, active: false, swapped: false, hitDone: false, target: null, pending: null, raf: 0, t0: 0,
   T: {enter: 240, liveStart: 120, live: 640, swap: 900, exit: 430},
   init(){
     this.el = $('#loader'); this.inner = $('#ld-inner');
@@ -710,8 +954,6 @@ function scrollFx(){
   if (!reduce) {
     const ht = $('#hero-txt');
     if (ht) { ht.style.transform = 'translate3d(0,' + (y * 0.16).toFixed(1) + 'px,0)'; ht.style.opacity = Math.max(0.12, 1 - y / 560).toFixed(3); }
-    const eq = $('#equity');
-    if (eq) eq.style.transform = 'translate3d(0,' + (y * 0.06).toFixed(1) + 'px,0)';
     const bw = $('#bg-wrap'); if (bw) bw.style.opacity = (1 - Math.min(1, y / 700) * 0.45).toFixed(3);
   }
   if (fill) {
@@ -723,10 +965,10 @@ function scrollFx(){
 
 /* ---------- ui chrome ---------- */
 let tT = 0;
-function toast(msg, bad){ const el = $('#toast'); el.textContent = msg; el.className = 'toast' + (bad ? ' bad' : ''); el.hidden = true; void el.offsetWidth; el.hidden = false; clearTimeout(tT); tT = setTimeout(() => { el.hidden = true; }, bad ? 5200 : 2600); }
+function toast(msg, bad){ const el = $('#toast'); el.textContent = msg; el.className = 'toast' + (bad ? ' bad' : ''); el.style.setProperty('--toast-t', (bad ? 5.2 : 2.6) + 's'); el.hidden = true; void el.offsetWidth; el.hidden = false; clearTimeout(tT); tT = setTimeout(() => { el.hidden = true; }, bad ? 5200 : 2600); }
 function setBanner(t){ const b = $('#banner'); b.textContent = t || ''; b.hidden = !t; }
 function updateChrome(){
-  const nav = Loader.active ? Loader.target : S.view;
+  const nav = ViewFx.target || S.view;
   const pg = pagesOn();
   $$('.tabs a').forEach(a => { a.hidden = !pg.includes(a.dataset.tab); if (a.dataset.tab === nav) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   $('.tabs').hidden = pg.length < 2;
@@ -751,7 +993,7 @@ let rq = 0;
 function schedule(){ if (rq) return; rq = requestAnimationFrame(() => { rq = 0; render(); }); }
 function render(){
   const el = $('#view');
-  if (S.mounted !== S.view) { S.mountN++; Views[S.view].mount(el); S.mounted = S.view; S.mountSig = settingsSig(); onScroll(); }
+  if (S.mounted !== S.view) { S.mountN++; Views[S.view].mount(el); S.mounted = S.view; S.mountSig = settingsSig(); splitTitle(el); onScroll(); }
   Views[S.view].update();
   Reveal.scan(el);
   updateChrome();
@@ -828,10 +1070,13 @@ const Views = {
           <p class="hero-sub">Jeder eingetragene Trade macht dich besser. Wähle einen Tag im Kalender und halte fest, was passiert ist.</p>
         </div>
         <div class="equity spot" id="equity" data-rv="${M}:hero-e" style="--rd:180ms">
+          <span class="eq-glare" aria-hidden="true"><i></i></span>
           <div class="eq-head"><span class="eyebrow gold" id="eq-label">Bilanz</span><span class="eq-n" id="eq-n"></span></div>
-          <div class="eq-row"><span class="eq-big"><span class="eq-v gold-t" id="eq-v">–</span><span class="eq-u gold-t" id="eq-u" hidden>%</span></span><span class="eq-vl">Win-Rate<small>TP ÷ (TP + SL)</small></span></div>
+          <div class="eq-row">
+            <div class="dial" id="dial">${Dial.svg()}<span class="eq-big"><span class="eq-v" id="eq-v">–</span><span class="eq-u" id="eq-u" hidden>%</span></span></div>
+            <div class="eq-side"><span class="eq-vl">Win-Rate<small>TP ÷ (TP + SL)</small></span><div class="ratio-l" id="ratio-l"></div></div>
+          </div>
           <div class="ratio" id="ratio" aria-hidden="true"><span class="r tp"></span><span class="r be"></span><span class="r sl"></span></div>
-          <div class="ratio-l" id="ratio-l"></div>
           <div class="tape-h"><span class="eyebrow">Trade-Tape</span><span class="tape-hint">älteste zuerst</span></div>
           <div class="tape" id="tape"></div>
           <div class="eq-foot" id="eq-foot"></div>
@@ -870,6 +1115,7 @@ const Views = {
       const hr = n.getHours(), greet = hr < 5 ? 'Gute Nacht' : hr < 11 ? 'Guten Morgen' : hr < 18 ? 'Guten Tag' : 'Guten Abend';
       $('#hero-date').innerHTML = (S.settings.name ? `<b>${esc(greet + ', ' + S.settings.name)}.</b> ` : '') + `<span>${esc(fLong.format(n))}</span><span class="hd-kw">, KW ${isoWeek(n)}</span>`;
       Mantra.mount($('#mantra'));
+      if (!Views.shone && !reduce) { Views.shone = true; const mn = $('#mantra'); mn.classList.add('shine'); setTimeout(() => mn.classList.remove('shine'), 3400); }
       const af = $('#acct-filter'), afEdge = () => af.classList.toggle('more', af.scrollLeft + af.clientWidth < af.scrollWidth - 2);
       af.addEventListener('scroll', afEdge, {passive: true}); requestAnimationFrame(afEdge);
       void $('#ratio').offsetWidth;
@@ -878,7 +1124,8 @@ const Views = {
     update(){
       const M = S.mountN;
       const m = S.month, y = m.getFullYear(), mo = m.getMonth(), mk = y + '-' + pad(mo + 1);
-      $('#month-title').textContent = fMonth.format(m);
+      const mtTxt = fMonth.format(m);
+      if ($('#month-title').textContent !== mtTxt) $('#month-title').innerHTML = '<span class="mt">' + esc(mtTxt) + '</span>';
       const fa = curAcct();
       $$('#acct-filter button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.acct === fa)));
       const afb = $('#acct-filter [aria-checked="true"]'), afw = afb && afb.parentElement;
@@ -892,7 +1139,12 @@ const Views = {
       // hero balance
       $('#eq-label').innerHTML = '<b>Bilanz</b> ' + esc(fMonth.format(m));
       $('#eq-n').textContent = ready ? s.n + (s.n === 1 ? ' Trade' : ' Trades') : '';
-      if (ready) { setNum($('#eq-v'), s.wr, v => String(Math.round(v * 100))); $('#eq-u').hidden = !(s.wr != null && isFinite(s.wr)); }
+      if (ready) {
+        const wrOk = s.wr != null && isFinite(s.wr);
+        Roll.set($('#eq-v'), wrOk ? String(Math.round(s.wr * 100)) : '–');
+        $('#eq-u').hidden = !wrOk;
+        Dial.set(wrOk ? s.wr : null, s.tp, s.be, s.sl);
+      }
       const tot = s.tp + s.be + s.sl;
       const rs = $$('#ratio .r');
       rs[0].style.width = ratioW(s.tp, tot); rs[1].style.width = ratioW(s.be, tot); rs[2].style.width = ratioW(s.sl, tot);
@@ -907,13 +1159,13 @@ const Views = {
 
       // stats
       if (ready) {
-        setNum($('#st-n'), s.n, int); $('#st-n-s').textContent = s.tdays + (s.tdays === 1 ? ' Handelstag' : ' Handelstage');
-        setNum($('#st-tp'), s.tp, int); $('#st-tp-s').textContent = s.n ? pct(s.tp, s.n) + ' der Trades' : 'noch keine Trades';
-        setNum($('#st-sl'), s.sl, int); $('#st-sl-s').textContent = s.n ? pct(s.sl, s.n) + ' der Trades' : 'noch keine Trades';
-        setNum($('#st-be'), s.be, int); $('#st-be-s').textContent = s.n ? pct(s.be, s.n) + ' der Trades' : 'noch keine Trades';
+        Roll.set($('#st-n'), int(s.n), 0); $('#st-n-s').textContent = s.tdays + (s.tdays === 1 ? ' Handelstag' : ' Handelstage');
+        Roll.set($('#st-tp'), int(s.tp), 60); $('#st-tp-s').textContent = s.n ? pct(s.tp, s.n) + ' der Trades' : 'noch keine Trades';
+        Roll.set($('#st-sl'), int(s.sl), 120); $('#st-sl-s').textContent = s.n ? pct(s.sl, s.n) + ' der Trades' : 'noch keine Trades';
+        Roll.set($('#st-be'), int(s.be), 180); $('#st-be-s').textContent = s.n ? pct(s.be, s.n) + ' der Trades' : 'noch keine Trades';
         for (const k of ['tp', 'sl', 'be']) $('#st-' + k + '-m').style.width = s.n ? (s[k] / s.n * 100).toFixed(2) + '%' : '0%';
         $('#st-streak').innerHTML = Array.from({length: Math.min(s.best, 12)}, () => '<i></i>').join('');
-        setNum($('#st-best'), s.best, v => Math.round(v) + '×'); $('#st-best-s').textContent = 'TP in Folge';
+        Roll.set($('#st-best'), Math.round(s.best) + '×', 240); $('#st-best-s').textContent = 'TP in Folge';
       }
 
       // grid
@@ -956,20 +1208,24 @@ const Views = {
             return `<span class="pill ${rr}" title="${esc((t.symbol || 'Trade') + ' · ' + (RES_NAME[rr] || 'ohne Ergebnis') + ' · ' + an(t.account))}">${adot(acctOf(t))}<b>${RES_LABEL[rr] || '–'}</b>${t.symbol ? `<span class="sym">${esc(t.symbol)}</span>` : ''}</span>`;
           }).join('') + (list.length > 4 ? `<span class="pill more">+${list.length - 4}</span>` : '');
           const dots = list.slice(0, 6).map(t => `<i class="${resOf(t) || 'na'}"></i>`).join('') + (o ? '<i class="ol"></i>' : '') + (l ? '<i class="ol"></i>' : '');
-          h += `<button type="button" class="${cls.join(' ')}" data-day="${key}" aria-label="${esc(label)}" ${rvOn ? `data-rv="${M}:${mk}:${key}"` : ''} style="--rd:${Math.min(700, 480 + (r * 7 + c) * 12)}ms;--gd:${c * 45}ms">
+          h += `<button type="button" class="${cls.join(' ')}" data-day="${key}" aria-label="${esc(label)}" ${rvOn ? `data-rv="${M}:${mk}:${key}"` : ''} style="--rd:${Math.min(700, 480 + (r * 7 + c) * 12)}ms;--gd:${c * 45}ms;--wv:${(dir === 'prev' ? (6 - c) + (rows - 1 - r) : c + r) * 26}ms">
             <span class="row1"><span class="d-num">${d.getDate()}</span><span class="rt"><span class="marks">${marks}</span>${shot}</span></span>
             ${list.length ? `<span class="pills">${pills}</span>` : ''}
             ${dots ? `<span class="d-dots">${dots}</span>` : ''}
           </button>`;
         }
         const wc = calc(wList), wt = wc.tp + wc.be + wc.sl, kw = isoWeek(wStart);
-        h += `<div class="wk" ${rvOn ? `data-rv="${M}:${mk}:wk${r}"` : ''} style="--rd:${Math.min(760, 560 + r * 40)}ms;--gd:315ms"><span class="kw">KW ${kw}</span>${wc.n ? `<span class="wk-n">${wc.n} ${wc.n === 1 ? 'Trade' : 'Trades'}</span><span class="wk-l">${countsHtml(wc)}</span><span class="mini"><span class="r tp" style="width:${ratioW(wc.tp, wt)}"></span><span class="r be" style="width:${ratioW(wc.be, wt)}"></span><span class="r sl" style="width:${ratioW(wc.sl, wt)}"></span></span>` : '<span class="none">–</span>'}</div>`;
+        h += `<div class="wk" ${rvOn ? `data-rv="${M}:${mk}:wk${r}"` : ''} style="--rd:${Math.min(760, 560 + r * 40)}ms;--gd:315ms;--wv:${(dir === 'prev' ? (rows - 1 - r) : 7 + r) * 26}ms"><span class="kw">KW ${kw}</span>${wc.n ? `<span class="wk-n">${wc.n} ${wc.n === 1 ? 'Trade' : 'Trades'}</span><span class="wk-l">${countsHtml(wc)}</span><span class="mini"><span class="r tp" style="width:${ratioW(wc.tp, wt)}"></span><span class="r be" style="width:${ratioW(wc.be, wt)}"></span><span class="r sl" style="width:${ratioW(wc.sl, wt)}"></span></span>` : '<span class="none">–</span>'}</div>`;
         wl += `<div class="wrow" ${rvOn ? `data-rv="${M}:${mk}:wl${r}"` : ''} style="--rd:${r * 50}ms"><span class="kw">KW ${kw} · ${fDM.format(wStart)}–${fDM.format(wEnd)}</span><span class="n">${wc.n ? wc.n + (wc.n === 1 ? ' Trade' : ' Trades') : ''}</span><span class="p">${wc.n ? countsHtml(wc) : '–'}</span></div>`;
       }
       $('#cal').innerHTML = h;
       if (dir) {
-        for (const el of [$('#cal'), $('#weeks')]) { el.classList.remove('slide-next', 'slide-prev'); void el.offsetWidth; el.classList.add('slide-' + dir); }
-        const mt = $('#month-title'); mt.classList.remove('swap'); void mt.offsetWidth; mt.classList.add('swap');
+        const cal = $('#cal'), wk = $('#weeks');
+        cal.style.setProperty('--wdir', dir === 'next' ? 1 : -1);
+        cal.classList.remove('wave'); void cal.offsetWidth; cal.classList.add('wave');
+        clearTimeout(this.waveT); this.waveT = setTimeout(() => cal.classList.remove('wave'), 1400);
+        wk.classList.remove('slide-next', 'slide-prev'); void wk.offsetWidth; wk.classList.add('slide-' + dir);
+        const mt = $('#month-title'); mt.style.setProperty('--mdir', dir === 'next' ? 1 : -1); mt.classList.remove('swap'); void mt.offsetWidth; mt.classList.add('swap');
       }
       $('#weeks').innerHTML = wl;
       $('#cal-hint').hidden = !(S.loaded.trades && S.trades.length === 0);
@@ -1077,16 +1333,34 @@ const Modal = {
   cur: null, opener: null,
   show(builder, opts){
     opts = opts || {};
+    const fresh = !this.cur, dirFx = this.goingBack ? 'bwd' : 'fwd';
+    this.goingBack = false;
+    const from = fresh ? Origin.take() : null;
     if (this.cur && this.cur.cleanup) this.cur.cleanup();
-    if (!this.cur) this.opener = document.activeElement;
+    if (!this.cur) { this.opener = document.activeElement; this.origin = from ? from.el : null; }
     this.cur = {builder, live: !!opts.live, back: opts.back || null, cleanup: opts.cleanup || null, dirty: false};
     const panel = this.freshPanel();
     panel.innerHTML = builder();
     panel.scrollTop = 0;
     $('#modal').hidden = false;
     panel.style.animation = 'none'; void panel.offsetWidth; panel.style.animation = '';
+    if (!fresh && !reduce) panel.classList.add(dirFx);
+    else if (fresh && !reduce && panel.animate) {
+      panel.style.animation = 'none';
+      const pr = panel.getBoundingClientRect();
+      if (phoneSheet()) {
+        panel.animate([{transform: 'translate3d(0,60%,0)', opacity: .4}, {transform: 'none', opacity: 1}], {duration: 520, easing: 'cubic-bezier(.16,1,.3,1)'});
+      } else if (from && pr.width) {
+        const sc = Math.max(.14, Math.min(.9, from.r.width / pr.width));
+        const dx = from.r.left + from.r.width / 2 - (pr.left + pr.width / 2), dy = from.r.top + from.r.height / 2 - (pr.top + pr.height / 2);
+        panel.animate([{transform: `translate3d(${dx}px,${dy}px,0) scale(${sc})`, opacity: 0}, {opacity: 1, offset: .32}, {transform: 'none', opacity: 1}], {duration: 600, easing: 'cubic-bezier(.16,1,.3,1)'});
+      } else {
+        panel.animate([{transform: 'translate3d(0,18px,0) scale(.97)', opacity: 0}, {transform: 'none', opacity: 1}], {duration: 420, easing: 'cubic-bezier(.16,1,.3,1)'});
+      }
+    }
     document.documentElement.style.overflow = 'hidden';
     if (opts.onMount) opts.onMount(panel);
+    if (fresh && !reduce) panel.querySelectorAll('.day-sum .v').forEach((v, i) => Roll.set(v, v.textContent, 180 + i * 70));
     const f = panel.querySelector(opts.focus || '.p-body button, .p-body input, .p-body textarea, .p-foot button');
     if (f) { try { f.focus({preventScroll: true}); } catch (e) { f.focus(); } }
   },
@@ -1105,13 +1379,48 @@ const Modal = {
     if (!this.cur) return;
     if (this.cur.cleanup) this.cur.cleanup();
     this.cur = null;
+    const old = $('#panel'), sc = old.scrollTop, land = this.landTo; this.landTo = null;
     $('#modal').hidden = true; this.freshPanel();
+    if (!reduce && old.animate && old.childElementCount) this.fold(old, sc, land);
     document.documentElement.style.overflow = '';
     if (this.opener && document.contains(this.opener)) { try { this.opener.focus({preventScroll: true}); } catch (e) {} }
     this.opener = null;
   },
+  // the closing sheet folds back into the element it came from (or into the day a trade was saved to)
+  fold(old, sc, land){
+    const ghost = document.createElement('div');
+    ghost.className = 'modal ghost'; ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
+    const scrim = document.createElement('div'); scrim.className = 'scrim';
+    old.removeAttribute('id'); old.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+    old.style.animation = 'none'; old.classList.remove('fwd', 'bwd');
+    ghost.append(scrim, old); document.body.append(ghost);
+    old.scrollTop = sc;
+    const origin = this.origin; this.origin = null;
+    const go = () => {
+      const pr = old.getBoundingClientRect();
+      const target = land ? $('#cal .day[data-day="' + land + '"]') : origin;
+      const tr = vis(target);
+      let kf;
+      if (tr && pr.width && !(phoneSheet() && !land)) {
+        const s2 = Math.max(.1, Math.min(.9, tr.width / pr.width));
+        const dx = tr.left + tr.width / 2 - (pr.left + pr.width / 2), dy = tr.top + tr.height / 2 - (pr.top + pr.height / 2);
+        kf = [{transform: 'none', opacity: 1}, {opacity: 1, offset: .55}, {transform: `translate3d(${dx}px,${dy}px,0) scale(${s2})`, opacity: 0}];
+      } else if (phoneSheet()) kf = [{transform: 'none', opacity: 1}, {transform: 'translate3d(0,70%,0)', opacity: .2}];
+      else kf = [{transform: 'none', opacity: 1}, {transform: 'translate3d(0,14px,0) scale(.965)', opacity: 0}];
+      const a = old.animate(kf, {duration: tr ? 460 : 300, easing: tr ? 'cubic-bezier(.65,0,.35,1)' : 'cubic-bezier(.55,0,.75,.06)', fill: 'forwards'});
+      scrim.animate([{opacity: 1}, {opacity: 0}], {duration: tr ? 420 : 280, easing: 'ease-out', fill: 'forwards'});
+      const end = () => {
+        ghost.remove();
+        if (land && target && document.contains(target)) { target.classList.remove('landed'); void target.offsetWidth; target.classList.add('landed'); setTimeout(() => target.classList.remove('landed'), 1100); }
+      };
+      a.onfinish = end; a.oncancel = end;
+      setTimeout(() => { if (ghost.isConnected) end(); }, 900);
+    };
+    // a saved trade: wait until the calendar shows it, then fly there
+    if (land) requestAnimationFrame(() => requestAnimationFrame(go)); else go();
+  },
   back(){
-    if (this.cur && this.cur.back) { const b = this.cur.back; if (this.cur.cleanup) this.cur.cleanup(); this.cur.cleanup = null; b(); }
+    if (this.cur && this.cur.back) { this.goingBack = true; const b = this.cur.back; if (this.cur.cleanup) this.cur.cleanup(); this.cur.cleanup = null; b(); }
     else this.close();
   },
   tryClose(){
@@ -1382,8 +1691,14 @@ function openForm(kind, entry, opts){
       for (const ref of st.removed) Store.deleteImage(ref);
       if (kind === 'trades' && obj.account) { S.lastAccount = obj.account; lsSet('blotter.lastAccount', obj.account); }
       st.busy = false;
+      if (!reduce) {
+        btn.classList.add('done');
+        btn.innerHTML = '<svg class="ok" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>Gespeichert';
+        await new Promise(r => setTimeout(r, 380));
+      }
       toast(def.saved);
       if (Modal.cur) Modal.cur.dirty = false;
+      if (kind === 'trades' && !opts.fromDay && obj.date && S.view === 'kalender') Modal.landTo = obj.date;
       if (kind === 'trades' && !opts.fromDay && obj.date) {
         const d = parseYmd(obj.date); S.month = new Date(d.getFullYear(), d.getMonth(), 1);
         if (S.view !== 'kalender') location.hash = 'kalender';
@@ -1457,16 +1772,51 @@ function openForm(kind, entry, opts){
 const LB = {
   list: [], i: 0,
   opener: null,
-  open(list, i){ if (!list.length) return; this.opener = document.activeElement; this.list = list; this.i = i; this.show(); $('#lightbox').hidden = false; $('.lb-close').focus(); },
-  show(){
-    $('#lb-img').src = this.list[this.i];
+  open(list, i){
+    if (!list.length) return;
+    const from = Origin.take();
+    this.opener = document.activeElement; this.list = list; this.i = i; this.show(true); $('#lightbox').hidden = false; $('.lb-close').focus();
+    const img = $('#lb-img'), lb = $('#lightbox');
+    if (reduce || !img.animate) return;
+    lb.animate([{opacity: 0}, {opacity: 1}], {duration: 260, easing: 'ease-out'});
+    const grow = () => {
+      if (!this.isOpen()) return;
+      const r = img.getBoundingClientRect(), o = from && vis(from.el);
+      if (o && r.width) {
+        const sc = o.width / r.width;
+        img.animate([{transform: `translate3d(${o.left - r.left}px,${o.top - r.top}px,0) scale(${sc})`, transformOrigin: '0 0', opacity: .6}, {transform: 'none', transformOrigin: '0 0', opacity: 1}], {duration: 560, easing: 'cubic-bezier(.16,1,.3,1)'});
+      } else img.animate([{opacity: 0, transform: 'scale(.96)'}, {opacity: 1, transform: 'none'}], {duration: 340, easing: 'cubic-bezier(.16,1,.3,1)'});
+    };
+    if (img.complete && img.naturalWidth) grow(); else img.addEventListener('load', grow, {once: true});
+  },
+  show(first){
+    const img = $('#lb-img');
+    if (!first && !reduce && img.animate && this.lastI != null && this.lastI !== this.i) {
+      const d = (this.i > this.lastI && !(this.lastI === 0 && this.i === this.list.length - 1)) || (this.lastI === this.list.length - 1 && this.i === 0) ? 1 : -1;
+      img.addEventListener('load', () => img.animate([{opacity: 0, transform: `translate3d(${d * 48}px,0,0)`}, {opacity: 1, transform: 'none'}], {duration: 380, easing: 'cubic-bezier(.16,1,.3,1)'}), {once: true});
+    }
+    this.lastI = this.i;
+    img.src = this.list[this.i];
     const many = this.list.length > 1;
     $('.lb-prev').hidden = !many; $('.lb-next').hidden = !many;
     $('#lb-count').textContent = many ? (this.i + 1) + ' / ' + this.list.length : '';
   },
   step(d){ this.i = (this.i + d + this.list.length) % this.list.length; this.show(); },
   close(){
-    $('#lightbox').hidden = true; $('#lb-img').removeAttribute('src');
+    const img = $('#lb-img'), tr = vis(this.opener);
+    if (!reduce && img.animate && tr && img.naturalWidth) {
+      const r = img.getBoundingClientRect();
+      const g = img.cloneNode(); g.removeAttribute('id'); g.className = 'lb-ghost';
+      Object.assign(g.style, {left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px'});
+      const f = document.createElement('div'); f.className = 'lb-fade';
+      document.body.append(f, g);
+      const a = g.animate([{transform: 'none', opacity: 1}, {transform: `translate3d(${tr.left - r.left}px,${tr.top - r.top}px,0) scale(${tr.width / r.width},${tr.height / r.height})`, opacity: .9}], {duration: 420, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards'});
+      f.animate([{opacity: 1}, {opacity: 0}], {duration: 360, easing: 'ease-out', fill: 'forwards'});
+      const end = () => { g.remove(); f.remove(); };
+      a.onfinish = end; a.oncancel = end; setTimeout(end, 800);
+    }
+    this.lastI = null;
+    $('#lightbox').hidden = true; img.removeAttribute('src');
     const o = this.opener; this.opener = null;
     if (o && document.contains(o)) { try { o.focus({preventScroll: true}); } catch (e) {} }
   },
@@ -2129,10 +2479,9 @@ function goView(next){
 }
 window.addEventListener('hashchange', () => {
   const next = hashView();
-  if (Loader.active) { Loader.retarget(next); return; }
-  if (next === S.view) return;
-  if (!Loader.on || S.mounted == null) { goView(next); return; }
-  Loader.play(next);
+  if (next === S.view && !ViewFx.busy) return;
+  if (S.mounted == null) { goView(next); return; }
+  ViewFx.go(next);
 });
 
 readHash();
@@ -2140,6 +2489,8 @@ Reveal.init();
 Loader.init();
 Setup.init();
 Tour.init();
+Origin.init();
+Tilt.init();
 BG.init();
 render();
 Store.init();

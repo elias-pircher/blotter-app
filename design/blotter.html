@@ -928,6 +928,195 @@ html.touring .rv-pop{animation:none!important}
   .p-foot > .btn{height:44px;justify-content:center}
   .oc-big small{display:none}
 }
+
+/* ===== Chronograph: motion system and materials ===== */
+:root{
+  --t1:140ms; --t2:260ms; --t3:480ms; --t4:860ms;
+  --e-out:cubic-bezier(.16,1,.3,1);
+  --e-io:cubic-bezier(.65,0,.35,1);
+  --e-in:cubic-bezier(.55,0,.75,.06);
+  --e-click:cubic-bezier(.3,1.32,.55,1);
+}
+
+/* date-wheel digits: each digit is a strip 0-9 that rolls into place */
+.roll{display:inline-flex;align-items:flex-start;white-space:nowrap;vertical-align:top}
+.roll .rw{display:inline-flex}
+.roll .rd{display:inline-block;height:1.08em;overflow:hidden}
+.roll .rs{display:block;transform:translate3d(0,calc(var(--d,0) * -10%),0);transition:transform var(--t4) var(--e-click);transition-delay:var(--dl,0ms)}
+.roll .rs.now{transition:none}
+.roll .rs::before{content:"0\A 1\A 2\A 3\A 4\A 5\A 6\A 7\A 8\A 9";white-space:pre;display:block;line-height:1.08em}
+.roll .rx{display:inline-block;line-height:1.08em}
+.roll .rx::before{content:attr(data-c)}
+
+/* win-rate dial */
+.eq-row{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px 18px;margin-top:12px}
+.dial{position:relative;width:136px;aspect-ratio:1;isolation:isolate}
+.dial::before{content:"";position:absolute;inset:-70px;z-index:-1;border-radius:50%;pointer-events:none;
+  background:repeating-conic-gradient(from 0deg,rgba(var(--fg-rgb),.05) 0deg .45deg,rgba(var(--fg-rgb),0) .45deg 1.5deg);
+  -webkit-mask:radial-gradient(closest-side,#000 30%,transparent 100%);mask:radial-gradient(closest-side,#000 30%,transparent 100%)}
+.dial::after{content:"";position:absolute;inset:16px;z-index:-1;border-radius:50%;background:radial-gradient(circle at 50% 30%,rgba(var(--fg-rgb),.07),rgba(var(--fg-rgb),0) 62%),rgba(var(--bg-rgb),.35);box-shadow:inset 0 1px 0 rgba(var(--fg-rgb),.08),inset 0 -10px 24px rgba(0,0,0,calc(.25 * var(--sh)))}
+.dial svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.dl-ticks line{stroke:rgba(var(--fg-rgb),.2);stroke-width:.9;stroke-linecap:round}
+.dl-ticks line.h{stroke:rgba(var(--fg-rgb),.55);stroke-width:1.4}
+.dl-track{fill:none;stroke:rgba(var(--fg-rgb),.07);stroke-width:4.5}
+.dl-arc{fill:none;stroke:url(#dl-gold);stroke-width:4.5;stroke-linecap:round;transform:rotate(-90deg);transform-origin:60px 60px;stroke-dasharray:0 1000;transition:stroke-dasharray 1.25s var(--e-out)}
+.dl-seg{fill:none;stroke-width:2.2;transform:rotate(-90deg);transform-origin:60px 60px;stroke-dasharray:0 1000;transition:stroke-dasharray 1.05s var(--e-out),stroke-dashoffset 1.05s var(--e-out)}
+.dl-seg.tp{stroke:var(--up)} .dl-seg.be{stroke:var(--be)} .dl-seg.sl{stroke:var(--down)}
+.dl-needle{position:absolute;inset:0;pointer-events:none;transform:rotate(0deg);transition:transform 1.35s var(--e-click),opacity .4s;will-change:transform}
+.dl-needle::before{content:"";position:absolute;left:calc(50% - .8px);top:6.7%;width:1.6px;height:15.8%;border-radius:1px;background:var(--gold-hi)}
+.dl-needle::after{content:"";position:absolute;left:47.8%;top:9.5%;width:4.4%;height:4.4%;border-radius:50%;background:var(--gold-hi);box-shadow:0 0 0 1.2px rgba(var(--bg-rgb),.9),0 0 8px rgba(var(--acc-rgb),.6)}
+.dl-needle.off{opacity:0}
+.dial .eq-big{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:1px;pointer-events:none}
+.dial .eq-v{font-family:var(--f-display);font-stretch:112%;font-weight:700;font-size:34px;letter-spacing:-.02em;line-height:1;color:var(--ink);background:none;-webkit-text-fill-color:currentColor;font-variant-numeric:tabular-nums lining-nums}
+.dial .eq-u{font-family:var(--f-display);font-weight:600;font-size:15px;line-height:1;color:var(--gold);background:none;-webkit-text-fill-color:currentColor;margin-top:3px}
+.eq-side{display:flex;flex-direction:column;gap:3px;min-width:0}
+.eq-side .eq-vl{padding:0}
+.eq-side .ratio-l{margin-top:8px}
+.equity .ratio{display:none}
+@media (max-width:600px){ .dial{width:118px} .dial .eq-v{font-size:30px} .eq-row{gap:8px 14px} }
+
+/* stats: minute-track meters */
+.meter{height:6px;border-radius:1px;background:rgba(var(--fg-rgb),.09);-webkit-mask:repeating-linear-gradient(90deg,#000 0 2px,transparent 2px 4px);mask:repeating-linear-gradient(90deg,#000 0 2px,transparent 2px 4px)}
+.meter i{border-radius:0;transition:width 1.2s var(--e-out)}
+.stat .v.roll{display:flex}
+
+/* brushed-gold buttons with a light that follows the pointer and a press flash */
+.btn.primary{position:relative;overflow:hidden;isolation:isolate;
+  background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,0) 48%),var(--gold-grad);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(0,0,0,.16),0 8px 22px -8px rgba(var(--acc-rgb),.6);
+  transition:transform var(--t2) var(--e-out),box-shadow var(--t2),filter var(--t2)}
+.btn.primary::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(110px 70px at var(--px,50%) var(--py,0%),rgba(255,255,255,.6),rgba(255,255,255,0) 70%);opacity:0;transition:opacity var(--t2)}
+.btn.primary:hover::after{opacity:1}
+.btn.primary:hover{filter:none;transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -1px 0 rgba(0,0,0,.16),0 14px 30px -10px rgba(var(--acc-rgb),.75)}
+.btn.primary::before{content:"";position:absolute;left:0;top:0;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:rgba(255,255,255,.7);transform:translate(var(--rx,0px),var(--ry,0px)) scale(0);opacity:0;pointer-events:none}
+.btn.primary.press::before{animation:pressflash .65s var(--e-out)}
+@keyframes pressflash{0%{transform:translate(var(--rx,0px),var(--ry,0px)) scale(0);opacity:.85}100%{transform:translate(var(--rx,0px),var(--ry,0px)) scale(22);opacity:0}}
+.btn:active:not(:disabled){transform:scale(.965);transition-duration:.08s}
+.btn.done{pointer-events:none}
+.btn.done svg.ok path{fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:24;stroke-dashoffset:24;animation:drawok .42s var(--e-out) .05s forwards}
+@keyframes drawok{to{stroke-dashoffset:0}}
+
+/* choosing an option clicks into place */
+.seg button[aria-checked="true"]{animation:selpop var(--t3) var(--e-click)}
+@keyframes selpop{0%{transform:scale(.9)}100%{transform:none}}
+
+/* month: name rolls like a date wheel, cells arrive in a diagonal wave */
+.month{overflow:hidden;padding-block:.1em;margin-block:-.1em}
+.month .mt{display:inline-block}
+.month.swap{animation:none}
+.month.swap .mt{animation:mroll .6s var(--e-out)}
+@keyframes mroll{from{opacity:0;transform:translate3d(0,calc(var(--mdir,1) * 80%),0)}}
+.cal.slide-next,.cal.slide-prev{animation:none}
+.cal.wave .day,.cal.wave .wk{animation:cellwave .64s var(--e-out) backwards;animation-delay:var(--wv,0ms)}
+@keyframes cellwave{from{opacity:0;transform:translate3d(calc(var(--wdir,1) * 26px),12px,0) scale(.93)}}
+.day.landed{animation:landed 1s var(--e-out)}
+@keyframes landed{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(var(--acc-rgb),.75)}25%{transform:scale(1.06)}100%{transform:none;box-shadow:0 0 0 22px rgba(var(--acc-rgb),0)}}
+
+/* view change: a gold second hand sweeps along the header */
+.vt-sweep{position:fixed;left:0;right:0;top:0;height:2px;z-index:41;pointer-events:none;opacity:0;
+  background:linear-gradient(90deg,rgba(var(--acc-rgb),0),rgba(var(--acc-rgb),.9) 40%,var(--gold-hi) 50%,rgba(var(--acc-rgb),.9) 60%,rgba(var(--acc-rgb),0));
+  box-shadow:0 0 14px rgba(var(--acc-rgb),.6)}
+html.vt #view{pointer-events:none}
+/* cut to navy, then the new page builds up section by section from the side of the tab */
+.vt-veil{position:fixed;inset:0;z-index:25;pointer-events:none;opacity:0;background:radial-gradient(1200px 700px at 50% 0%,rgba(var(--acc-rgb),.07),rgba(var(--acc-rgb),0) 70%),rgba(var(--bg-rgb),.94)}
+#view.vin{overflow-x:clip;overflow-clip-margin:24px}
+#view.vin .rv-pop{animation-name:rvslide;animation-duration:.74s;animation-timing-function:var(--e-out)}
+@keyframes rvslide{from{opacity:0;transform:translate3d(calc(var(--vdir,1) * 60px),0,0)}}
+/* the many calendar days rise instead (sliding 42 cells sideways is too heavy) */
+#view.vin .day.rv-pop,#view.vin .wk.rv-pop,#view.vin .wrow.rv-pop{animation-name:rvpop;animation-duration:.8s}
+
+/* dialogs: sheet slides on phones, panel swaps slide sideways */
+.panel.fwd{animation:pfwd .42s var(--e-out)} .panel.bwd{animation:pbwd .42s var(--e-out)}
+@keyframes pfwd{from{opacity:0;transform:translate3d(28px,0,0)}} @keyframes pbwd{from{opacity:0;transform:translate3d(-28px,0,0)}}
+.modal.ghost{z-index:49;pointer-events:none}
+.modal.ghost .scrim{animation:none}
+
+/* toast: springs up, a hairline shows how long it stays */
+.toast{animation:toastspring .55s var(--e-click);overflow:hidden}
+@keyframes toastspring{from{opacity:0;transform:translate(-50%,24px) scale(.94)}}
+.toast::after{content:"";position:absolute;left:14px;right:14px;bottom:5px;height:2px;border-radius:2px;background:currentColor;opacity:.28;transform-origin:0 50%;animation:toastbar var(--toast-t,2.6s) linear forwards}
+@keyframes toastbar{to{transform:scaleX(0)}}
+
+/* headline: one pass of light over the gold line when it appears */
+.mantra.shine .m.on:not(.leaving) .w.g{background-image:linear-gradient(105deg,rgba(255,255,255,0) 42%,rgba(255,255,255,.9) 50%,rgba(255,255,255,0) 58%),var(--gold-grad);background-size:260% 100%,100% 100%;background-repeat:no-repeat;background-position:130% 0,0 0;
+  animation:wordin .8s var(--ease) backwards,sheen 1.5s var(--e-io) both;animation-delay:calc(var(--i) * 70ms),calc(1100ms + var(--i) * 90ms)}
+@keyframes sheen{from{background-position:130% 0,0 0}to{background-position:-40% 0,0 0}}
+
+/* lightbox: image travels from its thumbnail */
+.lb-ghost{position:fixed;z-index:81;object-fit:cover;border-radius:8px;pointer-events:none;transform-origin:0 0}
+.lb-fade{position:fixed;inset:0;z-index:80;background:var(--lb-bg);pointer-events:none}
+
+@media (prefers-reduced-motion:reduce){
+  .roll .rs,.dl-arc,.dl-seg,.dl-needle,.meter i{transition:none}
+  .cal.wave .day,.cal.wave .wk,.month.swap .mt,.day.landed,.seg button[aria-checked="true"],.toast,.panel.fwd,.panel.bwd{animation:none}
+  .mantra.shine .m.on:not(.leaving) .w.g{animation:none}
+  .btn.primary.press::before{animation:none}
+}
+
+/* ===== Chronograph, part 2 ===== */
+/* numerals: the dial face, not code */
+.stat .v,.day-sum .v{font-family:var(--f-display);font-stretch:108%;font-weight:700;letter-spacing:-.012em;font-variant-numeric:tabular-nums lining-nums}
+.stat .v{font-size:clamp(24px,2.3vw,31px);line-height:1.1}
+.roll .rx{white-space:pre}
+
+/* Bilanz card: tilts toward the pointer, a reflection travels over the glass */
+.equity.untilt{transition:transform .7s var(--e-out)}
+.eq-glare{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;z-index:2;opacity:0;transition:opacity .5s}
+.eq-glare i{position:absolute;top:-40%;bottom:-40%;left:-60%;width:220%;background:linear-gradient(112deg,rgba(255,255,255,0) 40%,rgba(255,255,255,.075) 48%,rgba(255,255,255,.12) 50%,rgba(255,255,255,0) 58%)}
+.equity.tilt .eq-glare{opacity:1}
+
+/* page titles roll in letter by letter */
+.page-head h1.split{overflow:hidden;padding-block:.08em;margin-block:-.08em}
+.page-head h1 .tl{display:inline-block;animation:chroll .74s var(--e-click) backwards;animation-delay:calc(var(--tl0,140ms) + var(--i) * 34ms)}
+@keyframes chroll{from{transform:translate3d(0,105%,0);opacity:0}}
+
+/* today: a gold bezel */
+.day.today{box-shadow:inset 0 0 0 1px var(--gold),0 0 0 3px rgba(var(--acc-rgb),.13),0 14px 30px -16px rgba(var(--acc-rgb),.7)}
+
+@media (prefers-reduced-motion:reduce){
+  .page-head h1 .tl{animation:none}
+  .equity.untilt{transition:none}
+}
+
+/* ===== Chronograph, part 3: the page turns like a glass cube ===== */
+html.vt3d #topbar{view-transition-name:blotter-top}
+html.vt3d #vt-sweep{view-transition-name:blotter-sweep}
+::view-transition{background:radial-gradient(1100px 760px at 50% 38%,rgba(var(--acc-rgb),.16),rgba(var(--acc-rgb),0) 64%),radial-gradient(900px 600px at 50% 120%,rgba(var(--glow2-rgb),.35),rgba(var(--glow2-rgb),0) 70%),var(--bg)}
+::view-transition-group(root){animation:none}
+::view-transition-image-pair(root){isolation:auto}
+::view-transition-old(root),::view-transition-new(root){
+  animation-duration:1s;animation-timing-function:cubic-bezier(.72,0,.24,1);animation-fill-mode:both;
+  backface-visibility:hidden;mix-blend-mode:normal;transform-origin:50% 50%;
+  outline:1px solid rgba(var(--acc-rgb),.5);outline-offset:-1px;border-radius:2px}
+html[data-vtdir="fwd"]::view-transition-old(root){animation-name:cubeOutFwd}
+html[data-vtdir="fwd"]::view-transition-new(root){animation-name:cubeInFwd}
+html[data-vtdir="back"]::view-transition-old(root){animation-name:cubeOutBack}
+html[data-vtdir="back"]::view-transition-new(root){animation-name:cubeInBack}
+@keyframes cubeOutFwd{
+  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}
+  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(-45deg) translateZ(50vw);opacity:.9}
+  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(-90deg) translateZ(50vw);opacity:.35}}
+@keyframes cubeInFwd{
+  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(90deg) translateZ(50vw);opacity:.35}
+  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(45deg) translateZ(50vw);opacity:.9}
+  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}}
+@keyframes cubeOutBack{
+  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}
+  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(45deg) translateZ(50vw);opacity:.9}
+  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(90deg) translateZ(50vw);opacity:.35}}
+@keyframes cubeInBack{
+  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(-90deg) translateZ(50vw);opacity:.35}
+  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(-45deg) translateZ(50vw);opacity:.9}
+  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}}
+:root{--cube-p:1500px;--cube-s:.8}
+@media (max-width:760px){ :root{--cube-p:900px;--cube-s:.84} }
+/* header and the gold second hand stay flat above the turning cube */
+::view-transition-group(blotter-top),::view-transition-group(blotter-sweep){animation:none}
+::view-transition-old(blotter-top),::view-transition-old(blotter-sweep){display:none}
+::view-transition-new(blotter-top),::view-transition-new(blotter-sweep){animation:none}
+@media (prefers-reduced-motion:reduce){
+  ::view-transition-old(root),::view-transition-new(root){animation:none}
+}
 </style>
 <script>try{var k=localStorage.getItem("blotter.skin"),o={ocean:"slate",royal:"navy",copper:"mocha",arctic:"paper"};if(k&&/^[a-z]+$/.test(k))document.documentElement.setAttribute("data-skin",o[k]||k)}catch(e){}</script>
 
@@ -1020,6 +1209,8 @@ html.touring .rv-pop{animation:none!important}
   </div>
 </div>
 
+<div class="vt-veil" id="vt-veil" aria-hidden="true"></div>
+<div class="vt-sweep" id="vt-sweep" aria-hidden="true"></div>
 <div class="tour" id="tour" hidden>
   <div class="tour-hole none" id="tour-hole" aria-hidden="true"></div>
   <div class="tour-card" id="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-t" aria-describedby="tour-d">
@@ -1548,6 +1739,7 @@ const Reveal = {
       }
       const r = el.getBoundingClientRect();
       if (r.height && r.top > vh * 0.95) { this.seen.set(k, 'wait'); el.classList.add('rv-wait'); this.io.observe(el); }
+      else if (ViewFx.still) this.seen.set(k, now - 5000);
       else { this.seen.set(k, now); el.classList.add('rv-pop'); }
     });
   },
@@ -1572,6 +1764,249 @@ function setNum(el, v, fmt){
   cancelAnimationFrame(el._raf);
   const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(from + (v - from) * e); if (k < 1) el._raf = requestAnimationFrame(step); };
   el._raf = requestAnimationFrame(step);
+}
+
+/* ---------- chronograph: date-wheel digits ---------- */
+const Roll = {
+  // text: the value as it should read ("75", "4×", "–"); delay: ms before this number starts rolling
+  set(el, text, delay){
+    if (!el) return;
+    text = String(text);
+    if (el._rt === text) return;
+    const prev = el._digits || [];
+    el._rt = text;
+    if (reduce || !el.isConnected) { el.classList.remove('roll'); el.textContent = text; el._digits = null; return; }
+    el.classList.add('roll');
+    const chars = Array.from(text), digits = [];
+    let html = '<span class="sr">' + esc(text) + '</span><span class="rw" aria-hidden="true">';
+    chars.forEach((ch, i) => {
+      if (ch >= '0' && ch <= '9') {
+        const k = chars.length - 1 - i; // position from the right
+        digits[k] = +ch;
+        html += '<span class="rd"><span class="rs now" data-k="' + k + '" style="--d:' + (prev[k] != null ? prev[k] : 0) + '"></span></span>';
+      } else html += '<span class="rx" data-c="' + esc(ch) + '"></span>';
+    });
+    el.innerHTML = html + '</span>';
+    el._digits = digits;
+    const strips = el.querySelectorAll('.rs');
+    void el.offsetWidth;
+    requestAnimationFrame(() => {
+      strips.forEach((st, i) => {
+        const k = +st.dataset.k;
+        st.classList.remove('now');
+        st.style.setProperty('--dl', ((delay || 0) + i * 55) + 'ms');
+        st.style.setProperty('--d', digits[k]);
+      });
+    });
+  }
+};
+
+/* ---------- chronograph: win-rate dial ---------- */
+const Dial = {
+  svg(){
+    let t = '';
+    for (let i = 0; i < 60; i++) {
+      const a = i / 60 * Math.PI * 2, h = i % 5 === 0, r1 = h ? 35.5 : 37.5, r2 = 40;
+      const x1 = 60 + Math.sin(a) * r1, y1 = 60 - Math.cos(a) * r1, x2 = 60 + Math.sin(a) * r2, y2 = 60 - Math.cos(a) * r2;
+      t += `<line${h ? ' class="h"' : ''} x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"/>`;
+    }
+    return `<svg viewBox="0 0 120 120" aria-hidden="true" focusable="false"><defs><linearGradient id="dl-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--gold-hi)"/><stop offset=".55" stop-color="var(--gold)"/><stop offset="1" stop-color="var(--gold-lo)"/></linearGradient></defs>
+      <g class="dl-ticks">${t}</g>
+      <circle class="dl-track" cx="60" cy="60" r="46"/>
+      <circle class="dl-arc" cx="60" cy="60" r="46" pathLength="1000"/>
+      <circle class="dl-seg tp" cx="60" cy="60" r="54.5" pathLength="1000"/><circle class="dl-seg be" cx="60" cy="60" r="54.5" pathLength="1000"/><circle class="dl-seg sl" cx="60" cy="60" r="54.5" pathLength="1000"/>
+      </svg><i class="dl-needle off" aria-hidden="true"></i>`;
+  },
+  set(wr, tp, be, sl){
+    const d = $('#dial');
+    if (!d) return;
+    const sig = [wr, tp, be, sl].join('|');
+    if (d._sig === sig) return;
+    d._sig = sig;
+    const apply = () => {
+      const arc = $('.dl-arc', d), hand = $('.dl-needle', d), segs = $$('.dl-seg', d);
+      const v = wr == null ? 0 : Math.max(0, Math.min(1, wr));
+      arc.style.strokeDasharray = (v * 1000).toFixed(1) + ' 1000';
+      hand.classList.toggle('off', wr == null);
+      hand.style.transform = 'rotate(' + (v * 360).toFixed(2) + 'deg)';
+      const tot = tp + be + sl, parts = [tp, be, sl].filter(x => x > 0).length, gap = parts > 1 ? 10 : 0;
+      let off = 0;
+      [tp, be, sl].forEach((n, i) => {
+        const len = tot ? Math.max(0, n / tot * 1000 - (n ? gap : 0)) : 0;
+        segs[i].style.strokeDasharray = len.toFixed(1) + ' 1000';
+        segs[i].style.strokeDashoffset = (-off).toFixed(1);
+        if (n) off += len + gap;
+      });
+    };
+    // first values sweep in from zero, once the page has settled
+    if (!d._shown) { d._shown = true; setTimeout(() => requestAnimationFrame(apply), reduce ? 0 : ViewFx.still ? 900 : 420); } else apply();
+  }
+};
+
+/* ---------- chronograph: where an interaction came from (for morphs) ---------- */
+const Origin = {
+  el: null, t: 0,
+  init(){
+    document.addEventListener('pointerdown', e => {
+      const el = e.target.closest && e.target.closest('button, a, [data-day], .thumb, label');
+      if (el) { this.el = el; this.t = performance.now(); }
+      const pb = e.target.closest && e.target.closest('.btn.primary');
+      if (pb && !reduce) {
+        const r = pb.getBoundingClientRect();
+        pb.style.setProperty('--rx', (e.clientX - r.left) + 'px'); pb.style.setProperty('--ry', (e.clientY - r.top) + 'px');
+        pb.classList.remove('press'); void pb.offsetWidth; pb.classList.add('press');
+      }
+    }, true);
+    let raf = 0, last = null;
+    document.addEventListener('pointermove', e => {
+      if (e.pointerType !== 'mouse') return;
+      last = e;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const b = last.target.closest && last.target.closest('.btn.primary');
+        if (!b) return;
+        const r = b.getBoundingClientRect();
+        b.style.setProperty('--px', (last.clientX - r.left) + 'px'); b.style.setProperty('--py', (last.clientY - r.top) + 'px');
+      });
+    }, {passive: true});
+  },
+  // the element that opened something, if it was just used and is still on screen
+  take(){
+    let el = performance.now() - this.t < 900 ? this.el : null;
+    if (!el || !document.contains(el)) { const a = document.activeElement; el = a && a !== document.body && a.matches && a.matches('button, a, [data-day]') ? a : null; }
+    this.el = null;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (!r.width || r.bottom < 0 || r.top > innerHeight) return null;
+    return {el, r};
+  }
+};
+const vis = el => { if (!el || !document.contains(el)) return null; const r = el.getBoundingClientRect(); return r.width && r.bottom > 0 && r.top < innerHeight ? r : null; };
+const phoneSheet = () => innerWidth <= 600;
+
+/* ---------- chronograph: page change ---------- */
+const ViewFx = {
+  busy: false, queued: null, target: null, still: false,
+  go(next){
+    if (this.busy) { this.queued = next; this.target = next; updateChrome(); return; }
+    if (next === S.view) return;
+    const v = $('#view'), veil = $('#vt-veil');
+    if (reduce || !veil.animate || S.mounted == null) { goView(next); return; }
+    const order = pagesOn(), dir = order.indexOf(next) >= order.indexOf(S.view) ? 1 : -1;
+    if (typeof document.startViewTransition === 'function' && !document.hidden) { this.cube(next, dir); return; }
+    this.busy = true; this.target = next;
+    document.documentElement.classList.add('vt');
+    updateChrome();
+    this.sweep(dir);
+    // a solid veil is cheap to fade; the page itself is never moved as one big picture
+    const out = veil.animate([{opacity: 0}, {opacity: 1}], {duration: 190, easing: 'cubic-bezier(.55,0,.75,.06)', fill: 'forwards'});
+    let done = false;
+    const swap = () => {
+      if (done) return; done = true;
+      const to = this.queued || next; this.queued = null;
+      v.style.setProperty('--vdir', dir);
+      v.classList.add('vin');
+      goView(to);
+      out.cancel();
+      const inn = veil.animate([{opacity: 1}, {opacity: 0}], {duration: 460, easing: 'cubic-bezier(.16,1,.3,1)'});
+      const fin = () => {
+        this.busy = false; this.target = null;
+        document.documentElement.classList.remove('vt');
+        updateChrome();
+        const q = this.queued; this.queued = null;
+        if (q && q !== S.view) this.go(q);
+      };
+      inn.onfinish = fin; inn.oncancel = fin;
+      clearTimeout(this.vinT); this.vinT = setTimeout(() => v.classList.remove('vin'), 1500);
+    };
+    out.onfinish = swap;
+    setTimeout(swap, 400); // safety if the animation never reports back
+  },
+  // the page turns like a cube in the direction of the tab; the browser animates two snapshots
+  cube(next, dir){
+    const html = document.documentElement;
+    this.busy = true; this.target = next;
+    html.dataset.vtdir = dir > 0 ? 'fwd' : 'back';
+    html.classList.add('vt3d', 'vt');
+    this.still = true;
+    let vt;
+    try {
+      vt = document.startViewTransition(() => {
+        const to = this.queued || next; this.queued = null;
+        goView(to);
+      });
+    } catch (e) {
+      html.classList.remove('vt3d', 'vt'); delete html.dataset.vtdir;
+      this.still = false; this.busy = false; this.target = null; goView(next); return;
+    }
+    updateChrome();
+    vt.ready.then(() => this.sweep(dir), () => {});
+    const fin = () => {
+      html.classList.remove('vt3d', 'vt'); delete html.dataset.vtdir;
+      this.still = false; this.busy = false; this.target = null;
+      updateChrome();
+      const q = this.queued; this.queued = null;
+      if (q && q !== S.view) this.go(q);
+    };
+    vt.finished.then(fin, fin);
+  },
+  sweep(dir){
+    const sw = $('#vt-sweep'), tb = $('#topbar');
+    if (!sw || !sw.animate) return;
+    sw.style.top = Math.max(0, tb ? tb.getBoundingClientRect().bottom - 1 : 0) + 'px';
+    sw.animate([
+      {opacity: 0, transform: `translate3d(${dir * -100}%,0,0) scaleX(.4)`},
+      {opacity: 1, offset: .25},
+      {opacity: 1, offset: .7},
+      {opacity: 0, transform: `translate3d(${dir * 100}%,0,0) scaleX(.4)`}
+    ], {duration: 760, easing: 'cubic-bezier(.65,0,.35,1)'});
+  }
+};
+
+/* ---------- chronograph: the Bilanz card catches the light ---------- */
+const Tilt = {
+  cur: null, raf: 0, ev: null,
+  init(){
+    if (reduce || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    document.addEventListener('pointermove', e => {
+      this.ev = e;
+      if (this.raf) return;
+      this.raf = requestAnimationFrame(() => {
+        this.raf = 0;
+        const ev = this.ev, eq = ev.target.closest && ev.target.closest('#equity');
+        if (this.cur && this.cur !== eq) this.reset();
+        if (!eq || Modal.cur || Tour.on) return;
+        this.cur = eq;
+        const r = eq.getBoundingClientRect();
+        const x = Math.max(-.5, Math.min(.5, (ev.clientX - r.left) / r.width - .5)), y = Math.max(-.5, Math.min(.5, (ev.clientY - r.top) / r.height - .5));
+        eq.classList.add('tilt'); eq.classList.remove('untilt');
+        eq._rot = `perspective(1000px) rotateX(${(-y * 6).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg)`;
+        eq.style.transform = eq._rot;
+        const gl = eq.querySelector('.eq-glare i'); if (gl) gl.style.transform = 'translate3d(' + (x * r.width * .9).toFixed(1) + 'px,0,0)';
+      });
+    }, {passive: true});
+    document.addEventListener('pointerleave', () => this.reset());
+  },
+  reset(){
+    const eq = this.cur; this.cur = null;
+    if (!eq) return;
+    eq._rot = '';
+    eq.classList.remove('tilt'); eq.classList.add('untilt');
+    eq.style.transform = '';
+    clearTimeout(this.ut); this.ut = setTimeout(() => eq.classList.remove('untilt'), 750);
+  }
+};
+
+/* ---------- chronograph: page titles roll in ---------- */
+function splitTitle(root){
+  if (reduce || !root) return;
+  const h = root.querySelector('.page-head h1');
+  if (!h || h.classList.contains('split')) return;
+  const t = h.textContent;
+  h.classList.add('split'); h.setAttribute('aria-label', t);
+  if (ViewFx.still) h.style.setProperty('--tl0', '430ms');
+  h.innerHTML = Array.from(t).map((c, i) => `<span class="tl" aria-hidden="true" style="--i:${i}">${esc(c)}</span>`).join('');
 }
 
 /* ---------- motion: mantra ---------- */
@@ -1622,7 +2057,7 @@ const LD_NAMES = {kalender: ['', 'Kalender'], learnings: ['', 'Learnings'], outl
 const easeOut = k => 1 - Math.pow(1 - k, 3);
 const easeInOut = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
 const Loader = {
-  on: !reduce, active: false, swapped: false, hitDone: false, target: null, pending: null, raf: 0, t0: 0,
+  on: false, active: false, swapped: false, hitDone: false, target: null, pending: null, raf: 0, t0: 0,
   T: {enter: 240, liveStart: 120, live: 640, swap: 900, exit: 430},
   init(){
     this.el = $('#loader'); this.inner = $('#ld-inner');
@@ -1748,8 +2183,6 @@ function scrollFx(){
   if (!reduce) {
     const ht = $('#hero-txt');
     if (ht) { ht.style.transform = 'translate3d(0,' + (y * 0.16).toFixed(1) + 'px,0)'; ht.style.opacity = Math.max(0.12, 1 - y / 560).toFixed(3); }
-    const eq = $('#equity');
-    if (eq) eq.style.transform = 'translate3d(0,' + (y * 0.06).toFixed(1) + 'px,0)';
     const bw = $('#bg-wrap'); if (bw) bw.style.opacity = (1 - Math.min(1, y / 700) * 0.45).toFixed(3);
   }
   if (fill) {
@@ -1761,10 +2194,10 @@ function scrollFx(){
 
 /* ---------- ui chrome ---------- */
 let tT = 0;
-function toast(msg, bad){ const el = $('#toast'); el.textContent = msg; el.className = 'toast' + (bad ? ' bad' : ''); el.hidden = true; void el.offsetWidth; el.hidden = false; clearTimeout(tT); tT = setTimeout(() => { el.hidden = true; }, bad ? 5200 : 2600); }
+function toast(msg, bad){ const el = $('#toast'); el.textContent = msg; el.className = 'toast' + (bad ? ' bad' : ''); el.style.setProperty('--toast-t', (bad ? 5.2 : 2.6) + 's'); el.hidden = true; void el.offsetWidth; el.hidden = false; clearTimeout(tT); tT = setTimeout(() => { el.hidden = true; }, bad ? 5200 : 2600); }
 function setBanner(t){ const b = $('#banner'); b.textContent = t || ''; b.hidden = !t; }
 function updateChrome(){
-  const nav = Loader.active ? Loader.target : S.view;
+  const nav = ViewFx.target || S.view;
   const pg = pagesOn();
   $$('.tabs a').forEach(a => { a.hidden = !pg.includes(a.dataset.tab); if (a.dataset.tab === nav) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   $('.tabs').hidden = pg.length < 2;
@@ -1789,7 +2222,7 @@ let rq = 0;
 function schedule(){ if (rq) return; rq = requestAnimationFrame(() => { rq = 0; render(); }); }
 function render(){
   const el = $('#view');
-  if (S.mounted !== S.view) { S.mountN++; Views[S.view].mount(el); S.mounted = S.view; S.mountSig = settingsSig(); onScroll(); }
+  if (S.mounted !== S.view) { S.mountN++; Views[S.view].mount(el); S.mounted = S.view; S.mountSig = settingsSig(); splitTitle(el); onScroll(); }
   Views[S.view].update();
   Reveal.scan(el);
   updateChrome();
@@ -1866,10 +2299,13 @@ const Views = {
           <p class="hero-sub">Jeder eingetragene Trade macht dich besser. Wähle einen Tag im Kalender und halte fest, was passiert ist.</p>
         </div>
         <div class="equity spot" id="equity" data-rv="${M}:hero-e" style="--rd:180ms">
+          <span class="eq-glare" aria-hidden="true"><i></i></span>
           <div class="eq-head"><span class="eyebrow gold" id="eq-label">Bilanz</span><span class="eq-n" id="eq-n"></span></div>
-          <div class="eq-row"><span class="eq-big"><span class="eq-v gold-t" id="eq-v">–</span><span class="eq-u gold-t" id="eq-u" hidden>%</span></span><span class="eq-vl">Win-Rate<small>TP ÷ (TP + SL)</small></span></div>
+          <div class="eq-row">
+            <div class="dial" id="dial">${Dial.svg()}<span class="eq-big"><span class="eq-v" id="eq-v">–</span><span class="eq-u" id="eq-u" hidden>%</span></span></div>
+            <div class="eq-side"><span class="eq-vl">Win-Rate<small>TP ÷ (TP + SL)</small></span><div class="ratio-l" id="ratio-l"></div></div>
+          </div>
           <div class="ratio" id="ratio" aria-hidden="true"><span class="r tp"></span><span class="r be"></span><span class="r sl"></span></div>
-          <div class="ratio-l" id="ratio-l"></div>
           <div class="tape-h"><span class="eyebrow">Trade-Tape</span><span class="tape-hint">älteste zuerst</span></div>
           <div class="tape" id="tape"></div>
           <div class="eq-foot" id="eq-foot"></div>
@@ -1908,6 +2344,7 @@ const Views = {
       const hr = n.getHours(), greet = hr < 5 ? 'Gute Nacht' : hr < 11 ? 'Guten Morgen' : hr < 18 ? 'Guten Tag' : 'Guten Abend';
       $('#hero-date').innerHTML = (S.settings.name ? `<b>${esc(greet + ', ' + S.settings.name)}.</b> ` : '') + `<span>${esc(fLong.format(n))}</span><span class="hd-kw">, KW ${isoWeek(n)}</span>`;
       Mantra.mount($('#mantra'));
+      if (!Views.shone && !reduce) { Views.shone = true; const mn = $('#mantra'); mn.classList.add('shine'); setTimeout(() => mn.classList.remove('shine'), 3400); }
       const af = $('#acct-filter'), afEdge = () => af.classList.toggle('more', af.scrollLeft + af.clientWidth < af.scrollWidth - 2);
       af.addEventListener('scroll', afEdge, {passive: true}); requestAnimationFrame(afEdge);
       void $('#ratio').offsetWidth;
@@ -1916,7 +2353,8 @@ const Views = {
     update(){
       const M = S.mountN;
       const m = S.month, y = m.getFullYear(), mo = m.getMonth(), mk = y + '-' + pad(mo + 1);
-      $('#month-title').textContent = fMonth.format(m);
+      const mtTxt = fMonth.format(m);
+      if ($('#month-title').textContent !== mtTxt) $('#month-title').innerHTML = '<span class="mt">' + esc(mtTxt) + '</span>';
       const fa = curAcct();
       $$('#acct-filter button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.acct === fa)));
       const afb = $('#acct-filter [aria-checked="true"]'), afw = afb && afb.parentElement;
@@ -1930,7 +2368,12 @@ const Views = {
       // hero balance
       $('#eq-label').innerHTML = '<b>Bilanz</b> ' + esc(fMonth.format(m));
       $('#eq-n').textContent = ready ? s.n + (s.n === 1 ? ' Trade' : ' Trades') : '';
-      if (ready) { setNum($('#eq-v'), s.wr, v => String(Math.round(v * 100))); $('#eq-u').hidden = !(s.wr != null && isFinite(s.wr)); }
+      if (ready) {
+        const wrOk = s.wr != null && isFinite(s.wr);
+        Roll.set($('#eq-v'), wrOk ? String(Math.round(s.wr * 100)) : '–');
+        $('#eq-u').hidden = !wrOk;
+        Dial.set(wrOk ? s.wr : null, s.tp, s.be, s.sl);
+      }
       const tot = s.tp + s.be + s.sl;
       const rs = $$('#ratio .r');
       rs[0].style.width = ratioW(s.tp, tot); rs[1].style.width = ratioW(s.be, tot); rs[2].style.width = ratioW(s.sl, tot);
@@ -1945,13 +2388,13 @@ const Views = {
 
       // stats
       if (ready) {
-        setNum($('#st-n'), s.n, int); $('#st-n-s').textContent = s.tdays + (s.tdays === 1 ? ' Handelstag' : ' Handelstage');
-        setNum($('#st-tp'), s.tp, int); $('#st-tp-s').textContent = s.n ? pct(s.tp, s.n) + ' der Trades' : 'noch keine Trades';
-        setNum($('#st-sl'), s.sl, int); $('#st-sl-s').textContent = s.n ? pct(s.sl, s.n) + ' der Trades' : 'noch keine Trades';
-        setNum($('#st-be'), s.be, int); $('#st-be-s').textContent = s.n ? pct(s.be, s.n) + ' der Trades' : 'noch keine Trades';
+        Roll.set($('#st-n'), int(s.n), 0); $('#st-n-s').textContent = s.tdays + (s.tdays === 1 ? ' Handelstag' : ' Handelstage');
+        Roll.set($('#st-tp'), int(s.tp), 60); $('#st-tp-s').textContent = s.n ? pct(s.tp, s.n) + ' der Trades' : 'noch keine Trades';
+        Roll.set($('#st-sl'), int(s.sl), 120); $('#st-sl-s').textContent = s.n ? pct(s.sl, s.n) + ' der Trades' : 'noch keine Trades';
+        Roll.set($('#st-be'), int(s.be), 180); $('#st-be-s').textContent = s.n ? pct(s.be, s.n) + ' der Trades' : 'noch keine Trades';
         for (const k of ['tp', 'sl', 'be']) $('#st-' + k + '-m').style.width = s.n ? (s[k] / s.n * 100).toFixed(2) + '%' : '0%';
         $('#st-streak').innerHTML = Array.from({length: Math.min(s.best, 12)}, () => '<i></i>').join('');
-        setNum($('#st-best'), s.best, v => Math.round(v) + '×'); $('#st-best-s').textContent = 'TP in Folge';
+        Roll.set($('#st-best'), Math.round(s.best) + '×', 240); $('#st-best-s').textContent = 'TP in Folge';
       }
 
       // grid
@@ -1994,20 +2437,24 @@ const Views = {
             return `<span class="pill ${rr}" title="${esc((t.symbol || 'Trade') + ' · ' + (RES_NAME[rr] || 'ohne Ergebnis') + ' · ' + an(t.account))}">${adot(acctOf(t))}<b>${RES_LABEL[rr] || '–'}</b>${t.symbol ? `<span class="sym">${esc(t.symbol)}</span>` : ''}</span>`;
           }).join('') + (list.length > 4 ? `<span class="pill more">+${list.length - 4}</span>` : '');
           const dots = list.slice(0, 6).map(t => `<i class="${resOf(t) || 'na'}"></i>`).join('') + (o ? '<i class="ol"></i>' : '') + (l ? '<i class="ol"></i>' : '');
-          h += `<button type="button" class="${cls.join(' ')}" data-day="${key}" aria-label="${esc(label)}" ${rvOn ? `data-rv="${M}:${mk}:${key}"` : ''} style="--rd:${Math.min(700, 480 + (r * 7 + c) * 12)}ms;--gd:${c * 45}ms">
+          h += `<button type="button" class="${cls.join(' ')}" data-day="${key}" aria-label="${esc(label)}" ${rvOn ? `data-rv="${M}:${mk}:${key}"` : ''} style="--rd:${Math.min(700, 480 + (r * 7 + c) * 12)}ms;--gd:${c * 45}ms;--wv:${(dir === 'prev' ? (6 - c) + (rows - 1 - r) : c + r) * 26}ms">
             <span class="row1"><span class="d-num">${d.getDate()}</span><span class="rt"><span class="marks">${marks}</span>${shot}</span></span>
             ${list.length ? `<span class="pills">${pills}</span>` : ''}
             ${dots ? `<span class="d-dots">${dots}</span>` : ''}
           </button>`;
         }
         const wc = calc(wList), wt = wc.tp + wc.be + wc.sl, kw = isoWeek(wStart);
-        h += `<div class="wk" ${rvOn ? `data-rv="${M}:${mk}:wk${r}"` : ''} style="--rd:${Math.min(760, 560 + r * 40)}ms;--gd:315ms"><span class="kw">KW ${kw}</span>${wc.n ? `<span class="wk-n">${wc.n} ${wc.n === 1 ? 'Trade' : 'Trades'}</span><span class="wk-l">${countsHtml(wc)}</span><span class="mini"><span class="r tp" style="width:${ratioW(wc.tp, wt)}"></span><span class="r be" style="width:${ratioW(wc.be, wt)}"></span><span class="r sl" style="width:${ratioW(wc.sl, wt)}"></span></span>` : '<span class="none">–</span>'}</div>`;
+        h += `<div class="wk" ${rvOn ? `data-rv="${M}:${mk}:wk${r}"` : ''} style="--rd:${Math.min(760, 560 + r * 40)}ms;--gd:315ms;--wv:${(dir === 'prev' ? (rows - 1 - r) : 7 + r) * 26}ms"><span class="kw">KW ${kw}</span>${wc.n ? `<span class="wk-n">${wc.n} ${wc.n === 1 ? 'Trade' : 'Trades'}</span><span class="wk-l">${countsHtml(wc)}</span><span class="mini"><span class="r tp" style="width:${ratioW(wc.tp, wt)}"></span><span class="r be" style="width:${ratioW(wc.be, wt)}"></span><span class="r sl" style="width:${ratioW(wc.sl, wt)}"></span></span>` : '<span class="none">–</span>'}</div>`;
         wl += `<div class="wrow" ${rvOn ? `data-rv="${M}:${mk}:wl${r}"` : ''} style="--rd:${r * 50}ms"><span class="kw">KW ${kw} · ${fDM.format(wStart)}–${fDM.format(wEnd)}</span><span class="n">${wc.n ? wc.n + (wc.n === 1 ? ' Trade' : ' Trades') : ''}</span><span class="p">${wc.n ? countsHtml(wc) : '–'}</span></div>`;
       }
       $('#cal').innerHTML = h;
       if (dir) {
-        for (const el of [$('#cal'), $('#weeks')]) { el.classList.remove('slide-next', 'slide-prev'); void el.offsetWidth; el.classList.add('slide-' + dir); }
-        const mt = $('#month-title'); mt.classList.remove('swap'); void mt.offsetWidth; mt.classList.add('swap');
+        const cal = $('#cal'), wk = $('#weeks');
+        cal.style.setProperty('--wdir', dir === 'next' ? 1 : -1);
+        cal.classList.remove('wave'); void cal.offsetWidth; cal.classList.add('wave');
+        clearTimeout(this.waveT); this.waveT = setTimeout(() => cal.classList.remove('wave'), 1400);
+        wk.classList.remove('slide-next', 'slide-prev'); void wk.offsetWidth; wk.classList.add('slide-' + dir);
+        const mt = $('#month-title'); mt.style.setProperty('--mdir', dir === 'next' ? 1 : -1); mt.classList.remove('swap'); void mt.offsetWidth; mt.classList.add('swap');
       }
       $('#weeks').innerHTML = wl;
       $('#cal-hint').hidden = !(S.loaded.trades && S.trades.length === 0);
@@ -2115,16 +2562,34 @@ const Modal = {
   cur: null, opener: null,
   show(builder, opts){
     opts = opts || {};
+    const fresh = !this.cur, dirFx = this.goingBack ? 'bwd' : 'fwd';
+    this.goingBack = false;
+    const from = fresh ? Origin.take() : null;
     if (this.cur && this.cur.cleanup) this.cur.cleanup();
-    if (!this.cur) this.opener = document.activeElement;
+    if (!this.cur) { this.opener = document.activeElement; this.origin = from ? from.el : null; }
     this.cur = {builder, live: !!opts.live, back: opts.back || null, cleanup: opts.cleanup || null, dirty: false};
     const panel = this.freshPanel();
     panel.innerHTML = builder();
     panel.scrollTop = 0;
     $('#modal').hidden = false;
     panel.style.animation = 'none'; void panel.offsetWidth; panel.style.animation = '';
+    if (!fresh && !reduce) panel.classList.add(dirFx);
+    else if (fresh && !reduce && panel.animate) {
+      panel.style.animation = 'none';
+      const pr = panel.getBoundingClientRect();
+      if (phoneSheet()) {
+        panel.animate([{transform: 'translate3d(0,60%,0)', opacity: .4}, {transform: 'none', opacity: 1}], {duration: 520, easing: 'cubic-bezier(.16,1,.3,1)'});
+      } else if (from && pr.width) {
+        const sc = Math.max(.14, Math.min(.9, from.r.width / pr.width));
+        const dx = from.r.left + from.r.width / 2 - (pr.left + pr.width / 2), dy = from.r.top + from.r.height / 2 - (pr.top + pr.height / 2);
+        panel.animate([{transform: `translate3d(${dx}px,${dy}px,0) scale(${sc})`, opacity: 0}, {opacity: 1, offset: .32}, {transform: 'none', opacity: 1}], {duration: 600, easing: 'cubic-bezier(.16,1,.3,1)'});
+      } else {
+        panel.animate([{transform: 'translate3d(0,18px,0) scale(.97)', opacity: 0}, {transform: 'none', opacity: 1}], {duration: 420, easing: 'cubic-bezier(.16,1,.3,1)'});
+      }
+    }
     document.documentElement.style.overflow = 'hidden';
     if (opts.onMount) opts.onMount(panel);
+    if (fresh && !reduce) panel.querySelectorAll('.day-sum .v').forEach((v, i) => Roll.set(v, v.textContent, 180 + i * 70));
     const f = panel.querySelector(opts.focus || '.p-body button, .p-body input, .p-body textarea, .p-foot button');
     if (f) { try { f.focus({preventScroll: true}); } catch (e) { f.focus(); } }
   },
@@ -2143,13 +2608,48 @@ const Modal = {
     if (!this.cur) return;
     if (this.cur.cleanup) this.cur.cleanup();
     this.cur = null;
+    const old = $('#panel'), sc = old.scrollTop, land = this.landTo; this.landTo = null;
     $('#modal').hidden = true; this.freshPanel();
+    if (!reduce && old.animate && old.childElementCount) this.fold(old, sc, land);
     document.documentElement.style.overflow = '';
     if (this.opener && document.contains(this.opener)) { try { this.opener.focus({preventScroll: true}); } catch (e) {} }
     this.opener = null;
   },
+  // the closing sheet folds back into the element it came from (or into the day a trade was saved to)
+  fold(old, sc, land){
+    const ghost = document.createElement('div');
+    ghost.className = 'modal ghost'; ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
+    const scrim = document.createElement('div'); scrim.className = 'scrim';
+    old.removeAttribute('id'); old.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+    old.style.animation = 'none'; old.classList.remove('fwd', 'bwd');
+    ghost.append(scrim, old); document.body.append(ghost);
+    old.scrollTop = sc;
+    const origin = this.origin; this.origin = null;
+    const go = () => {
+      const pr = old.getBoundingClientRect();
+      const target = land ? $('#cal .day[data-day="' + land + '"]') : origin;
+      const tr = vis(target);
+      let kf;
+      if (tr && pr.width && !(phoneSheet() && !land)) {
+        const s2 = Math.max(.1, Math.min(.9, tr.width / pr.width));
+        const dx = tr.left + tr.width / 2 - (pr.left + pr.width / 2), dy = tr.top + tr.height / 2 - (pr.top + pr.height / 2);
+        kf = [{transform: 'none', opacity: 1}, {opacity: 1, offset: .55}, {transform: `translate3d(${dx}px,${dy}px,0) scale(${s2})`, opacity: 0}];
+      } else if (phoneSheet()) kf = [{transform: 'none', opacity: 1}, {transform: 'translate3d(0,70%,0)', opacity: .2}];
+      else kf = [{transform: 'none', opacity: 1}, {transform: 'translate3d(0,14px,0) scale(.965)', opacity: 0}];
+      const a = old.animate(kf, {duration: tr ? 460 : 300, easing: tr ? 'cubic-bezier(.65,0,.35,1)' : 'cubic-bezier(.55,0,.75,.06)', fill: 'forwards'});
+      scrim.animate([{opacity: 1}, {opacity: 0}], {duration: tr ? 420 : 280, easing: 'ease-out', fill: 'forwards'});
+      const end = () => {
+        ghost.remove();
+        if (land && target && document.contains(target)) { target.classList.remove('landed'); void target.offsetWidth; target.classList.add('landed'); setTimeout(() => target.classList.remove('landed'), 1100); }
+      };
+      a.onfinish = end; a.oncancel = end;
+      setTimeout(() => { if (ghost.isConnected) end(); }, 900);
+    };
+    // a saved trade: wait until the calendar shows it, then fly there
+    if (land) requestAnimationFrame(() => requestAnimationFrame(go)); else go();
+  },
   back(){
-    if (this.cur && this.cur.back) { const b = this.cur.back; if (this.cur.cleanup) this.cur.cleanup(); this.cur.cleanup = null; b(); }
+    if (this.cur && this.cur.back) { this.goingBack = true; const b = this.cur.back; if (this.cur.cleanup) this.cur.cleanup(); this.cur.cleanup = null; b(); }
     else this.close();
   },
   tryClose(){
@@ -2420,8 +2920,14 @@ function openForm(kind, entry, opts){
       for (const ref of st.removed) Store.deleteImage(ref);
       if (kind === 'trades' && obj.account) { S.lastAccount = obj.account; lsSet('blotter.lastAccount', obj.account); }
       st.busy = false;
+      if (!reduce) {
+        btn.classList.add('done');
+        btn.innerHTML = '<svg class="ok" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>Gespeichert';
+        await new Promise(r => setTimeout(r, 380));
+      }
       toast(def.saved);
       if (Modal.cur) Modal.cur.dirty = false;
+      if (kind === 'trades' && !opts.fromDay && obj.date && S.view === 'kalender') Modal.landTo = obj.date;
       if (kind === 'trades' && !opts.fromDay && obj.date) {
         const d = parseYmd(obj.date); S.month = new Date(d.getFullYear(), d.getMonth(), 1);
         if (S.view !== 'kalender') location.hash = 'kalender';
@@ -2495,16 +3001,51 @@ function openForm(kind, entry, opts){
 const LB = {
   list: [], i: 0,
   opener: null,
-  open(list, i){ if (!list.length) return; this.opener = document.activeElement; this.list = list; this.i = i; this.show(); $('#lightbox').hidden = false; $('.lb-close').focus(); },
-  show(){
-    $('#lb-img').src = this.list[this.i];
+  open(list, i){
+    if (!list.length) return;
+    const from = Origin.take();
+    this.opener = document.activeElement; this.list = list; this.i = i; this.show(true); $('#lightbox').hidden = false; $('.lb-close').focus();
+    const img = $('#lb-img'), lb = $('#lightbox');
+    if (reduce || !img.animate) return;
+    lb.animate([{opacity: 0}, {opacity: 1}], {duration: 260, easing: 'ease-out'});
+    const grow = () => {
+      if (!this.isOpen()) return;
+      const r = img.getBoundingClientRect(), o = from && vis(from.el);
+      if (o && r.width) {
+        const sc = o.width / r.width;
+        img.animate([{transform: `translate3d(${o.left - r.left}px,${o.top - r.top}px,0) scale(${sc})`, transformOrigin: '0 0', opacity: .6}, {transform: 'none', transformOrigin: '0 0', opacity: 1}], {duration: 560, easing: 'cubic-bezier(.16,1,.3,1)'});
+      } else img.animate([{opacity: 0, transform: 'scale(.96)'}, {opacity: 1, transform: 'none'}], {duration: 340, easing: 'cubic-bezier(.16,1,.3,1)'});
+    };
+    if (img.complete && img.naturalWidth) grow(); else img.addEventListener('load', grow, {once: true});
+  },
+  show(first){
+    const img = $('#lb-img');
+    if (!first && !reduce && img.animate && this.lastI != null && this.lastI !== this.i) {
+      const d = (this.i > this.lastI && !(this.lastI === 0 && this.i === this.list.length - 1)) || (this.lastI === this.list.length - 1 && this.i === 0) ? 1 : -1;
+      img.addEventListener('load', () => img.animate([{opacity: 0, transform: `translate3d(${d * 48}px,0,0)`}, {opacity: 1, transform: 'none'}], {duration: 380, easing: 'cubic-bezier(.16,1,.3,1)'}), {once: true});
+    }
+    this.lastI = this.i;
+    img.src = this.list[this.i];
     const many = this.list.length > 1;
     $('.lb-prev').hidden = !many; $('.lb-next').hidden = !many;
     $('#lb-count').textContent = many ? (this.i + 1) + ' / ' + this.list.length : '';
   },
   step(d){ this.i = (this.i + d + this.list.length) % this.list.length; this.show(); },
   close(){
-    $('#lightbox').hidden = true; $('#lb-img').removeAttribute('src');
+    const img = $('#lb-img'), tr = vis(this.opener);
+    if (!reduce && img.animate && tr && img.naturalWidth) {
+      const r = img.getBoundingClientRect();
+      const g = img.cloneNode(); g.removeAttribute('id'); g.className = 'lb-ghost';
+      Object.assign(g.style, {left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px'});
+      const f = document.createElement('div'); f.className = 'lb-fade';
+      document.body.append(f, g);
+      const a = g.animate([{transform: 'none', opacity: 1}, {transform: `translate3d(${tr.left - r.left}px,${tr.top - r.top}px,0) scale(${tr.width / r.width},${tr.height / r.height})`, opacity: .9}], {duration: 420, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards'});
+      f.animate([{opacity: 1}, {opacity: 0}], {duration: 360, easing: 'ease-out', fill: 'forwards'});
+      const end = () => { g.remove(); f.remove(); };
+      a.onfinish = end; a.oncancel = end; setTimeout(end, 800);
+    }
+    this.lastI = null;
+    $('#lightbox').hidden = true; img.removeAttribute('src');
     const o = this.opener; this.opener = null;
     if (o && document.contains(o)) { try { o.focus({preventScroll: true}); } catch (e) {} }
   },
@@ -3161,10 +3702,9 @@ function goView(next){
 }
 window.addEventListener('hashchange', () => {
   const next = hashView();
-  if (Loader.active) { Loader.retarget(next); return; }
-  if (next === S.view) return;
-  if (!Loader.on || S.mounted == null) { goView(next); return; }
-  Loader.play(next);
+  if (next === S.view && !ViewFx.busy) return;
+  if (S.mounted == null) { goView(next); return; }
+  ViewFx.go(next);
 });
 
 readHash();
@@ -3172,6 +3712,8 @@ Reveal.init();
 Loader.init();
 Setup.init();
 Tour.init();
+Origin.init();
+Tilt.init();
 BG.init();
 render();
 Store.init();

@@ -926,6 +926,195 @@ html.touring .rv-pop{animation:none!important}
   .oc-big small{display:none}
 }
 
+/* ===== Chronograph: motion system and materials ===== */
+:root{
+  --t1:140ms; --t2:260ms; --t3:480ms; --t4:860ms;
+  --e-out:cubic-bezier(.16,1,.3,1);
+  --e-io:cubic-bezier(.65,0,.35,1);
+  --e-in:cubic-bezier(.55,0,.75,.06);
+  --e-click:cubic-bezier(.3,1.32,.55,1);
+}
+
+/* date-wheel digits: each digit is a strip 0-9 that rolls into place */
+.roll{display:inline-flex;align-items:flex-start;white-space:nowrap;vertical-align:top}
+.roll .rw{display:inline-flex}
+.roll .rd{display:inline-block;height:1.08em;overflow:hidden}
+.roll .rs{display:block;transform:translate3d(0,calc(var(--d,0) * -10%),0);transition:transform var(--t4) var(--e-click);transition-delay:var(--dl,0ms)}
+.roll .rs.now{transition:none}
+.roll .rs::before{content:"0\A 1\A 2\A 3\A 4\A 5\A 6\A 7\A 8\A 9";white-space:pre;display:block;line-height:1.08em}
+.roll .rx{display:inline-block;line-height:1.08em}
+.roll .rx::before{content:attr(data-c)}
+
+/* win-rate dial */
+.eq-row{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px 18px;margin-top:12px}
+.dial{position:relative;width:136px;aspect-ratio:1;isolation:isolate}
+.dial::before{content:"";position:absolute;inset:-70px;z-index:-1;border-radius:50%;pointer-events:none;
+  background:repeating-conic-gradient(from 0deg,rgba(var(--fg-rgb),.05) 0deg .45deg,rgba(var(--fg-rgb),0) .45deg 1.5deg);
+  -webkit-mask:radial-gradient(closest-side,#000 30%,transparent 100%);mask:radial-gradient(closest-side,#000 30%,transparent 100%)}
+.dial::after{content:"";position:absolute;inset:16px;z-index:-1;border-radius:50%;background:radial-gradient(circle at 50% 30%,rgba(var(--fg-rgb),.07),rgba(var(--fg-rgb),0) 62%),rgba(var(--bg-rgb),.35);box-shadow:inset 0 1px 0 rgba(var(--fg-rgb),.08),inset 0 -10px 24px rgba(0,0,0,calc(.25 * var(--sh)))}
+.dial svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.dl-ticks line{stroke:rgba(var(--fg-rgb),.2);stroke-width:.9;stroke-linecap:round}
+.dl-ticks line.h{stroke:rgba(var(--fg-rgb),.55);stroke-width:1.4}
+.dl-track{fill:none;stroke:rgba(var(--fg-rgb),.07);stroke-width:4.5}
+.dl-arc{fill:none;stroke:url(#dl-gold);stroke-width:4.5;stroke-linecap:round;transform:rotate(-90deg);transform-origin:60px 60px;stroke-dasharray:0 1000;transition:stroke-dasharray 1.25s var(--e-out)}
+.dl-seg{fill:none;stroke-width:2.2;transform:rotate(-90deg);transform-origin:60px 60px;stroke-dasharray:0 1000;transition:stroke-dasharray 1.05s var(--e-out),stroke-dashoffset 1.05s var(--e-out)}
+.dl-seg.tp{stroke:var(--up)} .dl-seg.be{stroke:var(--be)} .dl-seg.sl{stroke:var(--down)}
+.dl-needle{position:absolute;inset:0;pointer-events:none;transform:rotate(0deg);transition:transform 1.35s var(--e-click),opacity .4s;will-change:transform}
+.dl-needle::before{content:"";position:absolute;left:calc(50% - .8px);top:6.7%;width:1.6px;height:15.8%;border-radius:1px;background:var(--gold-hi)}
+.dl-needle::after{content:"";position:absolute;left:47.8%;top:9.5%;width:4.4%;height:4.4%;border-radius:50%;background:var(--gold-hi);box-shadow:0 0 0 1.2px rgba(var(--bg-rgb),.9),0 0 8px rgba(var(--acc-rgb),.6)}
+.dl-needle.off{opacity:0}
+.dial .eq-big{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:1px;pointer-events:none}
+.dial .eq-v{font-family:var(--f-display);font-stretch:112%;font-weight:700;font-size:34px;letter-spacing:-.02em;line-height:1;color:var(--ink);background:none;-webkit-text-fill-color:currentColor;font-variant-numeric:tabular-nums lining-nums}
+.dial .eq-u{font-family:var(--f-display);font-weight:600;font-size:15px;line-height:1;color:var(--gold);background:none;-webkit-text-fill-color:currentColor;margin-top:3px}
+.eq-side{display:flex;flex-direction:column;gap:3px;min-width:0}
+.eq-side .eq-vl{padding:0}
+.eq-side .ratio-l{margin-top:8px}
+.equity .ratio{display:none}
+@media (max-width:600px){ .dial{width:118px} .dial .eq-v{font-size:30px} .eq-row{gap:8px 14px} }
+
+/* stats: minute-track meters */
+.meter{height:6px;border-radius:1px;background:rgba(var(--fg-rgb),.09);-webkit-mask:repeating-linear-gradient(90deg,#000 0 2px,transparent 2px 4px);mask:repeating-linear-gradient(90deg,#000 0 2px,transparent 2px 4px)}
+.meter i{border-radius:0;transition:width 1.2s var(--e-out)}
+.stat .v.roll{display:flex}
+
+/* brushed-gold buttons with a light that follows the pointer and a press flash */
+.btn.primary{position:relative;overflow:hidden;isolation:isolate;
+  background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,0) 48%),var(--gold-grad);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(0,0,0,.16),0 8px 22px -8px rgba(var(--acc-rgb),.6);
+  transition:transform var(--t2) var(--e-out),box-shadow var(--t2),filter var(--t2)}
+.btn.primary::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(110px 70px at var(--px,50%) var(--py,0%),rgba(255,255,255,.6),rgba(255,255,255,0) 70%);opacity:0;transition:opacity var(--t2)}
+.btn.primary:hover::after{opacity:1}
+.btn.primary:hover{filter:none;transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -1px 0 rgba(0,0,0,.16),0 14px 30px -10px rgba(var(--acc-rgb),.75)}
+.btn.primary::before{content:"";position:absolute;left:0;top:0;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:rgba(255,255,255,.7);transform:translate(var(--rx,0px),var(--ry,0px)) scale(0);opacity:0;pointer-events:none}
+.btn.primary.press::before{animation:pressflash .65s var(--e-out)}
+@keyframes pressflash{0%{transform:translate(var(--rx,0px),var(--ry,0px)) scale(0);opacity:.85}100%{transform:translate(var(--rx,0px),var(--ry,0px)) scale(22);opacity:0}}
+.btn:active:not(:disabled){transform:scale(.965);transition-duration:.08s}
+.btn.done{pointer-events:none}
+.btn.done svg.ok path{fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:24;stroke-dashoffset:24;animation:drawok .42s var(--e-out) .05s forwards}
+@keyframes drawok{to{stroke-dashoffset:0}}
+
+/* choosing an option clicks into place */
+.seg button[aria-checked="true"]{animation:selpop var(--t3) var(--e-click)}
+@keyframes selpop{0%{transform:scale(.9)}100%{transform:none}}
+
+/* month: name rolls like a date wheel, cells arrive in a diagonal wave */
+.month{overflow:hidden;padding-block:.1em;margin-block:-.1em}
+.month .mt{display:inline-block}
+.month.swap{animation:none}
+.month.swap .mt{animation:mroll .6s var(--e-out)}
+@keyframes mroll{from{opacity:0;transform:translate3d(0,calc(var(--mdir,1) * 80%),0)}}
+.cal.slide-next,.cal.slide-prev{animation:none}
+.cal.wave .day,.cal.wave .wk{animation:cellwave .64s var(--e-out) backwards;animation-delay:var(--wv,0ms)}
+@keyframes cellwave{from{opacity:0;transform:translate3d(calc(var(--wdir,1) * 26px),12px,0) scale(.93)}}
+.day.landed{animation:landed 1s var(--e-out)}
+@keyframes landed{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(var(--acc-rgb),.75)}25%{transform:scale(1.06)}100%{transform:none;box-shadow:0 0 0 22px rgba(var(--acc-rgb),0)}}
+
+/* view change: a gold second hand sweeps along the header */
+.vt-sweep{position:fixed;left:0;right:0;top:0;height:2px;z-index:41;pointer-events:none;opacity:0;
+  background:linear-gradient(90deg,rgba(var(--acc-rgb),0),rgba(var(--acc-rgb),.9) 40%,var(--gold-hi) 50%,rgba(var(--acc-rgb),.9) 60%,rgba(var(--acc-rgb),0));
+  box-shadow:0 0 14px rgba(var(--acc-rgb),.6)}
+html.vt #view{pointer-events:none}
+/* cut to navy, then the new page builds up section by section from the side of the tab */
+.vt-veil{position:fixed;inset:0;z-index:25;pointer-events:none;opacity:0;background:radial-gradient(1200px 700px at 50% 0%,rgba(var(--acc-rgb),.07),rgba(var(--acc-rgb),0) 70%),rgba(var(--bg-rgb),.94)}
+#view.vin{overflow-x:clip;overflow-clip-margin:24px}
+#view.vin .rv-pop{animation-name:rvslide;animation-duration:.74s;animation-timing-function:var(--e-out)}
+@keyframes rvslide{from{opacity:0;transform:translate3d(calc(var(--vdir,1) * 60px),0,0)}}
+/* the many calendar days rise instead (sliding 42 cells sideways is too heavy) */
+#view.vin .day.rv-pop,#view.vin .wk.rv-pop,#view.vin .wrow.rv-pop{animation-name:rvpop;animation-duration:.8s}
+
+/* dialogs: sheet slides on phones, panel swaps slide sideways */
+.panel.fwd{animation:pfwd .42s var(--e-out)} .panel.bwd{animation:pbwd .42s var(--e-out)}
+@keyframes pfwd{from{opacity:0;transform:translate3d(28px,0,0)}} @keyframes pbwd{from{opacity:0;transform:translate3d(-28px,0,0)}}
+.modal.ghost{z-index:49;pointer-events:none}
+.modal.ghost .scrim{animation:none}
+
+/* toast: springs up, a hairline shows how long it stays */
+.toast{animation:toastspring .55s var(--e-click);overflow:hidden}
+@keyframes toastspring{from{opacity:0;transform:translate(-50%,24px) scale(.94)}}
+.toast::after{content:"";position:absolute;left:14px;right:14px;bottom:5px;height:2px;border-radius:2px;background:currentColor;opacity:.28;transform-origin:0 50%;animation:toastbar var(--toast-t,2.6s) linear forwards}
+@keyframes toastbar{to{transform:scaleX(0)}}
+
+/* headline: one pass of light over the gold line when it appears */
+.mantra.shine .m.on:not(.leaving) .w.g{background-image:linear-gradient(105deg,rgba(255,255,255,0) 42%,rgba(255,255,255,.9) 50%,rgba(255,255,255,0) 58%),var(--gold-grad);background-size:260% 100%,100% 100%;background-repeat:no-repeat;background-position:130% 0,0 0;
+  animation:wordin .8s var(--ease) backwards,sheen 1.5s var(--e-io) both;animation-delay:calc(var(--i) * 70ms),calc(1100ms + var(--i) * 90ms)}
+@keyframes sheen{from{background-position:130% 0,0 0}to{background-position:-40% 0,0 0}}
+
+/* lightbox: image travels from its thumbnail */
+.lb-ghost{position:fixed;z-index:81;object-fit:cover;border-radius:8px;pointer-events:none;transform-origin:0 0}
+.lb-fade{position:fixed;inset:0;z-index:80;background:var(--lb-bg);pointer-events:none}
+
+@media (prefers-reduced-motion:reduce){
+  .roll .rs,.dl-arc,.dl-seg,.dl-needle,.meter i{transition:none}
+  .cal.wave .day,.cal.wave .wk,.month.swap .mt,.day.landed,.seg button[aria-checked="true"],.toast,.panel.fwd,.panel.bwd{animation:none}
+  .mantra.shine .m.on:not(.leaving) .w.g{animation:none}
+  .btn.primary.press::before{animation:none}
+}
+
+/* ===== Chronograph, part 2 ===== */
+/* numerals: the dial face, not code */
+.stat .v,.day-sum .v{font-family:var(--f-display);font-stretch:108%;font-weight:700;letter-spacing:-.012em;font-variant-numeric:tabular-nums lining-nums}
+.stat .v{font-size:clamp(24px,2.3vw,31px);line-height:1.1}
+.roll .rx{white-space:pre}
+
+/* Bilanz card: tilts toward the pointer, a reflection travels over the glass */
+.equity.untilt{transition:transform .7s var(--e-out)}
+.eq-glare{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;z-index:2;opacity:0;transition:opacity .5s}
+.eq-glare i{position:absolute;top:-40%;bottom:-40%;left:-60%;width:220%;background:linear-gradient(112deg,rgba(255,255,255,0) 40%,rgba(255,255,255,.075) 48%,rgba(255,255,255,.12) 50%,rgba(255,255,255,0) 58%)}
+.equity.tilt .eq-glare{opacity:1}
+
+/* page titles roll in letter by letter */
+.page-head h1.split{overflow:hidden;padding-block:.08em;margin-block:-.08em}
+.page-head h1 .tl{display:inline-block;animation:chroll .74s var(--e-click) backwards;animation-delay:calc(var(--tl0,140ms) + var(--i) * 34ms)}
+@keyframes chroll{from{transform:translate3d(0,105%,0);opacity:0}}
+
+/* today: a gold bezel */
+.day.today{box-shadow:inset 0 0 0 1px var(--gold),0 0 0 3px rgba(var(--acc-rgb),.13),0 14px 30px -16px rgba(var(--acc-rgb),.7)}
+
+@media (prefers-reduced-motion:reduce){
+  .page-head h1 .tl{animation:none}
+  .equity.untilt{transition:none}
+}
+
+/* ===== Chronograph, part 3: the page turns like a glass cube ===== */
+html.vt3d #topbar{view-transition-name:blotter-top}
+html.vt3d #vt-sweep{view-transition-name:blotter-sweep}
+::view-transition{background:radial-gradient(1100px 760px at 50% 38%,rgba(var(--acc-rgb),.16),rgba(var(--acc-rgb),0) 64%),radial-gradient(900px 600px at 50% 120%,rgba(var(--glow2-rgb),.35),rgba(var(--glow2-rgb),0) 70%),var(--bg)}
+::view-transition-group(root){animation:none}
+::view-transition-image-pair(root){isolation:auto}
+::view-transition-old(root),::view-transition-new(root){
+  animation-duration:1s;animation-timing-function:cubic-bezier(.72,0,.24,1);animation-fill-mode:both;
+  backface-visibility:hidden;mix-blend-mode:normal;transform-origin:50% 50%;
+  outline:1px solid rgba(var(--acc-rgb),.5);outline-offset:-1px;border-radius:2px}
+html[data-vtdir="fwd"]::view-transition-old(root){animation-name:cubeOutFwd}
+html[data-vtdir="fwd"]::view-transition-new(root){animation-name:cubeInFwd}
+html[data-vtdir="back"]::view-transition-old(root){animation-name:cubeOutBack}
+html[data-vtdir="back"]::view-transition-new(root){animation-name:cubeInBack}
+@keyframes cubeOutFwd{
+  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}
+  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(-45deg) translateZ(50vw);opacity:.9}
+  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(-90deg) translateZ(50vw);opacity:.35}}
+@keyframes cubeInFwd{
+  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(90deg) translateZ(50vw);opacity:.35}
+  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(45deg) translateZ(50vw);opacity:.9}
+  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}}
+@keyframes cubeOutBack{
+  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}
+  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(45deg) translateZ(50vw);opacity:.9}
+  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(90deg) translateZ(50vw);opacity:.35}}
+@keyframes cubeInBack{
+  0%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(-90deg) translateZ(50vw);opacity:.35}
+  50%{transform:perspective(var(--cube-p)) scale(var(--cube-s)) translateZ(calc(-50vw)) rotateY(-45deg) translateZ(50vw);opacity:.9}
+  100%{transform:perspective(var(--cube-p)) scale(1) translateZ(calc(-50vw)) rotateY(0deg) translateZ(50vw);opacity:1}}
+:root{--cube-p:1500px;--cube-s:.8}
+@media (max-width:760px){ :root{--cube-p:900px;--cube-s:.84} }
+/* header and the gold second hand stay flat above the turning cube */
+::view-transition-group(blotter-top),::view-transition-group(blotter-sweep){animation:none}
+::view-transition-old(blotter-top),::view-transition-old(blotter-sweep){display:none}
+::view-transition-new(blotter-top),::view-transition-new(blotter-sweep){animation:none}
+@media (prefers-reduced-motion:reduce){
+  ::view-transition-old(root),::view-transition-new(root){animation:none}
+}
+
 .acct-mail{margin:0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
 .acct-mail b{color:var(--ink);font-weight:600}
 .acct-btns{display:flex;flex-wrap:wrap;gap:8px}
