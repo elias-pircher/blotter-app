@@ -35,7 +35,7 @@ js = rep(js, "'Gespeichert im Journal, auf all deinen Geräten verfügbar'", "'G
 # ---- account & subscription section in the settings dialog
 js = rep(js, """      <section class="set-sec"><h3>Konten</h3>${acctEditor(draft.accounts, 'set')}</section>""",
 """      <section class="set-sec"><h3>Konten</h3>${acctEditor(draft.accounts, 'set')}</section>
-      ${window.BlotterBackend ? `<section class="set-sec"><h3>Konto &amp; Abo</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p><div class="acct-btns"><button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button><button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}""")
+      ${window.BlotterBackend ? `<section class="set-sec"><h3>${window.BlotterBackend.friend ? 'Konto' : 'Konto &amp; Abo'}</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p>${window.BlotterBackend.friend ? '<p class="acct-mail acct-friend">Freundeszugang: Blotter ist für dich kostenlos, ohne Abo.</p>' : ''}<div class="acct-btns">${window.BlotterBackend.friend ? '' : '<button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button>'}<button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}""")
 js = rep(js, """        if (act === 'set-cancel') { if (Modal.cur) Modal.cur.dirty = false; Modal.close(); }""",
 """        if (act === 'set-cancel') { if (Modal.cur) Modal.cur.dirty = false; Modal.close(); }
         else if (act === 'acct-portal' || act === 'acct-logout') {
@@ -47,6 +47,7 @@ js = rep(js, """        if (act === 'set-cancel') { if (Modal.cur) Modal.cur.dir
 css = css + """
 .acct-mail{margin:0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
 .acct-mail b{color:var(--ink);font-weight:600}
+.acct-friend{color:var(--ink-2)}
 .acct-btns{display:flex;flex-wrap:wrap;gap:8px}
 """
 

@@ -1174,4 +1174,5 @@ html.vt3d .topbar::before{opacity:1}
 
 .acct-mail{margin:0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
 .acct-mail b{color:var(--ink);font-weight:600}
+.acct-friend{color:var(--ink-2)}
 .acct-btns{display:flex;flex-wrap:wrap;gap:8px}

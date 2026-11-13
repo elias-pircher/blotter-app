@@ -2463,7 +2463,7 @@ function openSettings(){
       <section class="set-sec"><h3>Farbschema</h3>${skinGrid(draft.theme)}</section>
       <section class="set-sec"><h3>Seiten</h3>${modGrid(draft.modules)}</section>
       <section class="set-sec"><h3>Konten</h3>${acctEditor(draft.accounts, 'set')}</section>
-      ${window.BlotterBackend ? `<section class="set-sec"><h3>Konto &amp; Abo</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p><div class="acct-btns"><button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button><button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}
+      ${window.BlotterBackend ? `<section class="set-sec"><h3>${window.BlotterBackend.friend ? 'Konto' : 'Konto &amp; Abo'}</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p>${window.BlotterBackend.friend ? '<p class="acct-mail acct-friend">Freundeszugang: Blotter ist für dich kostenlos, ohne Abo.</p>' : ''}<div class="acct-btns">${window.BlotterBackend.friend ? '' : '<button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button>'}<button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}
       <section class="set-sec"><h3>Hilfe</h3><p class="set-help">Die kurze Tour zeigt dir noch einmal alle Bereiche deines Journals.</p><div><button type="button" class="btn sm" data-action="set-tour">Tour starten</button></div></section>
       <p class="form-err" id="form-err" role="alert" hidden></p>
     </div>

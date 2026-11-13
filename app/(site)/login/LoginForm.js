@@ -235,6 +235,7 @@ export default function LoginForm({ next, linkError }) {
       <span className="eyebrow">Anmelden oder registrieren</span>
       <h1>Willkommen bei Blotter</h1>
       <p>Gib deine E-Mail-Adresse ein. Du bekommst eine E-Mail mit einem Code und einem Button, mit dem du dich ohne Passwort anmeldest. Neue Konten werden dabei automatisch angelegt.</p>
+      {next.startsWith('/freund/') && <div className="msg info">Du wurdest eingeladen. Nach der Anmeldung ist Blotter für dich kostenlos, ganz ohne Abo.</div>}
       {state === 'linkerr' && <div className="msg err">Der Link war abgelaufen oder wurde schon benutzt. Es gilt immer nur die neueste E-Mail. Fordere einfach eine neue an.</div>}
       <div className="fld">
         <label htmlFor="email">E-Mail-Adresse</label>

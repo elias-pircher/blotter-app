@@ -14,7 +14,7 @@ function mapError(e) {
   return { code: 'unavailable', message: msg };
 }
 
-export function makeBackend(sb, uid, email) {
+export function makeBackend(sb, uid, email, opts = {}) {
   const cache = {};
   const listeners = {};
   const loading = {};
@@ -114,6 +114,7 @@ export function makeBackend(sb, uid, email) {
 
   return {
     email,
+    friend: !!opts.friend,
     async use(name) { return name === 'db' ? db : name === 'assets' ? assets : null; },
     imgSrc(ref) { return '/api/shot?p=' + encodeURIComponent(ref); },
     async portal() {

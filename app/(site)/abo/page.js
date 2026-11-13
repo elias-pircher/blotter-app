@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { isActive } from '@/lib/stripe';
+import { isFriendPlan } from '@/lib/friends';
 import { Nav, Footer } from '../chrome';
 import CheckoutButton from './CheckoutButton';
 
@@ -11,13 +12,21 @@ export default async function AboPage({ searchParams }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login?next=/abo');
-  const { data: sub } = await supabase.from('subscriptions').select('status,current_period_end,cancel_at_period_end').eq('user_id', user.id).maybeSingle();
+  const { data: sub } = await supabase.from('subscriptions').select('status,price_id,current_period_end,cancel_at_period_end').eq('user_id', user.id).maybeSingle();
   const active = isActive(sub);
+  const friend = active && isFriendPlan(sub);
   return (
     <>
       <Nav loggedIn />
       <main className="wrap center">
-        {active ? (
+        {friend ? (
+          <div className="card">
+            <span className="eyebrow">Freundeszugang</span>
+            <h1>Blotter ist für dich kostenlos.</h1>
+            <p>Du nutzt das Journal mit einem Freundeszugang. Es läuft kein Abo und es wird nichts abgebucht.</p>
+            <a className="btn primary block" href="/app">Zum Journal</a>
+          </div>
+        ) : active ? (
           <div className="card">
             <span className="eyebrow">Dein Abo</span>
             <h1>Dein Abo ist aktiv.</h1>

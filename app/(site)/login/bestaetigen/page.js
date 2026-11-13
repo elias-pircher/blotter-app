@@ -19,7 +19,7 @@ export default function ConfirmLoginPage({ searchParams }) {
       <Nav />
       <main className="wrap center">
         {tokenHash ? (
-          <form className="card" method="post" action="/auth/callback">
+          <form className="card" method="post" action={next.startsWith('/freund/') ? '/auth/callback?next=' + encodeURIComponent(next) : '/auth/callback'}>
             <span className="eyebrow">Fast geschafft</span>
             <h1>{signup ? 'E-Mail bestätigen' : 'Anmeldung abschließen'}</h1>
             <p>Klick auf den Button, dann bist du in deinem Trading Journal angemeldet.</p>
