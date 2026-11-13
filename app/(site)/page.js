@@ -3,111 +3,127 @@ import { Nav, Footer } from './chrome';
 
 export const dynamic = 'force-dynamic';
 
-const I = {
-  cal: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>,
-  target: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.5" fill="currentColor" /></svg>,
-  img: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 16l5-5 4 4 3-3 6 6" /><circle cx="16" cy="9" r="1.6" /></svg>,
-  bulb: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z" /></svg>,
-  compass: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" /></svg>,
-  wallet: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="6" width="18" height="14" rx="2.5" /><path d="M3 10h18M16 15h2" /></svg>,
-};
+// the small candles before the breakout: [open, close, high, low] in % of the chart height (0 = top)
+const HIST = [[71, 75, 69, 78], [75, 72, 70, 77], [72, 74, 68.5, 76], [74, 70, 68, 75.5], [70, 73, 67.5, 74.5], [73, 76, 71, 79], [76, 72.5, 71, 77.5], [72.5, 74, 70, 75.5]];
 
-const FEATURES = [
-  [I.cal, 'Kalender auf einen Blick', 'Jeder Tag zeigt deine Trades als TP, BE oder SL. Grüne und rote Tage siehst du sofort, dazu die Bilanz pro Woche.'],
-  [I.target, 'Ergebnis statt Kontostand', 'Win-Rate, Serien und Verteilung von TP, BE und SL. Ohne dich mit Beträgen abzulenken.'],
-  [I.wallet, 'Alle Konten in einem Journal', 'Bis zu 10 Konten mit eigenem Namen und eigener Farbe: Broker, Prop-Firm-Challenges, Demo. Filtern mit einem Klick.'],
-  [I.img, 'Screenshots dazu', 'Chart einfügen per Drag & Drop oder direkt aus der Zwischenablage. Groß ansehen mit einem Klick.'],
-  [I.bulb, 'Learnings als Timeline', 'Schreib auf, was du gelernt hast. Fehler, die du aufschreibst, kosten dich nur einmal Geld.'],
-  [I.compass, 'Outlooks mit Trefferquote', 'Halte HTF- und LTF-Bias und deine Key Levels vor der Session fest und markiere danach, ob es eingetreten ist.'],
+function Trade() {
+  return (
+    <div className="trade" aria-hidden="true">
+      <div className="lv tp"><i /><b>TP</b></div>
+      <div className="lv en"><i /><b>Entry</b></div>
+      <div className="lv sl"><i /><b>SL</b></div>
+      <div className="hist">
+        {HIST.map(([o, c, h, l], i) => (
+          <span key={i} className={c < o ? 'up' : 'dn'} style={{ '--h': h + '%', '--l': l + '%', '--t': Math.min(o, c) + '%', '--b': Math.max(o, c) + '%', '--i': i }}><u /><s /></span>
+        ))}
+      </div>
+      <div className="stage">
+        <div className="rig">
+          <div className="grow">
+            <div className="wick hi"><i /><i /></div>
+            <div className="body"><i className="f4" /><i className="f3" /><i className="f2" /><i className="f1" /><i className="f6" /></div>
+            <div className="wick lo"><i /><i /></div>
+          </div>
+        </div>
+      </div>
+      <span className="ring" /><span className="ring two" />
+      <b className="r">+4R</b>
+    </div>
+  );
+}
+
+const ROWS = [
+  ['phone-calendar', 'Kalender von Blotter auf dem Handy', 'Der Monat auf einen Blick.', 'Jeder Tag zeigt, ob deine Trades im Take Profit, auf Break Even oder im Stop Loss endeten. Dazu die Bilanz jeder Woche und deine Win-Rate auf dem Zifferblatt.'],
+  ['phone-day', 'Ein Handelstag mit zwei Trades und Chart-Screenshots', 'Der Chart gehört zum Trade.', 'Ein Trade ist in Sekunden eingetragen: Konto, Instrument, Richtung, Ergebnis. Den Screenshot ziehst du hinein oder fügst ihn direkt aus der Zwischenablage ein.'],
+  ['phone-learnings', 'Learnings als Timeline', 'Fehler kosten nur einmal Geld.', 'Halte fest, was du gelernt hast, als Timeline mit Kategorien und Suche. Was aufgeschrieben ist, passiert seltener ein zweites Mal.'],
+  ['phone-outlooks', 'Outlooks mit HTF- und LTF-Bias', 'Erst der Plan, dann der Trade.', 'Notiere vor der Session deinen HTF- und LTF-Bias und die Levels, die zählen. Danach markierst du, ob es eingetreten ist, und siehst deine Trefferquote.'],
 ];
 
-const DAYS = [
-  ['26', 'pos', ['tp', 'NQ']], ['27', 'neg', ['sl', 'DAX']], ['28', '', ['be', 'ES']], ['29', 'pos', ['tp', 'GOLD'], ['tp', 'NQ']], ['30', '', null], ['31', 'we', null], ['1', 'we', null],
-  ['2', 'pos', ['tp', 'NQ'], ['sl', 'DAX']], ['3', 'today', ['tp', 'EURUSD']], ['4', '', null], ['5', '', null], ['6', '', null], ['7', 'we', null], ['8', 'we', null],
+const FACTS = [
+  ['Ergebnis statt Kontostand', 'TP, BE und SL statt Beträgen, die dich ablenken.'],
+  ['Bis zu 10 Konten', 'Broker, Prop-Firm und Demo, mit einem Klick gefiltert.'],
+  ['Auf jedem Gerät', 'Laptop, Tablet und Handy, immer auf demselben Stand.'],
+  ['12 Farbschemen', 'Dunkel oder hell, so wie du am liebsten arbeitest.'],
+];
+
+const FAQ = [
+  ['Wer sieht meine Trades?', 'Nur du. Jedes Konto hat einen eigenen, getrennten Datenbereich, und Screenshots liegen in einem privaten Speicher.'],
+  ['Geht es um meinen Kontostand?', 'Nein. Blotter hält fest, ob ein Trade im Take Profit, im Stop Loss oder auf Break Even endete. So misst du, wie gut du deinem System folgst, und nicht deine Tagesform.'],
+  ['Brauche ich eine App?', 'Nein. Blotter läuft im Browser auf Mac, Windows, iPhone und Android. Deine Einträge sind auf allen Geräten gleich.'],
+  ['Wie kündige ich?', 'Im Journal unter Einstellungen → „Abo verwalten oder kündigen“. Das Abo läuft dann bis zum Ende des bezahlten Monats.'],
 ];
 
 export default async function Home() {
   let loggedIn = false;
   try { const { data } = await createClient().auth.getUser(); loggedIn = !!data.user; } catch {}
+  const start = loggedIn ? '/app' : '/login?next=/abo';
   return (
     <>
       <Nav loggedIn={loggedIn} />
-      <main>
+      <main className="lp">
         <section className="wrap hero">
-          <div>
-            <span className="eyebrow">Trading Journal</span>
-            <h1>Jeder Trade. <span className="gold-t">Jeder Tag.</span> Auf einen Blick.</h1>
-            <p className="lead">Blotter ist das Journal für Trader, die besser werden wollen: ein Kalender mit TP, BE und SL, Screenshots, Learnings und Outlooks. In deinen Farben, auf all deinen Geräten.</p>
+          <div className="hero-txt">
+            <h1><span>Miss deine Disziplin.</span> <span>Nicht deinen Kontostand.</span></h1>
+            <p className="lead">Blotter ist das Trading Journal, das festhält, wie jeder Trade endet: Take Profit, Break Even oder Stop Loss. Mit Kalender, Screenshots, Learnings und Outlooks, auf all deinen Geräten.</p>
             <div className="cta">
-              <a className="btn primary" href={loggedIn ? '/app' : '/login?next=/abo'}>{loggedIn ? 'Zum Journal' : 'Für 7,99 € im Monat starten'}</a>
-              <small><b>Monatlich kündbar.</b> Keine Mindestlaufzeit.</small>
+              <a className="btn primary" href={start}>{loggedIn ? 'Zum Journal' : 'Für 7,99 € im Monat starten'}</a>
+              <a className="btn quiet" href="#journal">Ansehen</a>
             </div>
+            <p className="fine">Monatlich kündbar. Keine Mindestlaufzeit.</p>
           </div>
-          <div className="shot" aria-label="Vorschau des Kalenders">
-            <div className="shot-top"><b>November 2026</b><span>KW 44 – 45</span></div>
-            <div className="mini">
-              {['MO', 'DI', 'MI', 'DO', 'FR', 'SA', 'SO'].map((d, i) => <span key={d} className={'h' + (i > 4 ? ' we' : '')}>{d}</span>)}
-              {DAYS.map(([n, cls, ...pills]) => (
-                <div key={n + cls} className={'d ' + cls}>
-                  <span>{n}</span>
-                  {pills.filter(Boolean).map(([r, sym], i) => <span key={i} className={'p ' + r}>{r.toUpperCase()} {sym}</span>)}
-                </div>
-              ))}
-            </div>
-            <div className="shot-stats">
-              <div><small>Win-Rate</small><b>71 %</b></div>
-              <div><small>Take Profit</small><b>5</b></div>
-              <div><small>Beste Serie</small><b>3× TP</b></div>
-            </div>
-          </div>
+          <Trade />
         </section>
 
-        <section className="wrap sec" id="funktionen">
-          <span className="eyebrow">Funktionen</span>
-          <h2>Alles, was ein Journal braucht. Nichts, was ablenkt.</h2>
-          <p className="sub">Du trägst einen Trade in Sekunden ein: Konto, Instrument, Richtung, Ergebnis, Screenshot. Den Rest erledigt Blotter.</p>
-          <div className="feat">
-            {FEATURES.map(([ic, h, p]) => <div className="f" key={h}><span className="ic">{ic}</span><h3>{h}</h3><p>{p}</p></div>)}
-          </div>
-          <div className="skins" aria-label="Farbschemen">
-            {[['Navy & Gold', '#060F27', '#D9B450'], ['Graphit', '#0B0C0E', '#D6DAE1'], ['Schiefer', '#0D131A', '#9DBBDD'], ['Mokka', '#12100E', '#CDAA84'], ['Wald', '#08130F', '#D2BC86'], ['Mitternacht', '#0C0B1A', '#B7AAF2'], ['Petrol', '#071417', '#DDA176'], ['Bordeaux', '#140A0E', '#E4B6A3'], ['Hell', '#F4F5F7', '#1F2B46'], ['Sand', '#F5F1EA', '#94703F'], ['Nebel', '#EDF1F5', '#2F5D8C'], ['Salbei', '#EDF1EA', '#2E3B33']].map(([n, a, b]) => (
-              <span className="skin" key={n}><i style={{ background: `linear-gradient(135deg, ${a} 50%, ${b} 50%)` }} />{n}</span>
-            ))}
-          </div>
+        <section className="wrap shot" id="journal">
+          <figure className="screen">
+            <picture>
+              <source media="(max-width: 700px)" srcSet="/landing/phone-start.webp" width="780" height="1328" />
+              <img src="/landing/journal-desktop.webp" width="2400" height="1500" alt="Das Journal: Kalender mit Bilanz, Win-Rate und den Trades des Monats" fetchPriority="high" />
+            </picture>
+          </figure>
+          <ul className="facts">
+            {FACTS.map(([h, p]) => <li key={h}><b>{h}</b><span>{p}</span></li>)}
+          </ul>
         </section>
 
-        <section className="wrap sec" id="preis">
-          <div className="price-wrap">
-            <div>
-              <span className="eyebrow">Preis</span>
+        <section className="wrap rows" id="funktionen">
+          {ROWS.map(([img, alt, h, p]) => (
+            <article className="row" key={img}>
+              <div className="row-txt"><h2>{h}</h2><p>{p}</p></div>
+              <figure className="phone"><img src={`/landing/${img}.webp`} width="780" height="1328" alt={alt} loading="lazy" decoding="async" /></figure>
+            </article>
+          ))}
+        </section>
+
+        <section className="wrap price-sec" id="preis">
+          <div className="price">
+            <div className="price-main">
               <h2>Ein Preis. Alles drin.</h2>
-              <p className="sub">Kein Gratis-Modell mit Werbung, keine Zusatzpakete. Dein Abo verlängert sich monatlich und lässt sich jederzeit mit zwei Klicks kündigen.</p>
+              <p className="amt"><b>7,99 €</b><span>im Monat</span></p>
+              <a className="btn primary" href={loggedIn ? '/abo' : '/login?next=/abo'}>Jetzt starten</a>
+              <p className="fine">Endpreis. Monatlich kündbar, mit zwei Klicks.</p>
             </div>
-            <div className="price">
-              <span className="eyebrow">Blotter Journal</span>
-              <div className="amt"><b>7,99 €</b><span>/ Monat</span></div>
-              <p className="note">Endpreis · monatlich kündbar</p>
-              <ul>
-                <li>Unbegrenzt Trades, Learnings und Outlooks</li>
-                <li>Screenshots zu jedem Eintrag</li>
-                <li>Bis zu 10 Konten, 12 Farbschemen</li>
-                <li>Synchron auf Laptop, Tablet und Handy</li>
-                <li>Deine Daten sind nur für dich sichtbar</li>
-              </ul>
-              <a className="btn primary block" href={loggedIn ? '/abo' : '/login?next=/abo'}>Jetzt starten</a>
-            </div>
+            <ul className="incl">
+              <li>Unbegrenzt Trades, Learnings und Outlooks</li>
+              <li>Screenshots zu jedem Eintrag</li>
+              <li>Bis zu 10 Konten und 12 Farbschemen</li>
+              <li>Synchron auf Laptop, Tablet und Handy</li>
+              <li>Deine Daten sieht nur du</li>
+              <li>Keine Werbung, keine Zusatzpakete</li>
+            </ul>
           </div>
         </section>
 
-        <section className="wrap sec" id="fragen">
-          <span className="eyebrow">Fragen</span>
+        <section className="wrap faq-sec" id="fragen">
           <h2>Gut zu wissen</h2>
           <div className="faq">
-            <details><summary>Wie kündige ich?</summary><p>In deinem Journal unter Einstellungen → „Abo verwalten oder kündigen“. Das Abo läuft dann bis zum Ende des bezahlten Monats.</p></details>
-            <details><summary>Wer sieht meine Trades?</summary><p>Nur du. Jedes Konto hat einen eigenen, getrennten Datenbereich, und Screenshots liegen in einem privaten Speicher.</p></details>
-            <details><summary>Brauche ich eine App?</summary><p>Nein. Blotter läuft im Browser auf Mac, Windows, iPhone und Android. Deine Einträge sind auf allen Geräten gleich.</p></details>
-            <details><summary>Geht es um meinen Kontostand?</summary><p>Nein. Blotter erfasst, ob ein Trade in den Take Profit, den Stop Loss oder auf Break Even gelaufen ist. So misst du deine Disziplin und nicht deine Tagesform.</p></details>
+            {FAQ.map(([q, a]) => <details key={q}><summary>{q}</summary><p>{a}</p></details>)}
           </div>
+        </section>
+
+        <section className="wrap close">
+          <p className="mantra">Halte dich an das System.</p>
+          <a className="btn primary" href={start}>{loggedIn ? 'Zum Journal' : 'Blotter starten'}</a>
         </section>
       </main>
       <Footer />

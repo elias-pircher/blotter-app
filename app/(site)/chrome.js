@@ -13,11 +13,12 @@ export function Nav({ loggedIn }) {
       <div className="wrap">
         <a className="logo" href="/"><Logo />Blotter</a>
         <span className="sp" />
+        <a className="link hide-sm" href="/#funktionen">Funktionen</a>
         <a className="link hide-sm" href="/#preis">Preis</a>
         <a className="link hide-sm" href="/#fragen">Fragen</a>
         {loggedIn
           ? <a className="btn sm primary" href="/app">Zum Journal</a>
-          : <><a className="link" href="/login">Anmelden</a><a className="btn sm primary" href="/login?next=/abo">Starten</a></>}
+          : <><a className="link hide-xs" href="/login">Anmelden</a><a className="btn sm primary" href="/login?next=/abo">Starten</a></>}
       </div>
     </header>
   );

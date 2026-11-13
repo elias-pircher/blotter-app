@@ -1079,7 +1079,6 @@ html.vt #view{pointer-events:none}
 /* the page lays down as the chart floor, a candle runs from entry into the TP, the hit drops the new page in */
 :root{--vc-d:1.3s;--vc-tp:21vh;--vc-en:69vh;--vc-sl:81vh;--vc-w:96px;--vc-x:57%;--vc-c:var(--up-rgb)}
 @media (max-width:760px){ :root{--vc-tp:28vh;--vc-en:70vh;--vc-sl:80vh;--vc-w:52px;--vc-x:55%} }
-html[data-vtdir="back"]{--vc-c:var(--down-rgb)}
 html.vt3d #topbar{view-transition-name:blotter-top}
 html.vt3d #vt-candle{view-transition-name:blotter-candle;display:block}
 ::view-transition{background:
@@ -1115,8 +1114,6 @@ html.vt3d::view-transition-new(root){transform-origin:50% 0;animation-name:vcNew
 #vt-candle{position:fixed;inset:0;z-index:20;pointer-events:none;display:none;overflow:hidden;contain:strict}
 #vt-candle .vc-scene{position:absolute;inset:0;opacity:0}
 #vt-candle .vc-m{position:absolute;inset:0}
-html[data-vtdir="back"] #vt-candle .vc-m{transform:scaleY(-1)}
-html[data-vtdir="back"] #vt-candle .vc-lvl .vc-flip{transform:scaleY(-1)}
 #vt-candle .vc-lvl{position:absolute;left:0;right:0;height:0}
 #vt-candle .vc-lvl i{position:absolute;left:5vw;right:5vw;top:-1px;height:2px;transform-origin:0 50%;transform:scaleX(0);
   background:repeating-linear-gradient(90deg,currentColor 0 10px,transparent 10px 17px)}
@@ -1156,7 +1153,6 @@ html[data-vtdir="back"] #vt-candle .vc-lvl .vc-flip{transform:scaleY(-1)}
 #vt-candle .vc-r{position:absolute;left:var(--vc-x);top:var(--vc-tp);opacity:0}
 #vt-candle .vc-r b{display:block;transform:translate(-50%,-235%);font:800 clamp(26px,3.4vw,44px)/1 var(--f-display);font-stretch:112%;letter-spacing:-.01em;
   color:rgb(var(--up-rgb));text-shadow:0 0 24px rgba(var(--up-rgb),.55)}
-html[data-vtdir="back"] #vt-candle .vc-r b{transform:translate(-50%,-235%) scaleY(-1)}
 
 /* the timeline (one clock for everything, so a finger can scrub it) */
 html.vtc-go #vt-candle .vc-scene{animation:vcScene var(--vc-d) linear both}

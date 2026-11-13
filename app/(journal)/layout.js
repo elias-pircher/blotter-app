@@ -13,9 +13,9 @@ export default function JournalLayout({ children }) {
   return (
     <html lang="de" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+        <link rel="preload" href="/fonts/archivo-wdth.woff2" as="font" type="font/woff2" crossOrigin="" />
+        <link rel="preload" href="/fonts/plex-sans-400.woff2" as="font" type="font/woff2" crossOrigin="" />
+        <link rel="stylesheet" href="/fonts/fonts.css" />
         <script dangerouslySetInnerHTML={{ __html: SKIN }} />
       </head>
       <body>{children}</body>
