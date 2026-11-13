@@ -610,7 +610,7 @@ const Dial = {
       });
     };
     // first values sweep in from zero, once the page has settled
-    if (!d._shown) { d._shown = true; if (ViewFx.quiet) apply(); else setTimeout(() => requestAnimationFrame(apply), reduce ? 0 : ViewFx.still ? 900 : 420); } else apply();
+    if (!d._shown) { d._shown = true; if (ViewFx.quiet) apply(); else setTimeout(() => requestAnimationFrame(apply), reduce ? 0 : ViewFx.still ? 1200 : 420); } else apply();
   }
 };
 
@@ -659,7 +659,7 @@ const phoneSheet = () => innerWidth <= 600;
 /* ---------- chronograph: page change ---------- */
 const ViewFx = {
   busy: false, queued: null, target: null, still: false, quiet: false, scrub: null,
-  // can a script drive the view-transition faces? (needed for the finger-driven turn)
+  // can a script reach the page snapshots' animations? (needed for the finger-driven change)
   canScrub: (() => { try { new KeyframeEffect(document.documentElement, null, {pseudoElement: '::view-transition-new(root)'}); return typeof document.startViewTransition === 'function'; } catch (e) { return false; } })(),
   go(next){
     if (this.busy) { this.queued = next; this.target = next; updateChrome(); return; }
@@ -667,7 +667,7 @@ const ViewFx = {
     const v = $('#view'), veil = $('#vt-veil');
     if (reduce || !veil.animate || S.mounted == null) { goView(next); return; }
     const order = pagesOn(), dir = order.indexOf(next) >= order.indexOf(S.view) ? 1 : -1;
-    if (typeof document.startViewTransition === 'function' && !document.hidden) { this.cube(next, dir); return; }
+    if (typeof document.startViewTransition === 'function' && !document.hidden) { this.trade(next, dir); return; }
     this.busy = true; this.target = next;
     document.documentElement.classList.add('vt');
     updateChrome();
@@ -696,81 +696,69 @@ const ViewFx = {
     out.onfinish = swap;
     setTimeout(swap, 400); // safety if the animation never reports back
   },
-  // the page turns like a cube in the direction of the tab; the browser animates two snapshots
-  cube(next, dir){
+  // the page change as a trade: the browser snapshots both pages, CSS plays one timeline for pages and overlay
+  HIT: .56,   // share of the timeline when the candle reaches the TP
+  dur(){ return (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--vc-d')) || 1.3) * 1000; },
+  begin(next, dir, update){
     const html = document.documentElement;
-    this.busy = true; this.target = next;
     html.dataset.vtdir = dir > 0 ? 'fwd' : 'back';
     html.classList.add('vt3d', 'vt');
     this.still = true;
-    let vt;
-    try {
-      vt = document.startViewTransition(() => {
-        const to = this.queued || next; this.queued = null;
-        html.classList.add('vt-in');
-        goView(to);
-      });
-    } catch (e) {
-      html.classList.remove('vt3d', 'vt'); delete html.dataset.vtdir;
-      this.still = false; this.busy = false; this.target = null; goView(next); return;
-    }
+    try { return document.startViewTransition(update); }
+    catch (e) { this.end(); return null; }
+  },
+  end(){
+    const html = document.documentElement;
+    html.classList.remove('vt3d', 'vt', 'vtc-go'); delete html.dataset.vtdir;
+    this.still = false; this.busy = false; this.target = null; this.scrub = null;
+  },
+  trade(next, dir){
+    this.busy = true; this.target = next;
+    const vt = this.begin(next, dir, () => { const to = this.queued || next; this.queued = null; goView(to); });
+    if (!vt) { goView(next); return; }
     updateChrome();
-    vt.ready.then(() => this.sweep(dir), () => {});
+    // the overlay's clock starts with the pages' clock
+    vt.ready.then(() => document.documentElement.classList.add('vtc-go'), () => {});
     const fin = () => {
-      html.classList.remove('vt3d', 'vt', 'vt-in'); delete html.dataset.vtdir;
-      this.still = false; this.busy = false; this.target = null;
+      this.end();
       updateChrome();
       const q = this.queued; this.queued = null;
       if (q && q !== S.view) this.go(q);
     };
     vt.finished.then(fin, fin);
   },
-  // ---- the same turn, driven by a finger ----
-  cfg(){
-    const cs = getComputedStyle(document.documentElement);
-    return {pp: (cs.getPropertyValue('--cube-p') || '').trim() || '1500px', dip: parseFloat(cs.getPropertyValue('--cube-dip')) || .2, tilt: parseFloat(cs.getPropertyValue('--cube-tilt')) || 4};
-  },
-  // one face at progress p (0 = old page in front, 1 = new page in front); matches the CSS keyframes
-  frame(face, dir, p, c){
-    const q = Math.max(0, Math.min(1, p)), sn = Math.sin(Math.PI * q);
-    const ang = (face === 'old' ? -90 * p : 90 * (1 - p)) * dir;
-    const op = .18 + .82 * Math.max(0, Math.cos(Math.min(90, Math.abs(ang)) * Math.PI / 180));
-    return {transform: `perspective(${c.pp}) scale(${(1 - c.dip * sn).toFixed(4)}) translateZ(-50vw) rotateX(${(c.tilt * sn).toFixed(3)}deg) rotateY(${ang.toFixed(3)}deg) translateZ(50vw)`, opacity: op.toFixed(3)};
-  },
-  faces(dir, from, to, curve, dur, n){
-    const html = document.documentElement, c = this.cfg();
-    return ['old', 'new'].map(face => {
-      const kf = [];
-      for (let i = 0; i <= n; i++) { const t = i / n; kf.push(Object.assign(this.frame(face, dir, from + (to - from) * curve(t), c), {offset: t})); }
-      return html.animate(kf, {pseudoElement: `::view-transition-${face}(root)`, duration: dur, fill: 'both', easing: 'linear'});
+  // all animations of this page change: the two page snapshots and the overlay
+  anims(){
+    const box = $('#vt-candle');
+    return document.getAnimations().filter(a => {
+      const ef = a.effect;
+      if (!ef || !ef.target) return false;
+      if (ef.pseudoElement) return ef.pseudoElement.indexOf('view-transition') >= 0;
+      return box.contains(ef.target);
     });
   },
+  // ---- the same trade, driven by a finger: the candle follows it up to the TP ----
   scrubStart(next, dir){
     if (this.busy || !this.canScrub || next === S.view) return false;
-    const html = document.documentElement;
     const sc = this.scrub = {next, dir, from: S.view, p: 0, ready: false, anims: null, done: null};
-    this.busy = true; this.target = null; this.still = true;
-    html.dataset.vtdir = dir > 0 ? 'fwd' : 'back';
-    html.classList.add('vt3d', 'vt', 'vtscrub');
-    let vt;
-    try { vt = document.startViewTransition(() => goView(next)); }
-    catch (e) {
-      html.classList.remove('vt3d', 'vt', 'vtscrub'); delete html.dataset.vtdir;
-      this.scrub = null; this.still = false; this.busy = false;
-      return false;
-    }
+    this.busy = true; this.target = null;
+    const vt = this.begin(next, dir, () => goView(next));
+    if (!vt) return false;
     vt.ready.then(() => {
-      try { sc.anims = this.faces(dir, 0, 1, t => t, 1000, 12); sc.anims.forEach(a => { a.pause(); a.currentTime = sc.p * 1000; }); }
-      catch (e) { sc.anims = null; html.classList.remove('vtscrub'); this.sweep(dir); }
+      document.documentElement.classList.add('vtc-go');
+      try {
+        sc.D = this.dur();
+        const list = this.anims();
+        if (!list.some(a => a.effect.pseudoElement)) throw new Error('no handle on the page snapshots');
+        list.forEach(a => { a.pause(); a.currentTime = sc.p * sc.D * this.HIT; });
+        sc.anims = list;
+      } catch (e) { sc.anims = null; }   // can't hold it: the trade simply plays
       sc.ready = true;
       if (sc.done) this.scrubLand();
     }, () => {});
     const fin = () => {
       if (sc.done === 'cancel' && S.view !== sc.from) this.restore(sc.from);
-      // scripted faces must not outlive this turn (a filled animation would sit on the next turn's faces)
-      if (sc.anims) sc.anims.forEach(a => a.cancel());
-      html.classList.remove('vt3d', 'vt', 'vtscrub', 'vt-in'); delete html.dataset.vtdir; html.style.removeProperty('--glint-d');
-      this.scrub = null; this.still = false; this.busy = false; this.target = null;
+      this.end();
       updateChrome();
       const q = this.queued; this.queued = null;
       if (q && q !== S.view) this.go(q);
@@ -782,35 +770,30 @@ const ViewFx = {
     const sc = this.scrub;
     if (!sc || sc.done) return;
     sc.p = p;
-    if (sc.anims) sc.anims.forEach(a => { a.currentTime = p * 1000; });
+    if (sc.anims) { const t = p * sc.D * this.HIT; sc.anims.forEach(a => { a.currentTime = t; }); }
     moveTabInd();
   },
   scrubEnd(commit){
     const sc = this.scrub;
     if (!sc || sc.done) return;
     sc.done = commit || !sc.anims && sc.ready ? 'commit' : 'cancel';
-    // same as tapping the tab: the hash change is queued behind the running turn and lands on the same page
+    // same as tapping the tab: the hash change is queued behind the running change and lands on the same page
     if (sc.done === 'commit') location.hash = sc.next;
     updateChrome();
     if (sc.ready) this.scrubLand();
   },
-  // after the finger lets go: click into place, or turn back
+  // after the finger lets go: on into the TP, or the candle sinks back and the page stands up again
   scrubLand(){
-    const sc = this.scrub, html = document.documentElement;
+    const sc = this.scrub;
     if (!sc || !sc.anims) return;
-    const p0 = sc.p, old = sc.anims;
-    if (sc.done === 'commit') {
-      const T = 1.0, back = t => { const u = t - 1; return u * u * ((T + 1) * u + T) + 1; };
-      html.style.setProperty('--glint-d', '20ms'); html.classList.add('vt-in');
-      sc.anims = this.faces(sc.dir, p0, 1, back, Math.round(300 + 480 * (1 - p0)), 20);
-      this.sweep(sc.dir);
-    } else {
-      const out = t => 1 - Math.pow(1 - t, 3);
-      sc.anims = this.faces(sc.dir, p0, 0, out, Math.round(200 + 360 * p0), 12);
-      // swap the page back in the same frame the turn ends, so the new page never flashes
-      sc.anims[0].onfinish = () => this.restore(sc.from);
-    }
-    old.forEach(a => a.cancel());
+    if (sc.done === 'commit') { sc.anims.forEach(a => { a.playbackRate = 1; a.play(); }); return; }
+    const root = sc.anims.find(a => a.effect.pseudoElement && a.effect.pseudoElement.indexOf('old(root)') >= 0) || sc.anims[0];
+    // swap the page back in the same frame the reverse ends, so the new page never flashes
+    root.onfinish = () => this.restore(sc.from);
+    sc.anims.forEach(a => {
+      a.playbackRate = -1.7;
+      if ((a.currentTime || 0) < 20) a.finish(); else a.play();
+    });
   },
   restore(view){
     if (S.view === view) return;
@@ -871,12 +854,12 @@ function splitTitle(root){
   if (!h || h.classList.contains('split')) return;
   const t = h.textContent;
   h.classList.add('split'); h.setAttribute('aria-label', t);
-  if (ViewFx.still) h.style.setProperty('--tl0', '430ms');
+  if (ViewFx.still) h.style.setProperty('--tl0', '860ms');
   h.innerHTML = Array.from(t).map((c, i) => `<span class="tl" aria-hidden="true" style="--i:${i}">${esc(c)}</span>`).join('');
 }
 
-/* ---------- chronograph: turn the cube with a finger (phones) ---------- */
-const CubeSwipe = {
+/* ---------- chronograph: drive the page change with a finger (phones) ---------- */
+const PageSwipe = {
   g: null,
   init(){
     if (reduce || typeof document.startViewTransition !== 'function') return;
@@ -2659,7 +2642,7 @@ Setup.init();
 Tour.init();
 Origin.init();
 Tilt.init();
-CubeSwipe.init();
+PageSwipe.init();
 BG.init();
 render();
 Store.init();
