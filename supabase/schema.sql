@@ -35,7 +35,7 @@ grant execute on function private.has_active_sub() to authenticated;
 -- 2) Journal-Einträge: Trades, Learnings, Outlooks und Einstellungen, getrennt pro Kunde
 create table if not exists public.entries (
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  kind text not null check (kind in ('trades', 'learnings', 'outlooks', 'settings')),
+  kind text not null check (kind in ('trades', 'learnings', 'outlooks', 'settings', 'backtests')),
   id text not null check (char_length(id) between 1 and 100),
   data jsonb not null,
   updated_at timestamptz not null default now(),
@@ -74,6 +74,25 @@ create policy "shots: eigene hochladen" on storage.objects
   for insert to authenticated with check (bucket_id = 'shots' and (storage.foldername(name))[1] = (select auth.uid())::text and (select private.has_active_sub()));
 create policy "shots: eigene löschen" on storage.objects
   for delete to authenticated using (bucket_id = 'shots' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+-- 4) Backtesting: selbst importierte Kursdaten, privat, jeder Kunde nur im eigenen Ordner
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('marketdata', 'marketdata', false, 10485760, array['application/octet-stream'])
+on conflict (id) do nothing;
+drop policy if exists "marketdata: eigene lesen" on storage.objects;
+drop policy if exists "marketdata: eigene hochladen" on storage.objects;
+drop policy if exists "marketdata: eigene ersetzen" on storage.objects;
+drop policy if exists "marketdata: eigene löschen" on storage.objects;
+create policy "marketdata: eigene lesen" on storage.objects
+  for select to authenticated using (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text);
+create policy "marketdata: eigene hochladen" on storage.objects
+  for insert to authenticated with check (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text and (select private.has_active_sub()));
+create policy "marketdata: eigene ersetzen" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text and (select private.has_active_sub()))
+  with check (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text);
+create policy "marketdata: eigene löschen" on storage.objects
+  for delete to authenticated using (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 -- Zustellprotokoll der Anmelde-E-Mails (nur Server mit Service-Key, Einträge werden nach 30 Tagen gelöscht)
 create table if not exists public.mail_log (

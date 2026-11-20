@@ -3,7 +3,7 @@
 // screenshots), backed by Supabase. Every row belongs to the signed-in customer; the database's
 // row level security keeps customers apart and blocks writes without an active subscription.
 
-const KINDS = new Set(['trades', 'learnings', 'outlooks', 'settings']);
+const KINDS = new Set(['trades', 'learnings', 'outlooks', 'settings', 'backtests']);
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 
 function mapError(e) {
@@ -99,6 +99,31 @@ export function makeBackend(sb, uid, email, opts = {}) {
     },
   };
 
+  // Market data for backtesting: the user's own imported candles, in their own folder of a private bucket.
+  const MD = 'marketdata';
+  const md = {
+    async put(path, blob) {
+      const { error } = await sb.storage.from(MD).upload(uid + '/' + path, blob, { contentType: 'application/octet-stream', upsert: true, cacheControl: '3600' });
+      if (error) throw mapError(error);
+    },
+    async get(path) {
+      const { data, error } = await sb.storage.from(MD).download(uid + '/' + path);
+      if (error) {
+        const st = String(error.statusCode || error.status || '');
+        if (st === '404' || st === '400' || /not.?found/i.test(error.message || '')) return null;
+        throw mapError(error);
+      }
+      return await data.arrayBuffer();
+    },
+    async remove(paths) {
+      const list = paths.map((p) => uid + '/' + p);
+      for (let i = 0; i < list.length; i += 100) {
+        const { error } = await sb.storage.from(MD).remove(list.slice(i, i + 100));
+        if (error) throw mapError(error);
+      }
+    },
+  };
+
   // Live updates from other devices, plus a refresh when the tab comes back into view.
   try {
     sb.channel('entries-' + uid)
@@ -115,7 +140,7 @@ export function makeBackend(sb, uid, email, opts = {}) {
   return {
     email,
     friend: !!opts.friend,
-    async use(name) { return name === 'db' ? db : name === 'assets' ? assets : null; },
+    async use(name) { return name === 'db' ? db : name === 'assets' ? assets : name === 'marketdata' ? md : null; },
     imgSrc(ref) { return '/api/shot?p=' + encodeURIComponent(ref); },
     async portal() {
       const r = await fetch('/api/portal', { method: 'POST' });

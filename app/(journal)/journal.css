@@ -1205,6 +1205,10 @@ html.vt3d .topbar::before{opacity:1}
 /* phones: horizontal swipes on the page drive the page change, vertical ones still scroll */
 @media (pointer:coarse){ #view{touch-action:pan-y;touch-action:pan-y pinch-zoom} }
 
+/* fourth tab: short label on narrow screens */
+.tabs .t-s{display:none}
+@media (max-width:520px){ .tabs .t-l{display:none} .tabs .t-s{display:inline} }
+
 .acct-mail{margin:0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
 .acct-mail b{color:var(--ink);font-weight:600}
 .acct-friend{color:var(--ink-2)}

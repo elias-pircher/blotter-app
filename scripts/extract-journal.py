@@ -59,3 +59,12 @@ open(APP + '/public/journal/journal.js', 'w', encoding='utf-8').write('/* Blotte
 open(APP + '/app/(journal)/app/markup.js', 'w', encoding='utf-8').write(
     '// Generated from the journal design source.\nexport const MARKUP = ' + json.dumps(markup, ensure_ascii=False) + ';\n')
 print('css', len(css), 'markup', len(markup), 'js', len(js))
+
+# backtesting: its own module, stylesheet and the chart library, loaded by the journal on the first visit
+import shutil, os
+os.makedirs(APP + '/public/journal/vendor', exist_ok=True)
+for f in ('backtest.js', 'backtest.css'):
+    shutil.copyfile(APP + '/design/' + f, APP + '/public/journal/' + f)
+for f, to in (('lightweight-charts.js', 'lightweight-charts.js'), ('LICENSE-lightweight-charts.txt', 'LICENSE-lightweight-charts.txt')):
+    shutil.copyfile(APP + '/design/vendor/' + f, APP + '/public/journal/vendor/' + to)
+print('backtest module copied')
