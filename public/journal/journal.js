@@ -514,6 +514,11 @@ const Reveal = {
       else { this.seen.set(k, now); el.classList.add('rv-pop'); }
     });
   },
+  replay(root){
+    if (!this.on || !root) return;
+    root.querySelectorAll('[data-rv]').forEach(el => { if (typeof this.seen.get(el.dataset.rv) === 'number') this.seen.delete(el.dataset.rv); });
+    this.scan(root);
+  },
   show(el){
     this.io.unobserve(el);
     const k = el.dataset.rv;
@@ -656,160 +661,82 @@ const Origin = {
 const vis = el => { if (!el || !document.contains(el)) return null; const r = el.getBoundingClientRect(); return r.width && r.bottom > 0 && r.top < innerHeight ? r : null; };
 const phoneSheet = () => innerWidth <= 600;
 
-/* ---------- chronograph: page change ---------- */
+/* ---------- page change: the loading screen comes up, the page swaps behind it, the screen lifts ---------- */
 const ViewFx = {
-  busy: false, queued: null, target: null, still: false, quiet: false, scrub: null,
-  // can a script reach the page snapshots' animations? (needed for the finger-driven change)
-  canScrub: (() => { try { new KeyframeEffect(document.documentElement, null, {pseudoElement: '::view-transition-new(root)'}); return typeof document.startViewTransition === 'function'; } catch (e) { return false; } })(),
+  busy: false, phase: null, target: null, still: false, quiet: false, scrub: null, ready: null, due: false, swapT: 0,
+  SWAP: 680,   // ms from the tap until the new page is put in place behind the screen
   go(next){
-    if (this.busy) { this.queued = next; this.target = next; updateChrome(); return; }
+    if (Loader.active || reduce || S.mounted == null || document.hidden || !document.body.animate) { goView(next); return; }
+    if (this.scrub && !this.scrub.done) return;
+    // still covering: only the name and the target change
+    if (this.phase === 'in') { if (next !== this.target) { this.target = next; Loader.label(next); this.prep(next); updateChrome(); if (this.due) this.swap(); } return; }
     if (next === S.view) return;
-    const v = $('#view'), veil = $('#vt-veil');
-    if (reduce || !veil.animate || S.mounted == null) { goView(next); return; }
-    const order = pagesOn(), dir = order.indexOf(next) >= order.indexOf(S.view) ? 1 : -1;
-    if (typeof document.startViewTransition === 'function' && !document.hidden) { this.trade(next, dir); return; }
-    this.busy = true; this.target = next;
+    this.start(next);
+  },
+  start(next){
+    clearTimeout(this.swapT);
+    this.busy = true; this.phase = 'in'; this.target = next; this.scrub = null; this.due = false;
     document.documentElement.classList.add('vt');
+    Loader.show(next);
+    this.prep(next);
     updateChrome();
-    this.sweep(dir);
-    // a solid veil is cheap to fade; the page itself is never moved as one big picture
-    const out = veil.animate([{opacity: 0}, {opacity: 1}], {duration: 190, easing: 'cubic-bezier(.55,0,.75,.06)', fill: 'forwards'});
-    let done = false;
-    const swap = () => {
-      if (done) return; done = true;
-      const to = this.queued || next; this.queued = null;
-      v.style.setProperty('--vdir', dir);
-      v.classList.add('vin');
-      goView(to);
-      out.cancel();
-      const inn = veil.animate([{opacity: 1}, {opacity: 0}], {duration: 460, easing: 'cubic-bezier(.16,1,.3,1)'});
-      const fin = () => {
-        this.busy = false; this.target = null;
-        document.documentElement.classList.remove('vt');
-        updateChrome();
-        const q = this.queued; this.queued = null;
-        if (q && q !== S.view) this.go(q);
-      };
-      inn.onfinish = fin; inn.oncancel = fin;
-      clearTimeout(this.vinT); this.vinT = setTimeout(() => v.classList.remove('vin'), 1500);
-    };
-    out.onfinish = swap;
-    setTimeout(swap, 400); // safety if the animation never reports back
+    this.swapT = setTimeout(() => this.swap(), this.SWAP);
   },
-  // the page change as a trade: the browser snapshots both pages, CSS plays one timeline for pages and overlay
-  HIT: .56,   // share of the timeline when the candle reaches the TP
-  dur(){ return (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--vc-d')) || 1.3) * 1000; },
-  begin(next, dir, update){
-    const html = document.documentElement;
-    html.dataset.vtdir = dir > 0 ? 'fwd' : 'back';
-    html.classList.add('vt3d', 'vt');
-    this.still = true;
-    try { return document.startViewTransition(update); }
-    catch (e) { this.end(); return null; }
+  // a page that needs its files first (Backtesting) starts loading them as the screen comes up
+  prep(next){
+    const v = Views[next];
+    if (!v || !v.prep) { this.ready = null; return; }
+    const r = this.ready = {done: false};
+    r.p = Promise.race([Promise.resolve().then(() => v.prep()).catch(() => {}), new Promise(res => setTimeout(res, 6000))]).then(() => { r.done = true; });
   },
-  end(){
-    const html = document.documentElement;
-    html.classList.remove('vt3d', 'vt', 'vtc-go'); delete html.dataset.vtdir;
-    this.still = false; this.busy = false; this.target = null; this.scrub = null;
-  },
-  trade(next, dir){
-    this.busy = true; this.target = next;
-    const vt = this.begin(next, dir, () => { const to = this.queued || next; this.queued = null; goView(to); });
-    if (!vt) { goView(next); return; }
+  swap(){
+    if (this.phase !== 'in') return;
+    this.due = true;
+    const r = this.ready;
+    if (r && !r.done) { r.p.then(() => this.swap()); return; }
+    this.phase = 'out'; this.ready = null; this.due = false;
+    $('#view').style.transform = '';
+    goView(this.target);
     updateChrome();
-    // the overlay's clock starts with the pages' clock
-    vt.ready.then(() => document.documentElement.classList.add('vtc-go'), () => {});
-    const fin = () => {
-      this.end();
-      updateChrome();
-      const q = this.queued; this.queued = null;
-      if (q && q !== S.view) this.go(q);
-    };
-    vt.finished.then(fin, fin);
+    Loader.lift(460, () => this.finish());
   },
-  // all animations of this page change: the two page snapshots and the overlay
-  anims(){
-    const box = $('#vt-candle');
-    return document.getAnimations().filter(a => {
-      const ef = a.effect;
-      if (!ef || !ef.target) return false;
-      if (ef.pseudoElement) return ef.pseudoElement.indexOf('view-transition') >= 0;
-      return box.contains(ef.target);
-    });
+  finish(){
+    this.busy = false; this.phase = null; this.target = null; this.scrub = null; this.due = false;
+    document.documentElement.classList.remove('vt');
+    updateChrome();
   },
-  // ---- the same trade, driven by a finger: the candle follows it up to the TP ----
+  // ---- the same change, driven by a finger (phones): the page slides, the screen and the candles follow ----
   scrubStart(next, dir){
-    if (this.busy || !this.canScrub || next === S.view) return false;
-    const sc = this.scrub = {next, dir, from: S.view, p: 0, ready: false, anims: null, done: null};
-    this.busy = true; this.target = null;
-    const vt = this.begin(next, dir, () => goView(next));
-    if (!vt) return false;
-    vt.ready.then(() => {
-      document.documentElement.classList.add('vtc-go');
-      try {
-        sc.D = this.dur();
-        const list = this.anims();
-        if (!list.some(a => a.effect.pseudoElement)) throw new Error('no handle on the page snapshots');
-        list.forEach(a => { a.pause(); a.currentTime = sc.p * sc.D * this.HIT; });
-        sc.anims = list;
-      } catch (e) { sc.anims = null; }   // can't hold it: the trade simply plays
-      sc.ready = true;
-      if (sc.done) this.scrubLand();
-    }, () => {});
-    const fin = () => {
-      if (sc.done === 'cancel' && S.view !== sc.from) this.restore(sc.from);
-      this.end();
-      updateChrome();
-      const q = this.queued; this.queued = null;
-      if (q && q !== S.view) this.go(q);
-    };
-    vt.finished.then(fin, fin);
+    if (this.busy || Loader.active || next === S.view || !document.body.animate) return false;
+    this.scrub = {next, dir, from: S.view, p: 0, done: null};
+    this.busy = true; this.phase = 'drag'; this.target = null;
+    document.documentElement.classList.add('vt');
+    Loader.hold(next, dir);
+    this.prep(next);
     return true;
   },
   scrubMove(p){
     const sc = this.scrub;
     if (!sc || sc.done) return;
     sc.p = p;
-    if (sc.anims) { const t = p * sc.D * this.HIT; sc.anims.forEach(a => { a.currentTime = t; }); }
+    Loader.at(p);
     moveTabInd();
   },
   scrubEnd(commit){
     const sc = this.scrub;
     if (!sc || sc.done) return;
-    sc.done = commit || !sc.anims && sc.ready ? 'commit' : 'cancel';
-    // same as tapping the tab: the hash change is queued behind the running change and lands on the same page
-    if (sc.done === 'commit') location.hash = sc.next;
+    sc.done = commit ? 'commit' : 'cancel';
+    if (commit) {
+      // the candles finish from where the finger left them, then the page swaps as after a tap
+      this.phase = 'in'; this.target = sc.next;
+      const left = Loader.release();
+      clearTimeout(this.swapT); this.swapT = setTimeout(() => this.swap(), Math.max(90, left + 60));
+      location.hash = sc.next;
+    } else {
+      this.phase = 'back';
+      Loader.back(() => this.finish());
+    }
     updateChrome();
-    if (sc.ready) this.scrubLand();
-  },
-  // after the finger lets go: on into the TP, or the candle sinks back and the page stands up again
-  scrubLand(){
-    const sc = this.scrub;
-    if (!sc || !sc.anims) return;
-    if (sc.done === 'commit') { sc.anims.forEach(a => { a.playbackRate = 1; a.play(); }); return; }
-    const root = sc.anims.find(a => a.effect.pseudoElement && a.effect.pseudoElement.indexOf('old(root)') >= 0) || sc.anims[0];
-    // swap the page back in the same frame the reverse ends, so the new page never flashes
-    root.onfinish = () => this.restore(sc.from);
-    sc.anims.forEach(a => {
-      a.playbackRate = -1.7;
-      if ((a.currentTime || 0) < 20) a.finish(); else a.play();
-    });
-  },
-  restore(view){
-    if (S.view === view) return;
-    this.quiet = true;
-    try { goView(view); } finally { this.quiet = false; }
-  },
-  sweep(dir){
-    const sw = $('#vt-sweep'), tb = $('#topbar');
-    if (!sw || !sw.animate) return;
-    sw.style.top = Math.max(0, tb ? tb.getBoundingClientRect().bottom - 1 : 0) + 'px';
-    sw.animate([
-      {opacity: 0, transform: `translate3d(${dir * -100}%,0,0) scaleX(.4)`},
-      {opacity: 1, offset: .25},
-      {opacity: 1, offset: .7},
-      {opacity: 0, transform: `translate3d(${dir * 100}%,0,0) scaleX(.4)`}
-    ], {duration: 760, easing: 'cubic-bezier(.65,0,.35,1)'});
   }
 };
 
@@ -858,11 +785,11 @@ function splitTitle(root){
   h.innerHTML = Array.from(t).map((c, i) => `<span class="tl" aria-hidden="true" style="--i:${i}">${esc(c)}</span>`).join('');
 }
 
-/* ---------- chronograph: drive the page change with a finger (phones) ---------- */
+/* ---------- page change with a finger (phones): the page slides, the loading screen follows ---------- */
 const PageSwipe = {
   g: null,
   init(){
-    if (reduce || typeof document.startViewTransition !== 'function') return;
+    if (reduce || !document.body.animate) return;
     document.addEventListener('pointerdown', e => this.down(e), {passive: true});
     document.addEventListener('pointermove', e => this.move(e), {passive: true});
     document.addEventListener('pointerup', e => this.up(e), {passive: true});
@@ -891,7 +818,6 @@ const PageSwipe = {
       if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
       const pg = pagesOn(), dir = dx < 0 ? 1 : -1, next = pg[pg.indexOf(S.view) + dir];
       if (!next) { this.g = null; return; }
-      if (!ViewFx.canScrub) { this.g = null; location.hash = next; return; }
       if (!ViewFx.scrubStart(next, dir)) { this.g = null; return; }
       g.on = true; g.dir = dir;
       try { document.documentElement.setPointerCapture(e.pointerId); } catch (_) {}
@@ -951,109 +877,133 @@ const Mantra = {
   }
 };
 
-/* ---------- motion: page loader ---------- */
-const LD_OPEN = 176, LD_TP = 64;
-const LD_KF = [[0, 176], [0.1, 166], [0.22, 193], [0.38, 231], [0.47, 222], [0.58, 186], [0.72, 128], [0.86, 86], [1, 64]];
-function ldPrice(u){
-  let i = 1; while (i < LD_KF.length - 1 && u > LD_KF[i][0]) i++;
-  const a = LD_KF[i - 1], b = LD_KF[i];
-  const t = Math.max(0, Math.min(1, (u - a[0]) / (b[0] - a[0]))), s = t * t * (3 - 2 * t);
-  const noise = (Math.sin(u * 61) * 4 + Math.sin(u * 23 + 1.3) * 3) * Math.pow(1 - u, 1.2) * Math.min(1, u * 8);
-  return a[1] + (b[1] - a[1]) * s + noise;
-}
-const LD_NAMES = {kalender: ['', 'Kalender'], learnings: ['', 'Learnings'], outlooks: ['', 'Outlooks']};
-const easeOut = k => 1 - Math.pow(1 - k, 3);
-const easeInOut = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+/* ---------- motion: the loading screen (start of the journal, every page change) ---------- */
+const PL_NAMES = {kalender: 'Kalender', learnings: 'Learnings', outlooks: 'Outlooks', backtest: 'Backtesting'};
 const Loader = {
-  on: false, active: false, swapped: false, hitDone: false, target: null, pending: null, raf: 0, t0: 0,
-  T: {enter: 240, liveStart: 120, live: 640, swap: 900, exit: 430},
+  active: false,   // the start screen is up: the journal is not ready yet
+  fx: null, list: null, t: 0, dir: 1, bootT: 0,
+  BUILD: 580,      // ms until the three candles stand (page change)
   init(){
-    this.el = $('#loader'); this.inner = $('#ld-inner');
-    this.body = $('#ld-body'); this.wick = $('#ld-wick'); this.pl = $('#ld-pl'); this.dot = $('#ld-dot'); this.glows = $$('.ld-glow', this.el);
-    this.title = $('#ld-title'); this.st = $('#ld-st');
-    this.tick = this.tick.bind(this);
-    this.el.addEventListener('click', () => this.skipNow());
+    this.el = $('#loader'); this.inner = $('#pl-in'); this.name = $('#pl-name');
+    if (this.el && !this.el.hidden && this.el.classList.contains('boot')) this.boot();
   },
-  setLabel(view){
-    const [a, b] = LD_NAMES[view] || [view, ''];
-    let i = 0;
-    const chars = (txt, g) => Array.from(txt).map(c => `<span class="ch${g ? ' g' : ''}" style="--i:${i++}">${esc(c)}</span>`).join('');
-    this.title.innerHTML = chars(a, false) + chars(b, true);
+  anims(){ try { return this.inner.getAnimations({subtree: true}); } catch (e) { return []; } },
+  restart(){ const el = this.el; el.classList.remove('run'); void el.offsetWidth; el.classList.add('run'); },
+  opacity(){ return parseFloat(getComputedStyle(this.el).opacity) || 0; },
+  stopFx(){ const f = this.fx; this.fx = null; if (f) f.forEach(a => { try { a.cancel(); } catch (e) {} }); },
+  label(view){ this.name.textContent = PL_NAMES[view] || ''; },
+  // fade the screen from where it is to a value; the value stays as an inline style
+  fadeTo(to, dur, ease, done){
+    const el = this.el, from = this.opacity();
+    this.stopFx();
+    el.style.opacity = String(to);
+    if (!el.animate || Math.abs(from - to) < .01) { if (done) done(); return; }
+    const a = el.animate([{opacity: from}, {opacity: to}], {duration: dur, easing: ease});
+    this.fx = [a];
+    a.onfinish = () => { if (this.fx && this.fx[0] === a) this.fx = null; if (done) done(); };
   },
-  draw(u){
-    const y = ldPrice(u);
-    let hi = Math.min(LD_OPEN, y), lo = Math.max(LD_OPEN, y);
-    for (let s = 0; s < u; s += 0.01) { const p = ldPrice(s); if (p < hi) hi = p; if (p > lo) lo = p; }
-    const bull = y < LD_OPEN - 0.5, ext = u > 0 ? 5 : 0;
-    const top = Math.min(LD_OPEN, y), h = Math.max(2, Math.abs(y - LD_OPEN));
-    for (const el of [this.body].concat(this.glows)) { el.setAttribute('y', top.toFixed(1)); el.setAttribute('height', h.toFixed(1)); }
-    for (const el of [this.body, this.wick, this.pl, this.dot].concat(this.glows)) el.classList.toggle('bull', bull);
-    this.wick.setAttribute('y1', (hi - ext).toFixed(1)); this.wick.setAttribute('y2', (lo + ext).toFixed(1));
-    this.pl.setAttribute('y1', y.toFixed(1)); this.pl.setAttribute('y2', y.toFixed(1));
-    this.dot.setAttribute('cy', y.toFixed(1));
-  },
-  play(view){
-    this.active = true; this.swapped = false; this.hitDone = false; this.pending = null; this.target = view;
-    this.setLabel(view);
-    this.st.textContent = 'Entry · warte auf TP';
+  // page change: the screen comes up over the page and the candles build
+  show(view){
     const el = this.el;
-    el.classList.remove('run', 'hit');
-    el.style.transform = 'translate3d(0,100%,0)';
-    this.inner.style.opacity = ''; this.inner.style.transform = '';
-    el.hidden = false; void el.offsetWidth; el.classList.add('run');
-    this.draw(0);
-    this.t0 = performance.now();
-    cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(this.tick);
-    updateChrome();
+    this.label(view);
+    if (el.hidden) el.style.opacity = '0';
+    el.hidden = false; el.classList.remove('boot');
+    this.inner.style.transform = '';
+    this.restart();
+    this.fadeTo(1, 220, 'cubic-bezier(.2,.7,.2,1)');
   },
-  retarget(view){
-    if (!this.swapped) { this.target = view; this.setLabel(view); updateChrome(); }
-    else this.pending = view;
+  // the screen lifts off the new page; the mark rises a little and goes first
+  lift(dur, done){
+    const el = this.el, from = this.opacity();
+    this.stopFx();
+    el.style.opacity = '0';
+    const end = () => { el.hidden = true; el.classList.remove('run', 'boot'); this.stopFx(); if (done) done(); };
+    if (!el.animate) { end(); return; }
+    const a = el.animate([{opacity: from}, {opacity: 0}], {duration: dur, easing: 'cubic-bezier(.4,0,.2,1)'});
+    const b = this.inner.animate([{opacity: 1, transform: 'none'}, {opacity: 0, transform: 'translate3d(0,-10px,0) scale(1.05)'}], {duration: Math.round(dur * .6), easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards'});
+    this.fx = [a, b];
+    a.onfinish = () => { if (this.fx && this.fx[0] === a) end(); };
   },
-  skipNow(){ if (this.active && !this.swapped) this.t0 = performance.now() - this.T.swap; },
-  tick(now){
-    const T = this.T, e = now - this.t0;
-    if (e < T.swap) this.el.style.transform = 'translate3d(0,' + ((1 - easeOut(Math.min(1, e / T.enter))) * 100).toFixed(2) + '%,0)';
-    const u = Math.max(0, Math.min(1, (e - T.liveStart) / T.live));
-    if (!this.swapped) this.draw(u);
-    if (u >= 1 && !this.hitDone) { this.hitDone = true; this.el.classList.add('hit'); this.st.textContent = '✓ Take Profit erreicht'; }
-    if (e >= T.swap) {
-      if (!this.swapped) {
-        this.swapped = true; goView(this.target);
-        this.exitT0 = performance.now();
-        if (this.el.animate) {
-          try {
-            const o = {duration: T.exit, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards'};
-            this.exitAnims = [
-              this.el.animate([{transform: 'translate3d(0,0,0)'}, {transform: 'translate3d(0,-100%,0)'}], o),
-              this.inner.animate([{transform: 'translate3d(0,0,0)'}, {transform: 'translate3d(0,60px,0)'}], o),
-              this.inner.animate([{opacity: 1}, {opacity: 0, offset: 0.714}, {opacity: 0}], {duration: T.exit, easing: 'linear', fill: 'forwards'})
-            ];
-            this.exitAnims[0].onfinish = () => { if (this.exitAnims) this.finish(); };
-            return;
-          } catch (err) { this.stopExit(); }
-        }
-      }
-      const k = Math.min(1, (now - this.exitT0) / T.exit), ek = easeInOut(k);
-      this.el.style.transform = 'translate3d(0,' + (-ek * 100).toFixed(2) + '%,0)';
-      this.inner.style.transform = 'translate3d(0,' + (ek * 60).toFixed(1) + 'px,0)';
-      this.inner.style.opacity = Math.max(0, 1 - k * 1.4).toFixed(3);
-      if (k >= 1) { this.finish(); return; }
-    }
-    this.raf = requestAnimationFrame(this.tick);
+  // ---- driven by a finger ----
+  hold(view, dir){
+    const el = this.el;
+    this.label(view);
+    this.stopFx();
+    el.hidden = false; el.classList.remove('boot');
+    el.style.opacity = '0';
+    this.restart();
+    this.list = this.anims().filter(a => isFinite(a.effect.getComputedTiming().endTime));
+    this.list.forEach(a => { a.pause(); a.currentTime = 0; });
+    this.t = 0; this.dir = dir;
   },
-  stopExit(){
-    if (this.exitAnims) { this.exitAnims.forEach(a => { try { a.cancel(); } catch (e) {} }); this.exitAnims = null; }
+  at(p){
+    this.t = p * this.BUILD;
+    if (this.list) this.list.forEach(a => { a.currentTime = this.t; });
+    this.el.style.opacity = Math.min(1, p * 1.25).toFixed(3);
+    $('#view').style.transform = 'translate3d(' + (-this.dir * p * 56).toFixed(1) + 'px,0,0)';
+    this.inner.style.transform = 'translate3d(' + (this.dir * (1 - p) * 26).toFixed(1) + 'px,0,0)';
   },
-  finish(){
-    this.stopExit();
-    this.el.style.transform = 'translate3d(0,-100%,0)'; this.inner.style.opacity = '0';
-    this.el.hidden = true; this.el.classList.remove('run', 'hit');
+  // let go past the point: the candles finish; returns the ms until they stand
+  release(){
+    const left = Math.max(0, this.BUILD - this.t);
+    if (this.list) this.list.forEach(a => { a.playbackRate = 1; a.play(); });
+    this.list = null;
+    const inn = this.inner, tf = inn.style.transform;
+    inn.style.transform = '';
+    if (inn.animate && tf) inn.animate([{transform: tf}, {transform: 'none'}], {duration: 240, easing: 'cubic-bezier(.2,.7,.2,1)'});
+    this.fadeTo(1, 180, 'cubic-bezier(.2,.7,.2,1)');
+    return left;
+  },
+  // let go too early: the page slides back and the screen fades away
+  back(done){
+    const v = $('#view'), tf = v.style.transform;
+    if (this.list) this.list.forEach(a => { a.playbackRate = -2.5; a.play(); });
+    this.list = null;
+    v.style.transform = '';
+    if (v.animate && tf) v.animate([{transform: tf}, {transform: 'none'}], {duration: 280, easing: 'cubic-bezier(.2,.7,.2,1)'});
+    this.inner.style.transform = '';
+    this.fadeTo(0, 240, 'cubic-bezier(.4,0,.2,1)', () => { this.el.hidden = true; this.el.classList.remove('run'); if (done) done(); });
+  },
+  // ---- the start of the journal: the screen stays until the entries are there ----
+  boot(){
+    this.active = true; ViewFx.still = true;
+    const t0 = performance.now();
+    const v = Views[S.view];
+    let filed = !(v && v.prep);
+    if (!filed) Promise.resolve().then(() => v.prep()).catch(() => {}).then(() => { filed = true; });
+    const ready = () => S.mounted != null && S.settingsLoaded && S.loaded.trades && filed;
+    // the third candle has closed (the ring and the glint may still run while the screen lifts)
+    const built = () => { const c = this.inner.querySelector('.b.c3'), a = c && c.getAnimations ? c.getAnimations()[0] : null; return !a || a.playState === 'finished' || a.playState === 'idle'; };
+    const tick = () => {
+      if (!this.active) return;
+      if (ready() && built() || performance.now() - t0 > 9000) this.bootEnd();
+      else this.bootT = setTimeout(tick, 50);
+    };
+    tick();
+  },
+  skipNow(){ if (this.active) this.bootEnd(); },
+  bootEnd(){
+    if (!this.active) return;
+    clearTimeout(this.bootT);
     this.active = false;
-    const p = this.pending; this.pending = null;
-    if (p && p !== S.view) this.play(p); else updateChrome();
+    const el = this.el;
+    el.style.pointerEvents = 'none';
+    // the page shows itself as the screen lifts
+    ViewFx.still = false;
+    const v = $('#view');
+    Reveal.replay(v); replayTitle(v);
+    this.lift(reduce ? 200 : 640, () => { el.style.pointerEvents = ''; updateChrome(); });
   }
 };
+function replayTitle(root){
+  const h = !reduce && root && root.querySelector('.page-head h1.split');
+  if (!h) return;
+  const ls = h.querySelectorAll('.tl');
+  ls.forEach(x => { x.style.animation = 'none'; });
+  void h.offsetWidth;
+  h.style.setProperty('--tl0', '160ms');
+  ls.forEach(x => { x.style.animation = ''; });
+}
 
 /* ---------- scroll-linked effects ---------- */
 // One pass per frame: all measurements first, then all style changes, so the browser never has to
@@ -2060,7 +2010,7 @@ function applySkin(id, persist){
 }
 function applySettings(){
   applySkin(S.settings.theme, true);
-  if (!modOn(S.view) && !Loader.active) { S.view = 'kalender'; S.mounted = null; try { if (location.hash && location.hash !== '#kalender') location.hash = 'kalender'; } catch (e) {} }
+  if (!modOn(S.view) && !ViewFx.busy) { S.view = 'kalender'; S.mounted = null; try { if (location.hash && location.hash !== '#kalender') location.hash = 'kalender'; } catch (e) {} }
   if (S.mountSig && settingsSig() !== S.mountSig) S.mounted = null;
   schedule();
 }
@@ -2086,6 +2036,7 @@ const btCtx = () => ({
   setWide: on => document.documentElement.classList.toggle('bt-wide', !!on)
 });
 Views.backtest = {
+  prep(){ return window.BlotterBT ? Promise.resolve() : Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)]); },
   mount(el){
     el.innerHTML = '<div id="bt-root" class="bt-root"><div class="page-head"><div class="grow"><h1>Backtesting</h1><p>Wird geladen…</p></div></div></div>';
     const root = $('#bt-root', el);
@@ -2207,7 +2158,7 @@ const Setup = {
       this.next();
     });
   },
-  maybe(){ if (S.settingsLoaded && !S.settings.setupDone && !this.isOpen && !this.dismissed) this.start(); else if (S.settingsLoaded && S.settings.setupDone) Tour.maybe(); },
+  maybe(){ if (Loader.active) { clearTimeout(this.mt); this.mt = setTimeout(() => this.maybe(), 150); return; } if (S.settingsLoaded && !S.settings.setupDone && !this.isOpen && !this.dismissed) this.start(); else if (S.settingsLoaded && S.settings.setupDone) Tour.maybe(); },
   start(){
     this.draft = JSON.parse(JSON.stringify(S.settings));
     this.isOpen = true; this.step = 0; this.failed = false;

@@ -684,49 +684,55 @@ html.touring .rv-pop{animation:none!important}
 .toast.bad{background:var(--down);color:var(--on-gold)}
 @keyframes toastin{from{opacity:0;transform:translate(-50%,14px)}}
 
-/* Page loader: one candle from entry, dips toward SL, rallies into TP */
-.loader{position:fixed;inset:0;z-index:28;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:radial-gradient(640px 440px at 50% 42%,rgba(var(--acc-rgb),.12),transparent 70%),radial-gradient(900px 600px at 50% 120%,rgba(var(--glow2-rgb),.25),transparent 65%),var(--bg);transform:translate3d(0,100%,0);will-change:transform;cursor:pointer}
-.loader::before,.loader::after{content:"";position:absolute;left:0;right:0;height:2px;background:var(--gold-grad);box-shadow:0 0 22px rgba(var(--acc-rgb),.85),0 0 4px rgba(var(--acc-hi-rgb),.9)}
-.loader::before{top:0} .loader::after{bottom:0}
-.ld-inner{display:flex;flex-direction:column;align-items:center;gap:20px;will-change:transform,opacity}
-.ld-svg{display:block;width:min(240px,62vw);height:auto;overflow:visible}
-.ld-grid line{stroke:rgba(var(--fg-rgb),.05);stroke-width:1}
-.ld-lvl line{stroke-width:1.5;stroke-dasharray:5 5;transform-box:fill-box;transform-origin:0 50%;transform:scaleX(0)}
-.ld-tp line{stroke:var(--up)} .ld-sl line{stroke:var(--down)} .ld-en line{stroke:rgba(var(--fg-rgb),.32)}
-.ld-tag{transform-box:fill-box;transform-origin:50% 50%;opacity:0}
-.ld-tag rect{stroke-width:1}
-.ld-tp rect{fill:var(--up-soft);stroke:var(--up-line)} .ld-sl rect{fill:var(--down-soft);stroke:var(--down-line)}
-.ld-tag text{font-family:var(--f-mono);font-size:10.5px;font-weight:700;text-anchor:middle;letter-spacing:.04em}
-.ld-tp text{fill:var(--up)} .ld-sl text{fill:var(--down)} .ld-en text{fill:var(--muted);text-anchor:start;font-weight:500}
-.loader.run .ld-lvl line{animation:ldline .5s var(--ease) forwards}
-.loader.run .ld-en line{animation-delay:.04s} .loader.run .ld-tp line{animation-delay:.1s} .loader.run .ld-sl line{animation-delay:.16s}
-.loader.run .ld-tag{animation:ldfade .3s .26s ease-out forwards}
-@keyframes ldline{to{transform:scaleX(1)}}
-@keyframes ldfade{to{opacity:1}}
-.ld-wick{stroke-width:3;stroke-linecap:round;stroke:rgba(var(--fg-rgb),.75)} .ld-wick.bull{stroke:var(--gold)}
-.ld-body{stroke-width:1.5;fill:rgba(var(--fg-rgb),.16);stroke:rgba(var(--fg-rgb),.75)} .ld-body.bull{fill:url(#ldGold);stroke:var(--gold-hi)}
-.ld-glow{fill:none;stroke:none}
-.ld-glow.bull{stroke:var(--gold);stroke-linejoin:round}
-.ld-glow.g1.bull{stroke-width:20;stroke-opacity:.09}
-.ld-glow.g2.bull{stroke-width:10;stroke-opacity:.2}
-#ld-dot{fill:var(--ink)} #ld-dot.bull{fill:var(--gold-hi)}
-.ld-pl{stroke-width:1;stroke-dasharray:3 4;opacity:.85;stroke:rgba(var(--fg-rgb),.7)} .ld-pl.bull{stroke:var(--gold)}
-.ld-burst{fill:none;stroke:var(--gold-hi);stroke-width:2;opacity:0;transform-box:fill-box;transform-origin:50% 50%}
-.loader.hit .ld-burst.b1{animation:ldburst .7s ease-out forwards}
-.loader.hit .ld-burst.b2{stroke:var(--up);animation:ldburst .9s .1s ease-out forwards}
-@keyframes ldburst{0%{opacity:.95;transform:scale(.15)}100%{opacity:0;transform:scale(2.8)}}
-.loader.hit .ld-tp line{stroke-dasharray:none;stroke-width:2.5;filter:drop-shadow(0 0 6px rgba(var(--up-rgb),.9))}
-.loader.hit .ld-tp .ld-tag{animation:ldpop .5s var(--ease) forwards}
-.loader.hit .ld-tp rect{fill:var(--up);stroke:var(--up)} .loader.hit .ld-tp text{fill:var(--on-gold)}
-@keyframes ldpop{0%{opacity:1;transform:scale(1)}40%{opacity:1;transform:scale(1.4)}100%{opacity:1;transform:scale(1.12)}}
-.ld-txt{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
-.ld-title{font-family:var(--f-display);font-stretch:118%;font-weight:800;text-transform:uppercase;font-size:clamp(30px,5vw,46px);line-height:1;letter-spacing:.02em;overflow:hidden;padding-block:.06em}
-.ld-title .ch{display:inline-block;white-space:pre}
-.loader.run .ld-title .ch{animation:ldch .55s var(--ease) backwards;animation-delay:calc(var(--i) * 30ms + 140ms)}
-.ld-title .g{background:var(--gold-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-@keyframes ldch{from{opacity:0;transform:translateY(80%)}}
-.ld-st{font-family:var(--f-mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);transition:color .2s}
-.loader.hit .ld-st{color:var(--up)}
+/* Loading screen: the three candles of the logo trade themselves into place.
+   Each candle dips below its open, rallies to its high and settles at its close, one after the other. */
+.loader{position:fixed;inset:0;z-index:29;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;
+  background:radial-gradient(min(560px,92vw) min(380px,62vh) at 50% 46%,rgba(var(--acc-rgb),.075),rgba(var(--acc-rgb),0) 70%),var(--bg);
+  --u:2.4px;--D:380ms;--d1:40ms;--d2:120ms;--d3:200ms;--gl:330ms}
+.loader[hidden]{display:none}
+/* the start of the journal: above everything, a little larger and slower */
+.loader.boot{z-index:100;opacity:1;pointer-events:auto;--u:3.1px;--D:460ms;--d1:120ms;--d2:220ms;--d3:320ms;--gl:640ms;animation:plGone .4s 14s both}
+@keyframes plGone{to{opacity:0;visibility:hidden}}
+.pl-in{display:flex;flex-direction:column;align-items:center;gap:calc(5 * var(--u) + 6px);margin-top:-5vh}
+.pl-mark{position:relative;width:calc(28 * var(--u));height:calc(28 * var(--u));filter:drop-shadow(0 var(--u) calc(6 * var(--u)) rgba(var(--acc-rgb),.3))}
+.pl-mark>i{position:absolute;left:calc(var(--x) * var(--u));top:calc(var(--y) * var(--u));width:calc(var(--w,1.6) * var(--u));height:calc(var(--h) * var(--u));border-radius:calc(var(--r,.8) * var(--u));
+  background:linear-gradient(to top right,var(--acc-c),var(--gold) 55%,var(--acc-a)) calc(var(--x) * var(--u) * -1) calc(var(--y) * var(--u) * -1) / calc(28 * var(--u)) calc(28 * var(--u)) no-repeat;
+  transform:scaleY(0)}
+.pl-mark>.wh{transform-origin:50% 100%}
+.pl-mark>.wl{transform-origin:50% 0}
+.pl-mark>.b{--w:5;--r:1;transform-origin:50% 100%;overflow:hidden}
+.pl-mark>.b u{position:absolute;left:calc(var(--x) * var(--u) * -1);top:calc(var(--y) * var(--u) * -1);width:calc(28 * var(--u));height:calc(28 * var(--u));
+  background:linear-gradient(112deg,rgba(255,255,255,0) 36%,rgba(255,255,255,.8) 50%,rgba(255,255,255,0) 64%);transform:translate3d(-100%,0,0)}
+.pl-hit{position:absolute;left:calc(22 * var(--u));top:calc(2 * var(--u));width:calc(9 * var(--u));height:calc(9 * var(--u));margin:calc(-4.5 * var(--u)) 0 0 calc(-4.5 * var(--u));
+  border-radius:50%;border:1.5px solid var(--gold-hi);box-shadow:0 0 calc(3 * var(--u)) rgba(var(--acc-rgb),.5);opacity:0;pointer-events:none}
+.pl-name{font-family:var(--f-display);font-stretch:112%;font-weight:600;font-size:15px;line-height:1.2;letter-spacing:.005em;color:var(--ink-2);opacity:0;white-space:nowrap}
+.loader.boot .pl-name{font-stretch:125%;font-weight:800;font-size:calc(7.6 * var(--u));letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
+.loader.run .pl-mark{animation:plIn .3s var(--e-out) both}
+.loader.run .pl-mark>.wl{animation:plLo var(--D) cubic-bezier(.3,.7,.4,1) both}
+.loader.run .pl-mark>.b{animation:plBody var(--D) linear both}
+.loader.run .pl-mark>.wh{animation:plHi var(--D) linear both}
+.loader.run .pl-mark>.c1{animation-delay:var(--d1)}
+.loader.run .pl-mark>.c2{animation-delay:var(--d2)}
+.loader.run .pl-mark>.c3{animation-delay:var(--d3)}
+.loader.run .pl-mark>.b u{animation:plGlint .46s var(--gl) cubic-bezier(.45,0,.3,1) both}
+.loader.boot.run .pl-mark>.b u{animation:plGlintLoop 2s var(--gl) cubic-bezier(.45,0,.3,1) infinite both}
+.loader.run .pl-hit{animation:plHit .62s calc(var(--d3) + var(--D) * .66) cubic-bezier(.15,.6,.3,1) both}
+.loader.run .pl-name{animation:plName .44s .14s var(--e-out) both}
+.loader.boot.run .pl-name{animation-delay:.46s}
+@keyframes plIn{from{opacity:0;transform:translate3d(0,calc(3 * var(--u)),0)}}
+@keyframes plLo{0%{transform:scaleY(0)}30%,100%{transform:scaleY(1)}}
+@keyframes plBody{0%,20%{transform:scaleY(0);animation-timing-function:cubic-bezier(.25,.65,.35,1)}68%{transform:scaleY(var(--hr));animation-timing-function:cubic-bezier(.5,0,.3,1)}100%{transform:scaleY(1)}}
+@keyframes plHi{0%,46%{transform:scaleY(0)}68%,100%{transform:scaleY(1)}}
+@keyframes plGlint{from{transform:translate3d(-100%,0,0)}to{transform:translate3d(100%,0,0)}}
+@keyframes plGlintLoop{0%{transform:translate3d(-100%,0,0)}34%,100%{transform:translate3d(100%,0,0)}}
+@keyframes plHit{0%{opacity:0;transform:scale(.15)}10%{opacity:1}100%{opacity:0;transform:scale(2.3)}}
+@keyframes plName{from{opacity:0;transform:translate3d(0,6px,0)}to{opacity:1;transform:none}}
+@media (max-width:600px){ .loader{--u:1.9px} .loader.boot{--u:2.5px} }
+@media (prefers-reduced-motion:reduce){
+  .loader .pl-mark>i{transform:none}
+  .loader .pl-name{opacity:1}
+  .loader.run *{animation:none!important}
+}
 
 /* Scroll reveal */
 .rv-pop{animation:rvpop .8s var(--ease) backwards;animation-delay:var(--rd,0ms)}
@@ -1012,18 +1018,8 @@ html.touring .rv-pop{animation:none!important}
 .day.landed{animation:landed 1s var(--e-out)}
 @keyframes landed{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(var(--acc-rgb),.75)}25%{transform:scale(1.06)}100%{transform:none;box-shadow:0 0 0 22px rgba(var(--acc-rgb),0)}}
 
-/* view change: a gold second hand sweeps along the header */
-.vt-sweep{position:fixed;left:0;right:0;top:0;height:2px;z-index:41;pointer-events:none;opacity:0;
-  background:linear-gradient(90deg,rgba(var(--acc-rgb),0),rgba(var(--acc-rgb),.9) 40%,var(--gold-hi) 50%,rgba(var(--acc-rgb),.9) 60%,rgba(var(--acc-rgb),0));
-  box-shadow:0 0 14px rgba(var(--acc-rgb),.6)}
+/* page change: the page under the loading screen takes no clicks */
 html.vt #view{pointer-events:none}
-/* cut to navy, then the new page builds up section by section from the side of the tab */
-.vt-veil{position:fixed;inset:0;z-index:25;pointer-events:none;opacity:0;background:radial-gradient(1200px 700px at 50% 0%,rgba(var(--acc-rgb),.07),rgba(var(--acc-rgb),0) 70%),rgba(var(--bg-rgb),.94)}
-#view.vin{overflow-x:clip;overflow-clip-margin:24px}
-#view.vin .rv-pop{animation-name:rvslide;animation-duration:.74s;animation-timing-function:var(--e-out)}
-@keyframes rvslide{from{opacity:0;transform:translate3d(calc(var(--vdir,1) * 60px),0,0)}}
-/* the many calendar days rise instead (sliding 42 cells sideways is too heavy) */
-#view.vin .day.rv-pop,#view.vin .wk.rv-pop,#view.vin .wrow.rv-pop{animation-name:rvpop;animation-duration:.8s}
 
 /* dialogs: sheet slides on phones, panel swaps slide sideways */
 .panel.fwd{animation:pfwd .42s var(--e-out)} .panel.bwd{animation:pbwd .42s var(--e-out)}
@@ -1078,165 +1074,31 @@ html.vt #view{pointer-events:none}
   .equity.untilt{transition:none}
 }
 
-/* ===== Chronograph, part 6: the page change is a trade ===== */
-/* the page lays down as the chart floor, a candle runs from entry into the TP, the hit drops the new page in */
-:root{--vc-d:1.3s;--vc-tp:21vh;--vc-en:69vh;--vc-sl:81vh;--vc-w:96px;--vc-x:57%;--vc-c:var(--up-rgb)}
-@media (max-width:760px){ :root{--vc-tp:28vh;--vc-en:70vh;--vc-sl:80vh;--vc-w:52px;--vc-x:55%} }
-html.vt3d #topbar{view-transition-name:blotter-top}
-html.vt3d #vt-candle{view-transition-name:blotter-candle;display:block}
-::view-transition{background:
-  repeating-linear-gradient(180deg,rgba(var(--fg-rgb),.05) 0 1px,rgba(var(--fg-rgb),0) 1px 8vh),
-  radial-gradient(80% 56% at 50% 34%,rgba(var(--glow2-rgb),.34),rgba(var(--glow2-rgb),0) 72%),
-  linear-gradient(var(--scrim),var(--scrim)),var(--bg)}
-::view-transition-group(root){animation:none}
-::view-transition-image-pair(root){isolation:auto}
-::view-transition-old(root),::view-transition-new(root){
-  animation-duration:var(--vc-d);animation-timing-function:linear;animation-fill-mode:both;
-  mix-blend-mode:normal;backface-visibility:hidden;outline:1px solid rgba(var(--acc-rgb),.4);outline-offset:-1px}
-html.vt3d::view-transition-old(root){transform-origin:50% 100%;animation-name:vcOld}
-html.vt3d::view-transition-new(root){transform-origin:50% 0;animation-name:vcNew}
-/* the old page lays down and becomes the floor of the chart */
-@keyframes vcOld{
-  0%{transform:perspective(1400px) translate3d(0,0,0) rotateX(0deg) scale(1);opacity:1;animation-timing-function:cubic-bezier(.62,0,.24,1)}
-  30%{transform:perspective(1400px) translate3d(0,5vh,0) rotateX(66deg) scale(.94);opacity:.5}
-  56%{opacity:.36;animation-timing-function:cubic-bezier(.4,0,1,1)}
-  66%{opacity:0}
-  100%{transform:perspective(1400px) translate3d(0,5vh,0) rotateX(66deg) scale(.94);opacity:0}}
-/* the new page drops in from above, like a board falling shut */
-@keyframes vcNew{
-  0%{transform:perspective(1700px) rotateX(-84deg);opacity:0}
-  56%{transform:perspective(1700px) rotateX(-84deg);opacity:0;animation-timing-function:cubic-bezier(.22,.72,.28,1.07)}
-  63%{opacity:1}
-  100%{transform:perspective(1700px) rotateX(0deg);opacity:1}}
-/* header and the trade overlay stay flat above the pages; the overlay is a live element */
-::view-transition-group(blotter-top),::view-transition-group(blotter-candle){animation:none}
-::view-transition-old(blotter-top),::view-transition-old(blotter-candle){display:none}
-::view-transition-new(blotter-top),::view-transition-new(blotter-candle){animation:none}
-
-/* --- the trade overlay --- */
-#vt-candle{position:fixed;inset:0;z-index:20;pointer-events:none;display:none;overflow:hidden;contain:strict}
-#vt-candle .vc-scene{position:absolute;inset:0;opacity:0}
-#vt-candle .vc-m{position:absolute;inset:0}
-#vt-candle .vc-lvl{position:absolute;left:0;right:0;height:0}
-#vt-candle .vc-lvl i{position:absolute;left:5vw;right:5vw;top:-1px;height:2px;transform-origin:0 50%;transform:scaleX(0);
-  background:repeating-linear-gradient(90deg,currentColor 0 10px,transparent 10px 17px)}
-#vt-candle .vc-lvl span{position:absolute;right:5vw;top:-11px;height:22px;opacity:0}
-#vt-candle .vc-lvl b{display:block;height:22px;padding:0 9px;border-radius:4px;font:600 11px/22px var(--f-mono);letter-spacing:.04em;
-  color:var(--bg);background:var(--lc);box-shadow:0 6px 18px -8px var(--lc)}
-#vt-candle .vc-tp{top:var(--vc-tp);--lc:rgb(var(--up-rgb));color:var(--lc)}
-#vt-candle .vc-en{top:var(--vc-en);--lc:rgba(var(--fg-rgb),.7);color:var(--lc)}
-#vt-candle .vc-sl{top:var(--vc-sl);--lc:rgb(var(--down-rgb));color:var(--lc)}
-#vt-candle .vc-tp u{position:absolute;left:5vw;right:5vw;top:-4px;height:8px;border-radius:4px;opacity:0;
-  background:linear-gradient(90deg,rgba(var(--up-rgb),0),rgba(var(--up-rgb),.95) 50%,rgba(var(--up-rgb),0));box-shadow:0 0 22px rgba(var(--up-rgb),.7)}
-/* the candle: a box with faces, turning slowly so it reads as 3D */
-#vt-candle .vc-stage{position:absolute;inset:0;perspective:1000px;perspective-origin:var(--vc-x) 46%}
-#vt-candle .vc-rig{position:absolute;left:var(--vc-x);top:var(--vc-tp);width:var(--vc-w);margin-left:calc(var(--vc-w) / -2);
-  height:calc(var(--vc-en) - var(--vc-tp));transform-style:preserve-3d;transform:rotateY(-34deg)}
-#vt-candle .vc-grow{position:absolute;inset:0;transform-origin:50% 100%;transform-style:preserve-3d;transform:scaleY(.012)}
-#vt-candle .vc-body{position:absolute;left:0;right:0;top:15%;bottom:0;transform-style:preserve-3d}
-#vt-candle .vc-body i{position:absolute;inset:0;backface-visibility:hidden}
-#vt-candle .vc-body .f1{transform:translateZ(calc(var(--vc-w) / 2));
-  background:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,0) 22%),rgb(var(--vc-c));box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
-#vt-candle .vc-body .f2{transform:rotateY(90deg) translateZ(calc(var(--vc-w) / 2));background:linear-gradient(90deg,rgba(0,0,0,.38),rgba(0,0,0,.55)),rgb(var(--vc-c))}
-#vt-candle .vc-body .f3{transform:rotateY(-90deg) translateZ(calc(var(--vc-w) / 2));background:linear-gradient(rgba(0,0,0,.45),rgba(0,0,0,.45)),rgb(var(--vc-c))}
-#vt-candle .vc-body .f4{transform:rotateY(180deg) translateZ(calc(var(--vc-w) / 2));background:linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)),rgb(var(--vc-c))}
-#vt-candle .vc-body .f5{top:calc(var(--vc-w) / -2);bottom:auto;height:var(--vc-w);transform:rotateX(90deg);background:linear-gradient(rgba(255,255,255,.3),rgba(255,255,255,.3)),rgb(var(--vc-c))}
-#vt-candle .vc-body .f6{transform:translateZ(calc(var(--vc-w) / 2 + 1px));opacity:0;background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,.35))}
-#vt-candle .vc-wick{position:absolute;left:50%;width:3px;margin-left:-1.5px;transform-style:preserve-3d}
-#vt-candle .vc-wick i{position:absolute;inset:0;background:rgb(var(--vc-c))}
-#vt-candle .vc-wick i+i{transform:rotateY(90deg)}
-#vt-candle .vc-wick.hi{top:0;height:15.5%}
-#vt-candle .vc-wick.lo{top:100%;height:5vh;transform-origin:50% 0;transform:scaleY(0)}
-/* the hit: light along the TP, a ring, a flash, the R */
-#vt-candle .vc-ring{position:absolute;left:var(--vc-x);top:var(--vc-tp);width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;
-  border:2px solid rgba(var(--up-rgb),.95);box-shadow:0 0 26px rgba(var(--up-rgb),.65),inset 0 0 18px rgba(var(--up-rgb),.45);opacity:0;transform:scale(0)}
-#vt-candle .vc-ring+.vc-ring{border-width:1px}
-#vt-candle .vc-flash{position:absolute;inset:0;opacity:0;
-  background:radial-gradient(70vmax 46vmax at var(--vc-x) var(--vc-tp),rgba(var(--up-rgb),.5),rgba(var(--up-rgb),.12) 38%,rgba(var(--up-rgb),0) 64%)}
-#vt-candle .vc-r{position:absolute;left:var(--vc-x);top:var(--vc-tp);opacity:0}
-#vt-candle .vc-r b{display:block;transform:translate(-50%,-235%);font:800 clamp(26px,3.4vw,44px)/1 var(--f-display);font-stretch:112%;letter-spacing:-.01em;
-  color:rgb(var(--up-rgb));text-shadow:0 0 24px rgba(var(--up-rgb),.55)}
-
-/* the timeline (one clock for everything, so a finger can scrub it) */
-html.vtc-go #vt-candle .vc-scene{animation:vcScene var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-tp i{animation:vcLnTp var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-en i{animation:vcLnEn var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-sl i{animation:vcLnSl var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-lvl span{animation:vcTag var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-tp span{animation-name:vcTagTp}
-html.vtc-go #vt-candle .vc-tp u{animation:vcTpGlow var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-rig{animation:vcRig var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-grow{animation:vcGrow var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-wick.lo{animation:vcLow var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-body .f6{animation:vcHot var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-ring{animation:vcRing var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-ring+.vc-ring{animation-name:vcRing2}
-html.vtc-go #vt-candle .vc-flash{animation:vcFlash var(--vc-d) linear both}
-html.vtc-go #vt-candle .vc-r{animation:vcR var(--vc-d) linear both}
-@keyframes vcScene{0%{opacity:0}6%{opacity:1}64%{opacity:1;transform:none;animation-timing-function:cubic-bezier(.4,0,.7,1)}82%,100%{opacity:0;transform:translate3d(0,-2vh,0) scale(1.03)}}
-@keyframes vcLnEn{0%{transform:scaleX(0);animation-timing-function:cubic-bezier(.3,.7,.2,1)}14%,100%{transform:scaleX(1)}}
-@keyframes vcLnSl{0%,4%{transform:scaleX(0);animation-timing-function:cubic-bezier(.3,.7,.2,1)}18%,100%{transform:scaleX(1)}}
-@keyframes vcLnTp{0%,7%{transform:scaleX(0);animation-timing-function:cubic-bezier(.3,.7,.2,1)}22%,100%{transform:scaleX(1)}}
-@keyframes vcTag{0%,10%{opacity:0;transform:translate3d(8px,0,0)}20%,100%{opacity:1;transform:none}}
-@keyframes vcTagTp{0%,14%{opacity:0;transform:translate3d(8px,0,0)}24%{opacity:1;transform:none}55.5%{transform:none;animation-timing-function:cubic-bezier(.3,1.6,.5,1)}62%{transform:scale(1.28)}70%,100%{opacity:1;transform:scale(1.1)}}
-@keyframes vcTpGlow{0%,55.5%{opacity:0}57%{opacity:1;animation-timing-function:ease-out}76%,100%{opacity:.3}}
-@keyframes vcRig{0%{transform:rotateY(-36deg)}56%{transform:rotateY(-17deg)}100%{transform:rotateY(-8deg)}}
-/* price action: a dip below the open, the rip, a pullback, then the drive into the TP */
-@keyframes vcGrow{
-  0%,15%{transform:scaleY(.012);animation-timing-function:cubic-bezier(.2,.7,.3,1)}
-  33%{transform:scaleY(.42);animation-timing-function:cubic-bezier(.45,0,.55,1)}
-  40%{transform:scaleY(.34);animation-timing-function:cubic-bezier(.55,0,.9,.6)}
-  56%{transform:scaleY(1)}
-  60%{transform:scaleY(1.012);animation-timing-function:ease-out}
-  70%,100%{transform:scaleY(1)}}
-@keyframes vcLow{0%,6%{transform:scaleY(0);animation-timing-function:cubic-bezier(.3,.6,.4,1)}14%,100%{transform:scaleY(1)}}
-@keyframes vcHot{0%,55%{opacity:0}57%{opacity:.85;animation-timing-function:ease-out}74%,100%{opacity:0}}
-@keyframes vcRing{0%,55.5%{opacity:0;transform:scale(.1)}57%{opacity:1;transform:scale(.25);animation-timing-function:cubic-bezier(.1,.6,.3,1)}80%,100%{opacity:0;transform:scale(5.5)}}
-@keyframes vcRing2{0%,58%{opacity:0;transform:scale(.1)}60%{opacity:.8;transform:scale(.25);animation-timing-function:cubic-bezier(.1,.6,.3,1)}86%,100%{opacity:0;transform:scale(8)}}
-@keyframes vcFlash{0%,55%{opacity:0}57.5%{opacity:1;animation-timing-function:ease-out}72%,100%{opacity:0}}
-@keyframes vcR{0%,56%{opacity:0;transform:translate3d(0,10px,0) scale(.8)}61%{opacity:1;transform:none;animation-timing-function:ease-out}100%{opacity:1;transform:translate3d(0,-6px,0)}}
-@media (prefers-reduced-motion:reduce){
-  ::view-transition-old(root),::view-transition-new(root){animation:none}
-  #vt-candle{display:none!important}
-}
 
 /* ===== Chronograph, part 5 ===== */
-/* the header becomes a solid bar while the page changes */
-/* (an opacity layer, so the browser fades it without repainting the header) */
-.topbar::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:rgba(var(--bg-rgb),.95);box-shadow:inset 0 -1px 0 var(--gold-line);opacity:0;transition:opacity .35s}
-html.vt3d .topbar::before{opacity:1}
 /* phones: horizontal swipes on the page drive the page change, vertical ones still scroll */
 @media (pointer:coarse){ #view{touch-action:pan-y;touch-action:pan-y pinch-zoom} }
 
 /* fourth tab: short label on narrow screens */
 .tabs .t-s{display:none}
 @media (max-width:520px){ .tabs .t-l{display:none} .tabs .t-s{display:inline} }
+/* four tabs on the narrowest phones (320 px) */
+@media (max-width:380px){ .tabs a{padding:8px 4px;font-size:13px} }
 </style>
 <script>try{var k=localStorage.getItem("blotter.skin"),o={ocean:"slate",royal:"navy",copper:"mocha",arctic:"paper"};if(k&&/^[a-z]+$/.test(k))document.documentElement.setAttribute("data-skin",o[k]||k)}catch(e){}</script>
 
 <div id="bg-wrap" aria-hidden="true"><canvas id="bg"></canvas><div id="bg-veil"></div></div>
 <div class="progress" id="progress" aria-hidden="true"></div>
 
-<div class="loader" id="loader" hidden aria-hidden="true">
-  <div class="ld-inner" id="ld-inner">
-    <svg class="ld-svg" viewBox="0 0 260 300" aria-hidden="true">
-      <defs>
-        <linearGradient id="ldGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--acc-a)"/><stop offset=".5" style="stop-color:var(--gold)"/><stop offset="1" style="stop-color:var(--acc-c)"/></linearGradient>
-      </defs>
-      <g class="ld-grid"><line x1="16" x2="244" y1="34" y2="34"/><line x1="16" x2="244" y1="94" y2="94"/><line x1="16" x2="244" y1="154" y2="154"/><line x1="16" x2="244" y1="214" y2="214"/><line x1="16" x2="244" y1="274" y2="274"/></g>
-      <g class="ld-lvl ld-en"><line x1="28" x2="204" y1="176" y2="176"/><g class="ld-tag"><text x="210" y="180">Entry</text></g></g>
-      <g class="ld-lvl ld-sl"><line x1="28" x2="204" y1="252" y2="252"/><g class="ld-tag"><rect x="209" y="242" width="36" height="20" rx="5"/><text x="227" y="256">SL</text></g></g>
-      <g class="ld-lvl ld-tp"><line x1="28" x2="204" y1="64" y2="64"/><g class="ld-tag"><rect x="209" y="54" width="36" height="20" rx="5"/><text x="227" y="68">TP</text></g></g>
-      <line id="ld-pl" class="ld-pl" x1="139" x2="204" y1="176" y2="176"/>
-      <circle id="ld-dot" cx="204" cy="176" r="3.5"/>
-      <line id="ld-wick" class="ld-wick" x1="116" x2="116" y1="176" y2="176"/>
-      <rect class="ld-glow g1" x="99" y="175" width="34" height="2" rx="8"/>
-      <rect class="ld-glow g2" x="99" y="175" width="34" height="2" rx="6"/>
-      <rect id="ld-body" class="ld-body" x="99" y="175" width="34" height="2" rx="4"/>
-      <circle class="ld-burst b1" cx="116" cy="64" r="22"/>
-      <circle class="ld-burst b2" cx="116" cy="64" r="22"/>
-    </svg>
-    <div class="ld-txt"><span class="ld-title" id="ld-title"></span><span class="ld-st" id="ld-st">Entry · warte auf TP</span></div>
+<div class="loader boot run" id="loader" aria-hidden="true">
+  <div class="pl-in" id="pl-in">
+    <div class="pl-mark">
+      <i class="wl c1" style="--x:5.2;--y:21.5;--h:3.3"></i><i class="wh c1" style="--x:5.2;--y:14.2;--h:3.3"></i><i class="b c1" style="--x:3.5;--y:17;--h:5;--hr:1.56"><u></u></i>
+      <i class="wl c2" style="--x:13.2;--y:18.5;--h:5.3"></i><i class="wh c2" style="--x:13.2;--y:8.2;--h:3.3"></i><i class="b c2" style="--x:11.5;--y:11;--h:8;--hr:1.35"><u></u></i>
+      <i class="wl c3" style="--x:21.2;--y:13.5;--h:4.3"></i><i class="wh c3" style="--x:21.2;--y:1.2;--h:3.3"></i><i class="b c3" style="--x:19.5;--y:4;--h:10;--hr:1.28"><u></u></i>
+      <b class="pl-hit"></b>
+    </div>
+    <div class="pl-name" id="pl-name">Blotter</div>
   </div>
 </div>
 
@@ -1304,20 +1166,6 @@ html.vt3d .topbar::before{opacity:1}
   </div>
 </div>
 
-<div class="vt-veil" id="vt-veil" aria-hidden="true"></div>
-<div id="vt-candle" aria-hidden="true"><div class="vc-scene"><div class="vc-m">
-  <div class="vc-flash"></div>
-  <div class="vc-lvl vc-sl"><i></i><span><b class="vc-flip">SL</b></span></div>
-  <div class="vc-lvl vc-en"><i></i><span><b class="vc-flip">Entry</b></span></div>
-  <div class="vc-lvl vc-tp"><u></u><i></i><span><b class="vc-flip">TP</b></span></div>
-  <div class="vc-stage"><div class="vc-rig"><div class="vc-grow">
-    <div class="vc-wick hi"><i></i><i></i></div>
-    <div class="vc-body"><i class="f4"></i><i class="f3"></i><i class="f2"></i><i class="f5"></i><i class="f1"></i><i class="f6"></i></div>
-  </div><div class="vc-wick lo"><i></i><i></i></div></div></div>
-  <div class="vc-ring"></div><div class="vc-ring"></div>
-  <div class="vc-r"><b class="vc-flip">+4R</b></div>
-</div></div></div>
-<div class="vt-sweep" id="vt-sweep" aria-hidden="true"></div>
 <div class="tour" id="tour" hidden>
   <div class="tour-hole none" id="tour-hole" aria-hidden="true"></div>
   <div class="tour-card" id="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-t" aria-describedby="tour-d">
@@ -1850,6 +1698,11 @@ const Reveal = {
       else { this.seen.set(k, now); el.classList.add('rv-pop'); }
     });
   },
+  replay(root){
+    if (!this.on || !root) return;
+    root.querySelectorAll('[data-rv]').forEach(el => { if (typeof this.seen.get(el.dataset.rv) === 'number') this.seen.delete(el.dataset.rv); });
+    this.scan(root);
+  },
   show(el){
     this.io.unobserve(el);
     const k = el.dataset.rv;
@@ -1992,160 +1845,82 @@ const Origin = {
 const vis = el => { if (!el || !document.contains(el)) return null; const r = el.getBoundingClientRect(); return r.width && r.bottom > 0 && r.top < innerHeight ? r : null; };
 const phoneSheet = () => innerWidth <= 600;
 
-/* ---------- chronograph: page change ---------- */
+/* ---------- page change: the loading screen comes up, the page swaps behind it, the screen lifts ---------- */
 const ViewFx = {
-  busy: false, queued: null, target: null, still: false, quiet: false, scrub: null,
-  // can a script reach the page snapshots' animations? (needed for the finger-driven change)
-  canScrub: (() => { try { new KeyframeEffect(document.documentElement, null, {pseudoElement: '::view-transition-new(root)'}); return typeof document.startViewTransition === 'function'; } catch (e) { return false; } })(),
+  busy: false, phase: null, target: null, still: false, quiet: false, scrub: null, ready: null, due: false, swapT: 0,
+  SWAP: 680,   // ms from the tap until the new page is put in place behind the screen
   go(next){
-    if (this.busy) { this.queued = next; this.target = next; updateChrome(); return; }
+    if (Loader.active || reduce || S.mounted == null || document.hidden || !document.body.animate) { goView(next); return; }
+    if (this.scrub && !this.scrub.done) return;
+    // still covering: only the name and the target change
+    if (this.phase === 'in') { if (next !== this.target) { this.target = next; Loader.label(next); this.prep(next); updateChrome(); if (this.due) this.swap(); } return; }
     if (next === S.view) return;
-    const v = $('#view'), veil = $('#vt-veil');
-    if (reduce || !veil.animate || S.mounted == null) { goView(next); return; }
-    const order = pagesOn(), dir = order.indexOf(next) >= order.indexOf(S.view) ? 1 : -1;
-    if (typeof document.startViewTransition === 'function' && !document.hidden) { this.trade(next, dir); return; }
-    this.busy = true; this.target = next;
+    this.start(next);
+  },
+  start(next){
+    clearTimeout(this.swapT);
+    this.busy = true; this.phase = 'in'; this.target = next; this.scrub = null; this.due = false;
     document.documentElement.classList.add('vt');
+    Loader.show(next);
+    this.prep(next);
     updateChrome();
-    this.sweep(dir);
-    // a solid veil is cheap to fade; the page itself is never moved as one big picture
-    const out = veil.animate([{opacity: 0}, {opacity: 1}], {duration: 190, easing: 'cubic-bezier(.55,0,.75,.06)', fill: 'forwards'});
-    let done = false;
-    const swap = () => {
-      if (done) return; done = true;
-      const to = this.queued || next; this.queued = null;
-      v.style.setProperty('--vdir', dir);
-      v.classList.add('vin');
-      goView(to);
-      out.cancel();
-      const inn = veil.animate([{opacity: 1}, {opacity: 0}], {duration: 460, easing: 'cubic-bezier(.16,1,.3,1)'});
-      const fin = () => {
-        this.busy = false; this.target = null;
-        document.documentElement.classList.remove('vt');
-        updateChrome();
-        const q = this.queued; this.queued = null;
-        if (q && q !== S.view) this.go(q);
-      };
-      inn.onfinish = fin; inn.oncancel = fin;
-      clearTimeout(this.vinT); this.vinT = setTimeout(() => v.classList.remove('vin'), 1500);
-    };
-    out.onfinish = swap;
-    setTimeout(swap, 400); // safety if the animation never reports back
+    this.swapT = setTimeout(() => this.swap(), this.SWAP);
   },
-  // the page change as a trade: the browser snapshots both pages, CSS plays one timeline for pages and overlay
-  HIT: .56,   // share of the timeline when the candle reaches the TP
-  dur(){ return (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--vc-d')) || 1.3) * 1000; },
-  begin(next, dir, update){
-    const html = document.documentElement;
-    html.dataset.vtdir = dir > 0 ? 'fwd' : 'back';
-    html.classList.add('vt3d', 'vt');
-    this.still = true;
-    try { return document.startViewTransition(update); }
-    catch (e) { this.end(); return null; }
+  // a page that needs its files first (Backtesting) starts loading them as the screen comes up
+  prep(next){
+    const v = Views[next];
+    if (!v || !v.prep) { this.ready = null; return; }
+    const r = this.ready = {done: false};
+    r.p = Promise.race([Promise.resolve().then(() => v.prep()).catch(() => {}), new Promise(res => setTimeout(res, 6000))]).then(() => { r.done = true; });
   },
-  end(){
-    const html = document.documentElement;
-    html.classList.remove('vt3d', 'vt', 'vtc-go'); delete html.dataset.vtdir;
-    this.still = false; this.busy = false; this.target = null; this.scrub = null;
-  },
-  trade(next, dir){
-    this.busy = true; this.target = next;
-    const vt = this.begin(next, dir, () => { const to = this.queued || next; this.queued = null; goView(to); });
-    if (!vt) { goView(next); return; }
+  swap(){
+    if (this.phase !== 'in') return;
+    this.due = true;
+    const r = this.ready;
+    if (r && !r.done) { r.p.then(() => this.swap()); return; }
+    this.phase = 'out'; this.ready = null; this.due = false;
+    $('#view').style.transform = '';
+    goView(this.target);
     updateChrome();
-    // the overlay's clock starts with the pages' clock
-    vt.ready.then(() => document.documentElement.classList.add('vtc-go'), () => {});
-    const fin = () => {
-      this.end();
-      updateChrome();
-      const q = this.queued; this.queued = null;
-      if (q && q !== S.view) this.go(q);
-    };
-    vt.finished.then(fin, fin);
+    Loader.lift(460, () => this.finish());
   },
-  // all animations of this page change: the two page snapshots and the overlay
-  anims(){
-    const box = $('#vt-candle');
-    return document.getAnimations().filter(a => {
-      const ef = a.effect;
-      if (!ef || !ef.target) return false;
-      if (ef.pseudoElement) return ef.pseudoElement.indexOf('view-transition') >= 0;
-      return box.contains(ef.target);
-    });
+  finish(){
+    this.busy = false; this.phase = null; this.target = null; this.scrub = null; this.due = false;
+    document.documentElement.classList.remove('vt');
+    updateChrome();
   },
-  // ---- the same trade, driven by a finger: the candle follows it up to the TP ----
+  // ---- the same change, driven by a finger (phones): the page slides, the screen and the candles follow ----
   scrubStart(next, dir){
-    if (this.busy || !this.canScrub || next === S.view) return false;
-    const sc = this.scrub = {next, dir, from: S.view, p: 0, ready: false, anims: null, done: null};
-    this.busy = true; this.target = null;
-    const vt = this.begin(next, dir, () => goView(next));
-    if (!vt) return false;
-    vt.ready.then(() => {
-      document.documentElement.classList.add('vtc-go');
-      try {
-        sc.D = this.dur();
-        const list = this.anims();
-        if (!list.some(a => a.effect.pseudoElement)) throw new Error('no handle on the page snapshots');
-        list.forEach(a => { a.pause(); a.currentTime = sc.p * sc.D * this.HIT; });
-        sc.anims = list;
-      } catch (e) { sc.anims = null; }   // can't hold it: the trade simply plays
-      sc.ready = true;
-      if (sc.done) this.scrubLand();
-    }, () => {});
-    const fin = () => {
-      if (sc.done === 'cancel' && S.view !== sc.from) this.restore(sc.from);
-      this.end();
-      updateChrome();
-      const q = this.queued; this.queued = null;
-      if (q && q !== S.view) this.go(q);
-    };
-    vt.finished.then(fin, fin);
+    if (this.busy || Loader.active || next === S.view || !document.body.animate) return false;
+    this.scrub = {next, dir, from: S.view, p: 0, done: null};
+    this.busy = true; this.phase = 'drag'; this.target = null;
+    document.documentElement.classList.add('vt');
+    Loader.hold(next, dir);
+    this.prep(next);
     return true;
   },
   scrubMove(p){
     const sc = this.scrub;
     if (!sc || sc.done) return;
     sc.p = p;
-    if (sc.anims) { const t = p * sc.D * this.HIT; sc.anims.forEach(a => { a.currentTime = t; }); }
+    Loader.at(p);
     moveTabInd();
   },
   scrubEnd(commit){
     const sc = this.scrub;
     if (!sc || sc.done) return;
-    sc.done = commit || !sc.anims && sc.ready ? 'commit' : 'cancel';
-    // same as tapping the tab: the hash change is queued behind the running change and lands on the same page
-    if (sc.done === 'commit') location.hash = sc.next;
+    sc.done = commit ? 'commit' : 'cancel';
+    if (commit) {
+      // the candles finish from where the finger left them, then the page swaps as after a tap
+      this.phase = 'in'; this.target = sc.next;
+      const left = Loader.release();
+      clearTimeout(this.swapT); this.swapT = setTimeout(() => this.swap(), Math.max(90, left + 60));
+      location.hash = sc.next;
+    } else {
+      this.phase = 'back';
+      Loader.back(() => this.finish());
+    }
     updateChrome();
-    if (sc.ready) this.scrubLand();
-  },
-  // after the finger lets go: on into the TP, or the candle sinks back and the page stands up again
-  scrubLand(){
-    const sc = this.scrub;
-    if (!sc || !sc.anims) return;
-    if (sc.done === 'commit') { sc.anims.forEach(a => { a.playbackRate = 1; a.play(); }); return; }
-    const root = sc.anims.find(a => a.effect.pseudoElement && a.effect.pseudoElement.indexOf('old(root)') >= 0) || sc.anims[0];
-    // swap the page back in the same frame the reverse ends, so the new page never flashes
-    root.onfinish = () => this.restore(sc.from);
-    sc.anims.forEach(a => {
-      a.playbackRate = -1.7;
-      if ((a.currentTime || 0) < 20) a.finish(); else a.play();
-    });
-  },
-  restore(view){
-    if (S.view === view) return;
-    this.quiet = true;
-    try { goView(view); } finally { this.quiet = false; }
-  },
-  sweep(dir){
-    const sw = $('#vt-sweep'), tb = $('#topbar');
-    if (!sw || !sw.animate) return;
-    sw.style.top = Math.max(0, tb ? tb.getBoundingClientRect().bottom - 1 : 0) + 'px';
-    sw.animate([
-      {opacity: 0, transform: `translate3d(${dir * -100}%,0,0) scaleX(.4)`},
-      {opacity: 1, offset: .25},
-      {opacity: 1, offset: .7},
-      {opacity: 0, transform: `translate3d(${dir * 100}%,0,0) scaleX(.4)`}
-    ], {duration: 760, easing: 'cubic-bezier(.65,0,.35,1)'});
   }
 };
 
@@ -2194,11 +1969,11 @@ function splitTitle(root){
   h.innerHTML = Array.from(t).map((c, i) => `<span class="tl" aria-hidden="true" style="--i:${i}">${esc(c)}</span>`).join('');
 }
 
-/* ---------- chronograph: drive the page change with a finger (phones) ---------- */
+/* ---------- page change with a finger (phones): the page slides, the loading screen follows ---------- */
 const PageSwipe = {
   g: null,
   init(){
-    if (reduce || typeof document.startViewTransition !== 'function') return;
+    if (reduce || !document.body.animate) return;
     document.addEventListener('pointerdown', e => this.down(e), {passive: true});
     document.addEventListener('pointermove', e => this.move(e), {passive: true});
     document.addEventListener('pointerup', e => this.up(e), {passive: true});
@@ -2227,7 +2002,6 @@ const PageSwipe = {
       if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
       const pg = pagesOn(), dir = dx < 0 ? 1 : -1, next = pg[pg.indexOf(S.view) + dir];
       if (!next) { this.g = null; return; }
-      if (!ViewFx.canScrub) { this.g = null; location.hash = next; return; }
       if (!ViewFx.scrubStart(next, dir)) { this.g = null; return; }
       g.on = true; g.dir = dir;
       try { document.documentElement.setPointerCapture(e.pointerId); } catch (_) {}
@@ -2287,109 +2061,133 @@ const Mantra = {
   }
 };
 
-/* ---------- motion: page loader ---------- */
-const LD_OPEN = 176, LD_TP = 64;
-const LD_KF = [[0, 176], [0.1, 166], [0.22, 193], [0.38, 231], [0.47, 222], [0.58, 186], [0.72, 128], [0.86, 86], [1, 64]];
-function ldPrice(u){
-  let i = 1; while (i < LD_KF.length - 1 && u > LD_KF[i][0]) i++;
-  const a = LD_KF[i - 1], b = LD_KF[i];
-  const t = Math.max(0, Math.min(1, (u - a[0]) / (b[0] - a[0]))), s = t * t * (3 - 2 * t);
-  const noise = (Math.sin(u * 61) * 4 + Math.sin(u * 23 + 1.3) * 3) * Math.pow(1 - u, 1.2) * Math.min(1, u * 8);
-  return a[1] + (b[1] - a[1]) * s + noise;
-}
-const LD_NAMES = {kalender: ['', 'Kalender'], learnings: ['', 'Learnings'], outlooks: ['', 'Outlooks']};
-const easeOut = k => 1 - Math.pow(1 - k, 3);
-const easeInOut = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+/* ---------- motion: the loading screen (start of the journal, every page change) ---------- */
+const PL_NAMES = {kalender: 'Kalender', learnings: 'Learnings', outlooks: 'Outlooks', backtest: 'Backtesting'};
 const Loader = {
-  on: false, active: false, swapped: false, hitDone: false, target: null, pending: null, raf: 0, t0: 0,
-  T: {enter: 240, liveStart: 120, live: 640, swap: 900, exit: 430},
+  active: false,   // the start screen is up: the journal is not ready yet
+  fx: null, list: null, t: 0, dir: 1, bootT: 0,
+  BUILD: 580,      // ms until the three candles stand (page change)
   init(){
-    this.el = $('#loader'); this.inner = $('#ld-inner');
-    this.body = $('#ld-body'); this.wick = $('#ld-wick'); this.pl = $('#ld-pl'); this.dot = $('#ld-dot'); this.glows = $$('.ld-glow', this.el);
-    this.title = $('#ld-title'); this.st = $('#ld-st');
-    this.tick = this.tick.bind(this);
-    this.el.addEventListener('click', () => this.skipNow());
+    this.el = $('#loader'); this.inner = $('#pl-in'); this.name = $('#pl-name');
+    if (this.el && !this.el.hidden && this.el.classList.contains('boot')) this.boot();
   },
-  setLabel(view){
-    const [a, b] = LD_NAMES[view] || [view, ''];
-    let i = 0;
-    const chars = (txt, g) => Array.from(txt).map(c => `<span class="ch${g ? ' g' : ''}" style="--i:${i++}">${esc(c)}</span>`).join('');
-    this.title.innerHTML = chars(a, false) + chars(b, true);
+  anims(){ try { return this.inner.getAnimations({subtree: true}); } catch (e) { return []; } },
+  restart(){ const el = this.el; el.classList.remove('run'); void el.offsetWidth; el.classList.add('run'); },
+  opacity(){ return parseFloat(getComputedStyle(this.el).opacity) || 0; },
+  stopFx(){ const f = this.fx; this.fx = null; if (f) f.forEach(a => { try { a.cancel(); } catch (e) {} }); },
+  label(view){ this.name.textContent = PL_NAMES[view] || ''; },
+  // fade the screen from where it is to a value; the value stays as an inline style
+  fadeTo(to, dur, ease, done){
+    const el = this.el, from = this.opacity();
+    this.stopFx();
+    el.style.opacity = String(to);
+    if (!el.animate || Math.abs(from - to) < .01) { if (done) done(); return; }
+    const a = el.animate([{opacity: from}, {opacity: to}], {duration: dur, easing: ease});
+    this.fx = [a];
+    a.onfinish = () => { if (this.fx && this.fx[0] === a) this.fx = null; if (done) done(); };
   },
-  draw(u){
-    const y = ldPrice(u);
-    let hi = Math.min(LD_OPEN, y), lo = Math.max(LD_OPEN, y);
-    for (let s = 0; s < u; s += 0.01) { const p = ldPrice(s); if (p < hi) hi = p; if (p > lo) lo = p; }
-    const bull = y < LD_OPEN - 0.5, ext = u > 0 ? 5 : 0;
-    const top = Math.min(LD_OPEN, y), h = Math.max(2, Math.abs(y - LD_OPEN));
-    for (const el of [this.body].concat(this.glows)) { el.setAttribute('y', top.toFixed(1)); el.setAttribute('height', h.toFixed(1)); }
-    for (const el of [this.body, this.wick, this.pl, this.dot].concat(this.glows)) el.classList.toggle('bull', bull);
-    this.wick.setAttribute('y1', (hi - ext).toFixed(1)); this.wick.setAttribute('y2', (lo + ext).toFixed(1));
-    this.pl.setAttribute('y1', y.toFixed(1)); this.pl.setAttribute('y2', y.toFixed(1));
-    this.dot.setAttribute('cy', y.toFixed(1));
-  },
-  play(view){
-    this.active = true; this.swapped = false; this.hitDone = false; this.pending = null; this.target = view;
-    this.setLabel(view);
-    this.st.textContent = 'Entry · warte auf TP';
+  // page change: the screen comes up over the page and the candles build
+  show(view){
     const el = this.el;
-    el.classList.remove('run', 'hit');
-    el.style.transform = 'translate3d(0,100%,0)';
-    this.inner.style.opacity = ''; this.inner.style.transform = '';
-    el.hidden = false; void el.offsetWidth; el.classList.add('run');
-    this.draw(0);
-    this.t0 = performance.now();
-    cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(this.tick);
-    updateChrome();
+    this.label(view);
+    if (el.hidden) el.style.opacity = '0';
+    el.hidden = false; el.classList.remove('boot');
+    this.inner.style.transform = '';
+    this.restart();
+    this.fadeTo(1, 220, 'cubic-bezier(.2,.7,.2,1)');
   },
-  retarget(view){
-    if (!this.swapped) { this.target = view; this.setLabel(view); updateChrome(); }
-    else this.pending = view;
+  // the screen lifts off the new page; the mark rises a little and goes first
+  lift(dur, done){
+    const el = this.el, from = this.opacity();
+    this.stopFx();
+    el.style.opacity = '0';
+    const end = () => { el.hidden = true; el.classList.remove('run', 'boot'); this.stopFx(); if (done) done(); };
+    if (!el.animate) { end(); return; }
+    const a = el.animate([{opacity: from}, {opacity: 0}], {duration: dur, easing: 'cubic-bezier(.4,0,.2,1)'});
+    const b = this.inner.animate([{opacity: 1, transform: 'none'}, {opacity: 0, transform: 'translate3d(0,-10px,0) scale(1.05)'}], {duration: Math.round(dur * .6), easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards'});
+    this.fx = [a, b];
+    a.onfinish = () => { if (this.fx && this.fx[0] === a) end(); };
   },
-  skipNow(){ if (this.active && !this.swapped) this.t0 = performance.now() - this.T.swap; },
-  tick(now){
-    const T = this.T, e = now - this.t0;
-    if (e < T.swap) this.el.style.transform = 'translate3d(0,' + ((1 - easeOut(Math.min(1, e / T.enter))) * 100).toFixed(2) + '%,0)';
-    const u = Math.max(0, Math.min(1, (e - T.liveStart) / T.live));
-    if (!this.swapped) this.draw(u);
-    if (u >= 1 && !this.hitDone) { this.hitDone = true; this.el.classList.add('hit'); this.st.textContent = '✓ Take Profit erreicht'; }
-    if (e >= T.swap) {
-      if (!this.swapped) {
-        this.swapped = true; goView(this.target);
-        this.exitT0 = performance.now();
-        if (this.el.animate) {
-          try {
-            const o = {duration: T.exit, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards'};
-            this.exitAnims = [
-              this.el.animate([{transform: 'translate3d(0,0,0)'}, {transform: 'translate3d(0,-100%,0)'}], o),
-              this.inner.animate([{transform: 'translate3d(0,0,0)'}, {transform: 'translate3d(0,60px,0)'}], o),
-              this.inner.animate([{opacity: 1}, {opacity: 0, offset: 0.714}, {opacity: 0}], {duration: T.exit, easing: 'linear', fill: 'forwards'})
-            ];
-            this.exitAnims[0].onfinish = () => { if (this.exitAnims) this.finish(); };
-            return;
-          } catch (err) { this.stopExit(); }
-        }
-      }
-      const k = Math.min(1, (now - this.exitT0) / T.exit), ek = easeInOut(k);
-      this.el.style.transform = 'translate3d(0,' + (-ek * 100).toFixed(2) + '%,0)';
-      this.inner.style.transform = 'translate3d(0,' + (ek * 60).toFixed(1) + 'px,0)';
-      this.inner.style.opacity = Math.max(0, 1 - k * 1.4).toFixed(3);
-      if (k >= 1) { this.finish(); return; }
-    }
-    this.raf = requestAnimationFrame(this.tick);
+  // ---- driven by a finger ----
+  hold(view, dir){
+    const el = this.el;
+    this.label(view);
+    this.stopFx();
+    el.hidden = false; el.classList.remove('boot');
+    el.style.opacity = '0';
+    this.restart();
+    this.list = this.anims().filter(a => isFinite(a.effect.getComputedTiming().endTime));
+    this.list.forEach(a => { a.pause(); a.currentTime = 0; });
+    this.t = 0; this.dir = dir;
   },
-  stopExit(){
-    if (this.exitAnims) { this.exitAnims.forEach(a => { try { a.cancel(); } catch (e) {} }); this.exitAnims = null; }
+  at(p){
+    this.t = p * this.BUILD;
+    if (this.list) this.list.forEach(a => { a.currentTime = this.t; });
+    this.el.style.opacity = Math.min(1, p * 1.25).toFixed(3);
+    $('#view').style.transform = 'translate3d(' + (-this.dir * p * 56).toFixed(1) + 'px,0,0)';
+    this.inner.style.transform = 'translate3d(' + (this.dir * (1 - p) * 26).toFixed(1) + 'px,0,0)';
   },
-  finish(){
-    this.stopExit();
-    this.el.style.transform = 'translate3d(0,-100%,0)'; this.inner.style.opacity = '0';
-    this.el.hidden = true; this.el.classList.remove('run', 'hit');
+  // let go past the point: the candles finish; returns the ms until they stand
+  release(){
+    const left = Math.max(0, this.BUILD - this.t);
+    if (this.list) this.list.forEach(a => { a.playbackRate = 1; a.play(); });
+    this.list = null;
+    const inn = this.inner, tf = inn.style.transform;
+    inn.style.transform = '';
+    if (inn.animate && tf) inn.animate([{transform: tf}, {transform: 'none'}], {duration: 240, easing: 'cubic-bezier(.2,.7,.2,1)'});
+    this.fadeTo(1, 180, 'cubic-bezier(.2,.7,.2,1)');
+    return left;
+  },
+  // let go too early: the page slides back and the screen fades away
+  back(done){
+    const v = $('#view'), tf = v.style.transform;
+    if (this.list) this.list.forEach(a => { a.playbackRate = -2.5; a.play(); });
+    this.list = null;
+    v.style.transform = '';
+    if (v.animate && tf) v.animate([{transform: tf}, {transform: 'none'}], {duration: 280, easing: 'cubic-bezier(.2,.7,.2,1)'});
+    this.inner.style.transform = '';
+    this.fadeTo(0, 240, 'cubic-bezier(.4,0,.2,1)', () => { this.el.hidden = true; this.el.classList.remove('run'); if (done) done(); });
+  },
+  // ---- the start of the journal: the screen stays until the entries are there ----
+  boot(){
+    this.active = true; ViewFx.still = true;
+    const t0 = performance.now();
+    const v = Views[S.view];
+    let filed = !(v && v.prep);
+    if (!filed) Promise.resolve().then(() => v.prep()).catch(() => {}).then(() => { filed = true; });
+    const ready = () => S.mounted != null && S.settingsLoaded && S.loaded.trades && filed;
+    // the third candle has closed (the ring and the glint may still run while the screen lifts)
+    const built = () => { const c = this.inner.querySelector('.b.c3'), a = c && c.getAnimations ? c.getAnimations()[0] : null; return !a || a.playState === 'finished' || a.playState === 'idle'; };
+    const tick = () => {
+      if (!this.active) return;
+      if (ready() && built() || performance.now() - t0 > 9000) this.bootEnd();
+      else this.bootT = setTimeout(tick, 50);
+    };
+    tick();
+  },
+  skipNow(){ if (this.active) this.bootEnd(); },
+  bootEnd(){
+    if (!this.active) return;
+    clearTimeout(this.bootT);
     this.active = false;
-    const p = this.pending; this.pending = null;
-    if (p && p !== S.view) this.play(p); else updateChrome();
+    const el = this.el;
+    el.style.pointerEvents = 'none';
+    // the page shows itself as the screen lifts
+    ViewFx.still = false;
+    const v = $('#view');
+    Reveal.replay(v); replayTitle(v);
+    this.lift(reduce ? 200 : 640, () => { el.style.pointerEvents = ''; updateChrome(); });
   }
 };
+function replayTitle(root){
+  const h = !reduce && root && root.querySelector('.page-head h1.split');
+  if (!h) return;
+  const ls = h.querySelectorAll('.tl');
+  ls.forEach(x => { x.style.animation = 'none'; });
+  void h.offsetWidth;
+  h.style.setProperty('--tl0', '160ms');
+  ls.forEach(x => { x.style.animation = ''; });
+}
 
 /* ---------- scroll-linked effects ---------- */
 // One pass per frame: all measurements first, then all style changes, so the browser never has to
@@ -3396,7 +3194,7 @@ function applySkin(id, persist){
 }
 function applySettings(){
   applySkin(S.settings.theme, true);
-  if (!modOn(S.view) && !Loader.active) { S.view = 'kalender'; S.mounted = null; try { if (location.hash && location.hash !== '#kalender') location.hash = 'kalender'; } catch (e) {} }
+  if (!modOn(S.view) && !ViewFx.busy) { S.view = 'kalender'; S.mounted = null; try { if (location.hash && location.hash !== '#kalender') location.hash = 'kalender'; } catch (e) {} }
   if (S.mountSig && settingsSig() !== S.mountSig) S.mounted = null;
   schedule();
 }
@@ -3422,6 +3220,7 @@ const btCtx = () => ({
   setWide: on => document.documentElement.classList.toggle('bt-wide', !!on)
 });
 Views.backtest = {
+  prep(){ return window.BlotterBT ? Promise.resolve() : Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)]); },
   mount(el){
     el.innerHTML = '<div id="bt-root" class="bt-root"><div class="page-head"><div class="grow"><h1>Backtesting</h1><p>Wird geladen…</p></div></div></div>';
     const root = $('#bt-root', el);
@@ -3543,7 +3342,7 @@ const Setup = {
       this.next();
     });
   },
-  maybe(){ if (S.settingsLoaded && !S.settings.setupDone && !this.isOpen && !this.dismissed) this.start(); else if (S.settingsLoaded && S.settings.setupDone) Tour.maybe(); },
+  maybe(){ if (Loader.active) { clearTimeout(this.mt); this.mt = setTimeout(() => this.maybe(), 150); return; } if (S.settingsLoaded && !S.settings.setupDone && !this.isOpen && !this.dismissed) this.start(); else if (S.settingsLoaded && S.settings.setupDone) Tour.maybe(); },
   start(){
     this.draft = JSON.parse(JSON.stringify(S.settings));
     this.isOpen = true; this.step = 0; this.failed = false;
