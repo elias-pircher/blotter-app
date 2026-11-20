@@ -507,7 +507,7 @@ function sparkSvg(curve, w, h) {
 
 /* ---------------------------------------------------------------- module state */
 let CTX = null;
-const V = {el: null, mode: 'list', sid: null, ws: null, dlg: null};
+const V = {el: null, mode: 'list', sid: null, ws: null, dlg: null, guideOpen: null, guideSrc: 'histdata'};
 
 /* ================================================================ OVERVIEW */
 function renderList() {
@@ -526,15 +526,103 @@ function renderList() {
         <h2 class="bt-h">Sessions</h2>
         ${!loaded ? '<div class="empty sm"><p>Sessions werden geladen…</p></div>'
           : list.length ? '<div class="bt-cards">' + list.map(sessCard).join('') + '</div>'
-          : `<div class="empty"><h3>Noch keine Session</h3><p>${have.length ? 'Starte eine Session: Markt wählen, Startzeitpunkt setzen und dann Kerze für Kerze traden.' : 'Importiere zuerst Kursdaten für einen Markt. Danach startest du deine erste Session.'}</p>${have.length ? `<button type="button" class="btn primary" data-bt="new">${ICON_PLUS}Erste Session starten</button>` : ''}</div>`}
+          : `<div class="empty"><h3>Noch keine Session</h3><p>${have.length ? 'Starte eine Session: Markt wählen, Startzeitpunkt setzen und dann Kerze für Kerze traden.' : 'Importiere zuerst Kursdaten für einen Markt. Wo du sie bekommst und wie du sie herunterlädst, steht in der Anleitung.'}</p>${have.length ? `<button type="button" class="btn primary" data-bt="new">${ICON_PLUS}Erste Session starten</button>` : '<button type="button" class="btn" data-bt="guide">Zur Anleitung</button>'}</div>`}
       </div>
       <aside class="bt-data" aria-label="Kursdaten">
         <h2 class="bt-h">Kursdaten</h2>
-        <p class="bt-note">Deine 1-Minuten-Daten, die nur du siehst. Lade sie einmal herunter und importiere sie hier.</p>
+        <p class="bt-note">Deine 1-Minuten-Daten, die nur du siehst. Lade sie einmal herunter und importiere sie hier. <button type="button" class="bt-link" data-bt="guide">Wo bekomme ich die Daten?</button></p>
         <ul class="bt-mkts">${MARKETS.map(m => mktRow(m, idx[m.id])).join('')}</ul>
       </aside>
     </div>
+    ${guideHtml(V.guideOpen == null ? !have.length : V.guideOpen)}
   </section>`;
+  const g = $('#bt-guide', el);
+  if (g) g.addEventListener('toggle', () => { V.guideOpen = g.open; });
+}
+
+/* ---- guide: where the price data comes from and how to download it */
+const ICON_EXT = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+const DUKA_URL = 'https://www.dukascopy.com/swiss/deutsch/marketwatch/historical/';
+const ext = (url, text) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+const SOURCES = [
+  {id: 'histdata', name: 'HistData', badge: 'Empfohlen',
+    lead: 'Kostenlos, ohne Abo und viele Jahre zurück. Für alle sechs Märkte der einfachste Weg.',
+    steps: [
+      'Öffne unten die Seite deines Markts bei HistData. Dort sind 1-Minuten-Kerzen im Format „Generic ASCII“ schon ausgewählt.',
+      'Klicke auf das Jahr, das du testen willst. Für das laufende Jahr stehen dort einzelne Monate.',
+      'Auf der nächsten Seite klickst du den Link mit dem Dateinamen, der mit „HISTDATA_COM_ASCII“ beginnt. Die ZIP-Datei wird heruntergeladen.',
+      'Wiederhole das für jedes weitere Jahr.',
+      'Zieh die ZIP-Dateien unverändert in den Import. Entpacken musst du nichts.'
+    ],
+    extra: () => `<h4 class="bt-g-sub">Deine Märkte bei HistData</h4>
+      <ul class="bt-g-links">${MARKETS.map(m => `<li><a href="${HIST_URL(m)}" target="_blank" rel="noopener noreferrer">
+        <span class="bt-mk-tag">${esc(m.tag)}</span><span class="bt-g-lt"><b>${esc(m.name)}</b><small>heißt dort ${esc(m.hist.toUpperCase())}</small></span>${ICON_EXT}</a></li>`).join('')}</ul>`},
+  {id: 'dukascopy', name: 'Dukascopy',
+    lead: 'Kostenlos und sehr sauber, dazu viele Märkte. Für den Download kann Dukascopy eine kostenlose Anmeldung verlangen.',
+    steps: [
+      `Öffne den ${ext(DUKA_URL, 'Export historischer Daten bei Dukascopy')}.`,
+      'Wähle dein Instrument. Indizes heißen dort anders, der Nasdaq 100 zum Beispiel „USA 100 Technical Index“.',
+      'Stell den Zeitrahmen auf 1 Minute, wähl den Zeitraum und als Dateiformat CSV. Die Zeit bleibt auf GMT.',
+      'Lade die Datei herunter und zieh sie in den Import.'
+    ]},
+  {id: 'mt5', name: 'MetaTrader 5',
+    lead: 'Die Kurse deines eigenen Brokers. Wie weit sie zurückgehen, hängt vom Broker ab.',
+    steps: [
+      'Öffne in MetaTrader 5 „Ansicht → Symbole“ (unter Windows Strg+U).',
+      'Wähle dein Symbol, zum Beispiel US100, GER40 oder XAUUSD, und öffne den Reiter „Balken“ (Bars).',
+      'Stell M1 und den Zeitraum ein und klicke „Anfordern“ (Request).',
+      'Klicke „Balken exportieren“ (Export Bars) und speichere die Datei als CSV.',
+      'Zieh die Datei in den Import. Blotter schlägt die übliche Serverzeit vor (UTC+2, im US-Sommer UTC+3). Prüf, ob das bei deinem Broker stimmt.'
+    ],
+    tip: 'Kommen weniger Kerzen als erwartet, erhöhe in den MetaTrader-Einstellungen unter „Charts“ die maximale Anzahl Balken und starte MetaTrader neu.'},
+  {id: 'tradingview', name: 'TradingView',
+    lead: 'Geht nur mit einem bezahlten TradingView-Abo. Exportiert werden nur die Kerzen, die im Chart geladen sind, bei 1-Minuten-Kerzen also eher kurze Zeiträume.',
+    steps: [
+      'Öffne deinen Markt im 1-Minuten-Chart.',
+      'Scroll nach links, bis der Zeitraum geladen ist, den du testen willst.',
+      'Öffne oben im Menü „Chartdaten herunterladen…“ (Download chart data) und lade die CSV-Datei herunter.',
+      'Zieh die Datei in den Import.'
+    ]}
+];
+function guideHtml(open) {
+  const cur = SOURCES.find(s => s.id === V.guideSrc) || SOURCES[0];
+  return `<details class="bt-guide" id="bt-guide"${open ? ' open' : ''}>
+    <summary><span class="bt-g-title">Anleitung: Kursdaten herunterladen</span><span class="bt-g-hint">Woher die Kurse kommen und wie du sie in Blotter bekommst</span></summary>
+    <div class="bt-g-body">
+      <p class="bt-g-intro">Für das Backtesting brauchst du Kurse als 1-Minuten-Kerzen (M1). Blotter liefert keine Kurse mit: Du lädst sie einmal selbst herunter und importierst sie hier. Danach liegen sie privat in deinem Konto und sind auf all deinen Geräten da. Für den Anfang reicht ein Jahr pro Markt, das sind etwa 2 MB.</p>
+      <div class="bt-g-tabs" role="tablist" aria-label="Datenquelle">${SOURCES.map(s => `<button type="button" role="tab" id="bt-gt-${s.id}" aria-controls="bt-gp-${s.id}" aria-selected="${s === cur}" tabindex="${s === cur ? 0 : -1}" data-bt="gsrc" data-src="${s.id}">${esc(s.name)}${s.badge ? `<span class="bt-g-badge">${esc(s.badge)}</span>` : ''}</button>`).join('')}</div>
+      ${SOURCES.map(s => `<section class="bt-g-panel" role="tabpanel" id="bt-gp-${s.id}" aria-labelledby="bt-gt-${s.id}"${s === cur ? '' : ' hidden'}>
+        <p class="bt-g-lead">${s.lead}</p>
+        <ol class="bt-g-steps">${s.steps.map(t => `<li>${t}</li>`).join('')}</ol>
+        ${s.tip ? `<p class="bt-g-tip">${esc(s.tip)}</p>` : ''}
+        ${s.extra ? s.extra() : ''}
+      </section>`).join('')}
+      <dl class="bt-g-notes">
+        <div><dt>Zeitzone</dt><dd>Blotter erkennt beim Import, aus welcher Quelle die Datei stammt, und stellt die Zeitzone passend ein. Vor dem Import kannst du sie noch ändern.</dd></div>
+        <div><dt>Mehr Jahre</dt><dd>Weitere Jahre kannst du jederzeit mit „Ergänzen“ dazuholen. Bereits importierte Monate werden zusammengeführt.</dd></div>
+        <div><dt>Nur für dich</dt><dd>Deine Kursdaten liegen in deinem Konto und sind für niemanden sonst sichtbar.</dd></div>
+      </dl>
+      <div class="bt-g-foot"><button type="button" class="btn primary" data-bt="import">Kursdaten importieren</button></div>
+    </div>
+  </details>`;
+}
+function selectSource(id) {
+  if (!SOURCES.some(s => s.id === id)) return;
+  V.guideSrc = id;
+  const g = $('#bt-guide'); if (!g) return;
+  $$('[role="tab"]', g).forEach(t => { const on = t.dataset.src === id; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
+  $$('.bt-g-panel', g).forEach(p => { p.hidden = p.id !== 'bt-gp-' + id; });
+}
+function showGuide() {
+  closeDialog();
+  if (V.mode !== 'list') return;
+  const g = $('#bt-guide'); if (!g) return;
+  g.open = true; V.guideOpen = true;
+  // below the sticky header (two rows on phones)
+  requestAnimationFrame(() => {
+    const tb = document.getElementById('topbar'), off = (tb ? tb.getBoundingClientRect().bottom : 0) + 14;
+    window.scrollTo({top: Math.max(0, g.getBoundingClientRect().top + window.scrollY - off), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+  });
 }
 const ICON_PLUS = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 function mktRow(m, info) {
@@ -601,7 +689,8 @@ function openImport(market) {
     $('#bt-im-help', d).innerHTML = `<ol>
       <li>Öffne <a href="${HIST_URL(x)}" target="_blank" rel="noopener noreferrer">HistData: ${esc(x.name)}</a> (kostenlos).</li>
       <li>Lade die Jahre herunter, die du testen willst. Für das laufende Jahr gibt es einzelne Monate.</li>
-      <li>Zieh die ZIP-Dateien unverändert hier hinein. Exporte aus MetaTrader, TradingView oder Dukascopy gehen auch.</li></ol>`;
+      <li>Zieh die ZIP-Dateien unverändert hier hinein. Exporte aus MetaTrader, TradingView oder Dukascopy gehen auch.</li></ol>
+      <p class="bt-steps-more">Schritt für Schritt und für alle Quellen: <button type="button" class="bt-link" data-bt="guide">Anleitung öffnen</button></p>`;
   };
   help();
   $('#bt-im-mk', d).addEventListener('change', () => { help(); if (state.items) showFiles(); });
@@ -1332,13 +1421,24 @@ function onClick(e) {
   else if (a === 'import') openImport(b.dataset.mk);
   else if (a === 'open') openSession(b.dataset.id);
   else if (a === 'close') { if (!(V.dlg && V.dlg.dataset.busy)) closeDialog(); }
+  else if (a === 'guide') { if (!(V.dlg && V.dlg.dataset.busy)) showGuide(); }
+  else if (a === 'gsrc') selectSource(b.dataset.src);
+}
+// arrow keys move between the guide's source tabs
+function onKeyTabs(e) {
+  const t = e.target.closest && e.target.closest('.bt-g-tabs [role="tab"]');
+  if (!t || !/^(ArrowLeft|ArrowRight|Home|End)$/.test(e.key)) return;
+  const tabs = $$('[role="tab"]', t.parentElement), i = tabs.indexOf(t);
+  const j = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+  e.preventDefault(); e.stopPropagation();
+  selectSource(tabs[j].dataset.src); tabs[j].focus();
 }
 function onKeyDlg(e) { if (e.key === 'Escape' && V.dlg && !V.dlg.dataset.busy) { e.preventDefault(); e.stopPropagation(); closeDialog(); } }
 
 window.BlotterBT = {
   mount(el, ctx) {
     CTX = ctx; V.el = el;
-    if (!this.bound) { document.addEventListener('click', onClick); window.addEventListener('keydown', onKeyDlg, true); this.bound = true; }
+    if (!this.bound) { document.addEventListener('click', onClick); window.addEventListener('keydown', onKeyDlg, true); document.addEventListener('keydown', onKeyTabs); this.bound = true; }
     if (V.ws) { V.ws.flush(); V.ws.destroy(); V.ws = null; }
     if (V.mode === 'ws' && V.sid && sessions().some(s => s.id === V.sid)) openSession(V.sid);
     else { V.mode = 'list'; renderList(); }
