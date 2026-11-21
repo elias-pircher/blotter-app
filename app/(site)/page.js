@@ -74,15 +74,31 @@ const BT_POINTS = [
   ['Statistik pro Session', 'Win-Rate, Summe in R, Profit Factor, Drawdown und Equity-Kurve.'],
 ];
 
-const INCL = [
-  'Unbegrenzt Trades, Learnings und Outlooks',
-  'Backtesting mit sechs Märkten',
-  'Screenshots zu jedem Eintrag',
-  'Bis zu 10 Konten, gefiltert mit einem Klick',
-  'Laptop, Tablet und Handy, immer synchron',
-  '12 Farbschemen, dunkel oder hell',
-  'Deine Daten sieht nur du',
-  'Keine Werbung, keine Zusatzpakete',
+// the two plans: the journal, and the journal with backtesting on top
+const TIERS = [
+  {
+    id: 'journal', name: 'Journal', amt: '7,99 €',
+    lead: 'Alles, um deine Live-Trades festzuhalten und auszuwerten.',
+    list: [
+      'Unbegrenzt Trades, Learnings und Outlooks',
+      'Kalender mit Win-Rate und Wochenbilanz',
+      'Screenshots zu jedem Eintrag',
+      'Bis zu 10 Konten, gefiltert mit einem Klick',
+      'Laptop, Tablet und Handy, immer synchron',
+      '12 Farbschemen, dunkel oder hell',
+    ],
+  },
+  {
+    id: 'backtest', name: 'Journal + Backtesting', amt: '14,99 €',
+    lead: 'Alles aus dem Journal, dazu der Markt zum Nachspielen.',
+    list: [
+      'Das komplette Journal',
+      'Backtesting Kerze für Kerze, von 1 Minute bis Monthly',
+      'Sechs Märkte mit deinen eigenen Kursdaten',
+      'Entry, Stop und Ziel, jeder Trade in R',
+      'Statistik und Equity-Kurve pro Session',
+    ],
+  },
 ];
 
 const FAQ = [
@@ -90,6 +106,8 @@ const FAQ = [
   ['Geht es um meinen Kontostand?', 'Nein. Blotter hält fest, ob ein Trade im Take Profit, im Stop Loss oder auf Break Even endete. So misst du, wie gut du deinem System folgst, und nicht deine Tagesform.'],
   ['Woher kommen die Kursdaten fürs Backtesting?', 'Du lädst 1-Minuten-Daten einmal selbst herunter, zum Beispiel kostenlos bei HistData, und importierst sie in Blotter. Eine Schritt-für-Schritt-Anleitung steht direkt auf der Backtesting-Seite. Danach liegen die Daten privat in deinem Konto.'],
   ['Brauche ich eine App?', 'Nein. Blotter läuft im Browser auf Mac, Windows, iPhone und Android. Deine Einträge sind auf allen Geräten gleich.'],
+  ['Welches Abo passt zu mir?', 'Wenn du deine Live-Trades festhalten und auswerten willst, reicht das Journal. Willst du dein Setup vorher auf vergangenen Kursen testen, nimm Journal + Backtesting. Alles andere ist in beiden Abos gleich.'],
+  ['Kann ich später wechseln?', 'Ja, jederzeit unter Einstellungen im Journal. Beim Wechsel zu Journal + Backtesting zahlst du nur die Differenz für die restlichen Tage des Monats. Wechselst du zurück, wird der nicht genutzte Teil mit deiner nächsten Rechnung verrechnet, und deine Backtests bleiben gespeichert.'],
   ['Wie kündige ich?', 'Im Journal unter Einstellungen → „Abo verwalten oder kündigen“. Das Abo läuft dann bis zum Ende des bezahlten Monats.'],
 ];
 
@@ -97,6 +115,7 @@ export default async function Home() {
   let loggedIn = false;
   try { const { data } = await createClient().auth.getUser(); loggedIn = !!data.user; } catch {}
   const start = loggedIn ? '/app' : '/login?next=/abo';
+  const choose = (plan) => (loggedIn ? '/abo?plan=' + plan : '/login?next=' + encodeURIComponent('/abo?plan=' + plan));
   const cells = monthCells();
   const days = cells.filter((c) => c.k != null).length;
   return (
@@ -110,7 +129,7 @@ export default async function Home() {
               <h1><span>Miss deine Disziplin.</span> <span>Nicht deinen Kontostand.</span></h1>
               <p className="lead">Blotter ist das Trading Journal, das festhält, wie jeder Trade endet: Take Profit, Break Even oder Stop Loss. Mit Kalender, Screenshots, Learnings, Outlooks und Backtesting.</p>
               <div className="cta">
-                <a className="btn primary" href={start}>{loggedIn ? 'Zum Journal' : 'Für 7,99 € im Monat starten'}</a>
+                <a className="btn primary" href={start}>{loggedIn ? 'Zum Journal' : 'Ab 7,99 € im Monat starten'}</a>
                 <a className="btn quiet" href="#journal">Ansehen</a>
               </div>
               <p className="fine">Monatlich kündbar. Keine Mindestlaufzeit.</p>
@@ -215,20 +234,33 @@ export default async function Home() {
             <ul className="pts">
               {BT_POINTS.map(([h, p], i) => <li key={h} data-reveal style={{ '--d': i * 0.08 + 's' }}><b>{h}</b><span>{p}</span></li>)}
             </ul>
+            <div className="bts-cta" data-reveal>
+              <p>Backtesting ist im Abo <b>Journal + Backtesting</b> enthalten, für 14,99 € im Monat.</p>
+              <a className="btn quiet" href={choose('backtest')}>Mit Backtesting starten</a>
+            </div>
           </div>
         </section>
 
         {/* 7 · price */}
         <section className="wrap s-price" id="preis">
-          <div className="price-l" data-reveal>
-            <h2>Ein Preis. Alles drin.</h2>
-            <p className="amt"><b>7,99 €</b><span>im Monat</span></p>
-            <a className="btn primary" href={loggedIn ? '/abo' : '/login?next=/abo'}>Blotter starten</a>
-            <p className="fine">Endpreis. Monatlich kündbar, mit zwei Klicks.</p>
+          <div className="price-h">
+            <h2 data-reveal>Journal allein oder mit Backtesting.</h2>
+            <p data-reveal style={{ '--d': '.06s' }}>Beide Abos sind monatlich kündbar. Du kannst jederzeit wechseln, abgerechnet wird tagesgenau.</p>
           </div>
-          <ul className="incl">
-            {INCL.map((t, i) => <li key={t} data-reveal style={{ '--d': i * 0.05 + 's' }}>{t}</li>)}
-          </ul>
+          <div className="tiers">
+            {TIERS.map((t, k) => (
+              <article key={t.id} className={'tier' + (t.id === 'backtest' ? ' plus' : '')} data-reveal style={{ '--d': k * 0.1 + 's' }} aria-labelledby={'tier-' + t.id}>
+                <h3 id={'tier-' + t.id}>{t.name}</h3>
+                <p className="amt"><b>{t.amt}</b><span>im Monat</span></p>
+                <p className="tl">{t.lead}</p>
+                <a className={'btn ' + (t.id === 'backtest' ? 'primary' : 'quiet')} href={choose(t.id)}>{t.id === 'backtest' ? 'Mit Backtesting starten' : 'Mit dem Journal starten'}</a>
+                <ul className="incl">
+                  {t.list.map((x, i) => <li key={x} data-reveal style={{ '--d': k * 0.1 + 0.15 + i * 0.04 + 's' }}>{x}</li>)}
+                </ul>
+              </article>
+            ))}
+          </div>
+          <p className="fine price-f" data-reveal>Endpreise. Keine Mindestlaufzeit, keine Werbung, und deine Daten sieht nur du.</p>
         </section>
 
         {/* 8 · questions */}

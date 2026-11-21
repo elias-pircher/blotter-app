@@ -60,10 +60,18 @@ async function checkStripe() {
   if (!/^(sk|rk)_(test|live)_/.test(key)) return { status: 'ungültig', hinweis: 'Kein Stripe-Geheimschlüssel erkannt. Er muss mit sk_test_ beginnen.' };
   try {
     const price = await stripe().prices.retrieve(process.env.STRIPE_PRICE_ID);
+    let plus = 'fehlt';
+    if (process.env.STRIPE_PRICE_ID_BACKTEST) {
+      try {
+        const p2 = await stripe().prices.retrieve(process.env.STRIPE_PRICE_ID_BACKTEST);
+        plus = p2.unit_amount === 1499 && p2.recurring?.interval === 'month' && p2.livemode === price.livemode ? 'ok (14,99 € / Monat)' : 'unerwartet';
+      } catch { plus = 'nicht gefunden'; }
+    }
     return {
       status: 'ok',
       modus: price.livemode ? 'live' : 'test',
       preis: price.unit_amount === 799 && price.recurring?.interval === 'month' ? 'ok (7,99 € / Monat)' : 'unerwartet',
+      preis_backtesting: plus,
     };
   } catch (e) {
     if (e?.type === 'StripeAuthenticationError') return { status: 'ungültig', hinweis: 'Stripe lehnt den Schlüssel ab: unvollständig kopiert oder inzwischen ersetzt.' };

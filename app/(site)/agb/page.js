@@ -6,9 +6,10 @@ export default function AGB() {
       <h2>1. Geltungsbereich</h2>
       <p>Diese AGB gelten für die Nutzung von Blotter, angeboten von <Ph>Name/Firma</Ph>.</p>
       <h2>2. Leistung</h2>
-      <p>Blotter ist ein Online-Trading-Journal. Es dokumentiert eigene Trades, Learnings und Outlooks und bietet keine Anlageberatung.</p>
+      <p>Blotter ist ein Online-Trading-Journal. Es dokumentiert eigene Trades, Learnings und Outlooks und bietet keine Anlageberatung. Im Abo „Journal + Backtesting“ kommt das Backtesting hinzu: das Nachspielen historischer Kursverläufe mit vom Kunden selbst importierten Kursdaten.</p>
       <h2>3. Preis und Zahlung</h2>
-      <p>Das Abo kostet 7,99 € pro Monat <Ph>inkl. USt. oder Hinweis Kleinunternehmerregelung</Ph> und wird monatlich im Voraus über Stripe abgerechnet.</p>
+      <p>Es gibt zwei Abos: „Journal“ für 7,99 € pro Monat und „Journal + Backtesting“ für 14,99 € pro Monat <Ph>inkl. USt. oder Hinweis Kleinunternehmerregelung</Ph>. Das Abo wird monatlich im Voraus über Stripe abgerechnet.</p>
+      <p>Ein Wechsel zwischen den Abos ist jederzeit möglich und gilt sofort. Beim Wechsel zu „Journal + Backtesting“ wird die Preisdifferenz für den Rest des laufenden Abrechnungsmonats sofort anteilig berechnet. Beim Wechsel zu „Journal“ wird der nicht genutzte Teil anteilig mit der nächsten Abrechnung verrechnet; gespeicherte Backtesting-Daten bleiben erhalten.</p>
       <h2>4. Laufzeit und Kündigung</h2>
       <p>Das Abo verlängert sich jeweils um einen Monat und kann jederzeit zum Ende des laufenden Abrechnungsmonats gekündigt werden, direkt im Journal unter Einstellungen.</p>
       <h2>5. Rücktrittsrecht für Verbraucher</h2>

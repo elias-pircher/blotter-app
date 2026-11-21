@@ -1,6 +1,6 @@
 # Blotter – Verkaufsversion
 
-Das Blotter Trading Journal als eigene Web-App mit Login, getrennten Kundendaten und Stripe-Abo (7,99 €/Monat, monatlich kündbar).
+Das Blotter Trading Journal als eigene Web-App mit Login, getrennten Kundendaten und zwei Stripe-Abos: Journal (7,99 €/Monat) und Journal + Backtesting (14,99 €/Monat), beide monatlich kündbar und jederzeit wechselbar.
 
 **Technik:** Next.js (Hosting auf Vercel) · Supabase (Login, Datenbank, Screenshot-Speicher, Server in Frankfurt) · Stripe (Abo, Bezahlung, Kundenportal)
 
@@ -33,7 +33,7 @@ Jeder Kunde sieht nur seine eigenen Daten. Das erzwingt die Datenbank selbst (Ro
 6. Für echte Kunden: **Authentication → Emails → SMTP** mit einem eigenen Versanddienst (z. B. Resend) einrichten. Der eingebaute Versand ist nur zum Testen gedacht und stark begrenzt.
 
 ### 2 · Stripe (erst im Testmodus)
-1. **Produktkatalog → Produkt hinzufügen**: „Blotter Journal“, Preis **7,99 EUR**, **wiederkehrend, monatlich**. Die **Preis-ID** (`price_…`) notieren.
+1. **Produktkatalog → Produkt hinzufügen**: „Blotter Journal“, Preis **7,99 EUR**, **wiederkehrend, monatlich**. Die **Preis-ID** (`price_…`) notieren. Dasselbe für „Blotter Journal + Backtesting“ mit **14,99 EUR**.
 2. **Einstellungen → Billing → Kundenportal**: aktivieren, „Abos kündigen“ erlauben (zum Ende des Abrechnungszeitraums), „Zahlungsmethode aktualisieren“ erlauben.
 3. **Entwickler → Webhooks → Endpoint hinzufügen**
    - URL: `https://DEINE-ADRESSE/api/stripe/webhook`
@@ -53,7 +53,8 @@ Jeder Kunde sieht nur seine eigenen Daten. Das erzwingt die Datenbank selbst (Ro
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role/secret key | **ja** |
 | `STRIPE_SECRET_KEY` | `sk_test_…` | **ja** |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` | **ja** |
-| `STRIPE_PRICE_ID` | `price_…` | nein |
+| `STRIPE_PRICE_ID` | `price_…` (Journal, 7,99 €) | nein |
+| `STRIPE_PRICE_ID_BACKTEST` | `price_…` (Journal + Backtesting, 14,99 €) | nein |
 | `STRIPE_AUTOMATIC_TAX` | `false` (später `true` mit Stripe Tax) | nein |
 
 3. **Deploy**.
@@ -69,7 +70,7 @@ Jeder Kunde sieht nur seine eigenen Daten. Das erzwingt die Datenbank selbst (Ro
 - Impressum, Datenschutz und AGB vollständig ausfüllen und prüfen lassen.
 - Umsatzsteuer klären (Kleinunternehmer oder USt.-pflichtig, EU-Verkauf über OSS); bei Bedarf Stripe Tax aktivieren.
 - Eigene Domain in Vercel verbinden, `NEXT_PUBLIC_SITE_URL` und die Supabase-URLs anpassen.
-- Stripe auf **Live** umstellen: Live-Produkt und -Preis, Live-Webhook, Live-Schlüssel in Vercel eintragen.
+- Stripe auf **Live** umstellen: Live-Produkte und -Preise (beide Abos), Live-Webhook, Live-Schlüssel in Vercel eintragen.
 
 ---
 

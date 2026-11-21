@@ -435,6 +435,34 @@ button{cursor:pointer}
 .empty p{margin:0;max-width:52ch}
 .empty.sm{padding:20px 16px}
 
+/* backtesting in the smaller plan: what it does and how to switch */
+.bt-lock{max-width:1100px}
+.lock-card{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:32px;align-items:center;padding:30px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(var(--surface),var(--surface)),rgb(var(--bg-rgb))}
+.lock-txt h2{margin:0 0 8px;font-family:var(--f-display);font-stretch:108%;font-weight:700;font-size:24px;line-height:1.2}
+.lock-txt p{margin:0;color:var(--muted);font-size:15px}
+.lock-pts{list-style:none;margin:16px 0 24px;padding:0;display:flex;flex-direction:column;gap:10px}
+.lock-pts li{display:flex;gap:12px;align-items:baseline;color:var(--ink-2);font-size:15px;line-height:1.45}
+.lock-pts li::before{content:"";flex:none;width:10px;height:2px;background:var(--gold);transform:translateY(-4px)}
+.lock-act{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.lock-act .btn{height:44px;padding:0 20px}
+.lock-act small{color:var(--muted);font-size:13px;line-height:1.45;max-width:34ch}
+.lock-fig{margin:0;padding:12px 10px 8px;border-radius:14px;background:rgba(var(--bg-rgb),.6);border:1px solid var(--line)}
+.lock-fig svg{display:block;width:100%;height:auto}
+.lock-fig line{stroke-width:1.2}
+.lock-fig .u line{stroke:var(--up)}.lock-fig .u rect{fill:var(--up)}
+.lock-fig .d line{stroke:var(--down)}.lock-fig .d rect{fill:var(--down)}
+.lock-fig .after{opacity:.35}
+.lock-fig .tp-z{fill:rgba(var(--up-rgb),.14)}
+.lock-fig .sl-z{fill:rgba(var(--down-rgb),.14)}
+.lock-fig .en{stroke:var(--gold);stroke-width:1.2;stroke-dasharray:3 3}
+.lock-fig .lb{font:600 10px var(--f-mono);fill:var(--muted)}
+.lock-fig .lb.tp{fill:var(--up)}.lock-fig .lb.sl{fill:var(--down)}.lock-fig .rr{font-weight:500;fill:var(--up)}
+@media (max-width:760px){
+  .lock-card{grid-template-columns:minmax(0,1fr);gap:20px;padding:18px}
+  .lock-fig{order:-1}
+  .lock-act .btn{width:100%}
+}
+
 .feed.tl{gap:16px}
 .tl-rail{position:absolute;left:79px;top:10px;bottom:10px;width:2px;border-radius:2px;background:rgba(var(--fg-rgb),.07)}
 .tl-fill{position:absolute;inset:0;border-radius:2px;background:linear-gradient(180deg,var(--gold-hi),var(--gold) 50%,var(--gold-lo));box-shadow:0 0 14px rgba(var(--acc-rgb),.6);transform-origin:50% 0;transform:scaleY(0)}

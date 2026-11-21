@@ -438,6 +438,34 @@ button{cursor:pointer}
 .empty p{margin:0;max-width:52ch}
 .empty.sm{padding:20px 16px}
 
+/* backtesting in the smaller plan: what it does and how to switch */
+.bt-lock{max-width:1100px}
+.lock-card{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:32px;align-items:center;padding:30px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(var(--surface),var(--surface)),rgb(var(--bg-rgb))}
+.lock-txt h2{margin:0 0 8px;font-family:var(--f-display);font-stretch:108%;font-weight:700;font-size:24px;line-height:1.2}
+.lock-txt p{margin:0;color:var(--muted);font-size:15px}
+.lock-pts{list-style:none;margin:16px 0 24px;padding:0;display:flex;flex-direction:column;gap:10px}
+.lock-pts li{display:flex;gap:12px;align-items:baseline;color:var(--ink-2);font-size:15px;line-height:1.45}
+.lock-pts li::before{content:"";flex:none;width:10px;height:2px;background:var(--gold);transform:translateY(-4px)}
+.lock-act{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.lock-act .btn{height:44px;padding:0 20px}
+.lock-act small{color:var(--muted);font-size:13px;line-height:1.45;max-width:34ch}
+.lock-fig{margin:0;padding:12px 10px 8px;border-radius:14px;background:rgba(var(--bg-rgb),.6);border:1px solid var(--line)}
+.lock-fig svg{display:block;width:100%;height:auto}
+.lock-fig line{stroke-width:1.2}
+.lock-fig .u line{stroke:var(--up)}.lock-fig .u rect{fill:var(--up)}
+.lock-fig .d line{stroke:var(--down)}.lock-fig .d rect{fill:var(--down)}
+.lock-fig .after{opacity:.35}
+.lock-fig .tp-z{fill:rgba(var(--up-rgb),.14)}
+.lock-fig .sl-z{fill:rgba(var(--down-rgb),.14)}
+.lock-fig .en{stroke:var(--gold);stroke-width:1.2;stroke-dasharray:3 3}
+.lock-fig .lb{font:600 10px var(--f-mono);fill:var(--muted)}
+.lock-fig .lb.tp{fill:var(--up)}.lock-fig .lb.sl{fill:var(--down)}.lock-fig .rr{font-weight:500;fill:var(--up)}
+@media (max-width:760px){
+  .lock-card{grid-template-columns:minmax(0,1fr);gap:20px;padding:18px}
+  .lock-fig{order:-1}
+  .lock-act .btn{width:100%}
+}
+
 .feed.tl{gap:16px}
 .tl-rail{position:absolute;left:79px;top:10px;bottom:10px;width:2px;border-radius:2px;background:rgba(var(--fg-rgb),.07)}
 .tl-fill{position:absolute;inset:0;border-radius:2px;background:linear-gradient(180deg,var(--gold-hi),var(--gold) 50%,var(--gold-lo));box-shadow:0 0 14px rgba(var(--acc-rgb),.6);transform-origin:50% 0;transform:scaleY(0)}
@@ -3219,16 +3247,61 @@ const btCtx = () => ({
   chartLib: () => window.LightweightCharts ? Promise.resolve() : loadAsset('/journal/vendor/lightweight-charts.js?v=5.3.0'),
   setWide: on => document.documentElement.classList.toggle('bt-wide', !!on)
 });
+// Backtesting belongs to the larger plan. In the smaller one the page says what it does and how to switch;
+// the module and the chart library are not loaded at all.
+const btLocked = () => !!(window.BlotterBackend && window.BlotterBackend.canBacktest === false);
+function btLockFig(){
+  const C = [50, 47, 49, 44, 41, 43, 39, 36, 38, 35, 33, 36, 34, 31, 33, 35, 38, 37, 41, 44, 42, 47, 51, 49, 54, 52, 56, 58];
+  const W = [1.6, 2.4, 1.1, 2.8, 1.9, 1.3, 2.2];
+  const E = 15, HIT = 24, ENTRY = 35, SL = 28, TP = 52;
+  const K = 5.6, y = v => (204 - (v - 27) * K).toFixed(1), x = i => 14 + i * 12;
+  let o = 52, k = '';
+  C.forEach((c, i) => {
+    const up = c >= o, hi = Math.max(o, c) + W[i % 7], lo = Math.min(o, c) - W[(i + 3) % 7];
+    const top = y(Math.max(o, c)), h = Math.max(1.5, Math.abs(o - c) * K).toFixed(1);
+    k += `<g class="${up ? 'u' : 'd'}${i > HIT ? ' after' : ''}"><line x1="${x(i)}" x2="${x(i)}" y1="${y(hi)}" y2="${y(lo)}"/><rect x="${x(i) - 3.5}" y="${top}" width="7" height="${h}" rx="1"/></g>`;
+    o = c;
+  });
+  const x0 = x(E) - 6, x1 = x(HIT) + 6;
+  return `<svg viewBox="0 0 360 214" role="img" aria-label="Beispiel: Long-Trade mit Stop und Ziel auf einem Kerzenchart, das Ziel wird erreicht">
+    <rect class="tp-z" x="${x0}" y="${y(TP)}" width="${x1 - x0}" height="${(y(ENTRY) - y(TP)).toFixed(1)}"/>
+    <rect class="sl-z" x="${x0}" y="${y(ENTRY)}" width="${x1 - x0}" height="${(y(SL) - y(ENTRY)).toFixed(1)}"/>
+    <line class="en" x1="${x0}" x2="${x1}" y1="${y(ENTRY)}" y2="${y(ENTRY)}"/>
+    ${k}
+    <text class="lb tp" x="${x0 + 6}" y="${(+y(TP) + 14).toFixed(1)}">TP <tspan class="rr">+2,4 R</tspan></text>
+    <text class="lb sl" x="${x1 - 6}" y="${(+y(SL) - 6).toFixed(1)}" text-anchor="end">SL</text>
+  </svg>`;
+}
+function btLockHtml(){
+  return `<div class="bt-lock">
+    <div class="page-head"><div class="grow"><h1>Backtesting</h1><p>Spiel den Markt Kerze für Kerze nach und teste dein Setup, bevor echtes Geld im Spiel ist.</p></div></div>
+    <section class="lock-card" aria-labelledby="lock-h">
+      <div class="lock-txt">
+        <h2 id="lock-h">Im Abo Journal + Backtesting</h2>
+        <p>Dein Abo ist das Journal. Mit Journal + Backtesting bekommst du zusätzlich:</p>
+        <ul class="lock-pts">
+          <li>Kerze für Kerze abspielen, von 1 Minute bis Monthly</li>
+          <li>Entry, Stop und Ziel setzen, jeder Trade in R</li>
+          <li>Win-Rate, Profit Factor und Equity-Kurve pro Session</li>
+          <li>Sechs Märkte mit deinen eigenen Kursdaten, privat in deinem Konto</li>
+        </ul>
+        <div class="lock-act"><a class="btn primary" href="/abo?plan=backtest">Auf Journal + Backtesting wechseln</a><small>14,99 € im Monat. Heute zahlst du nur die Differenz für die restlichen Tage.</small></div>
+      </div>
+      <figure class="lock-fig">${btLockFig()}</figure>
+    </section>
+  </div>`;
+}
 Views.backtest = {
-  prep(){ return window.BlotterBT ? Promise.resolve() : Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)]); },
+  prep(){ return window.BlotterBT || btLocked() ? Promise.resolve() : Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)]); },
   mount(el){
+    if (btLocked()) { el.innerHTML = btLockHtml(); return; }
     el.innerHTML = '<div id="bt-root" class="bt-root"><div class="page-head"><div class="grow"><h1>Backtesting</h1><p>Wird geladen…</p></div></div></div>';
     const root = $('#bt-root', el);
     Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)])
       .then(() => { if (S.view === 'backtest' && root.isConnected) window.BlotterBT.mount(root, btCtx()); })
       .catch(() => { if (root.isConnected) root.innerHTML = '<div class="page-head"><div class="grow"><h1>Backtesting</h1><p>Das Backtesting konnte nicht geladen werden. Prüfe deine Verbindung und lade die Seite neu.</p></div></div>'; });
   },
-  update(){ if (window.BlotterBT && $('#bt-root') && $('#bt-root').dataset.ready !== '0') window.BlotterBT.update(); }
+  update(){ if (!btLocked() && window.BlotterBT && $('#bt-root') && $('#bt-root').dataset.ready !== '0') window.BlotterBT.update(); }
 };
 
 const MI = {
@@ -3241,7 +3314,7 @@ const MODS = [
   {k: 'kalender', name: 'Kalender', desc: 'Alle Trades im Monatsüberblick mit TP, BE und SL.', locked: true},
   {k: 'learnings', name: 'Learnings', desc: 'Halte fest, was du aus Trades lernst, mit Text und Screenshots.'},
   {k: 'outlooks', name: 'Outlooks', desc: 'Plane deine Markterwartung vorab und bewerte sie danach.'},
-  {k: 'backtest', name: 'Backtesting', desc: 'Spiel den Markt Kerze für Kerze nach und teste dein Setup mit eigenen Kursdaten.'}
+  {k: 'backtest', name: 'Backtesting', desc: 'Spiel den Markt Kerze für Kerze nach und teste dein Setup mit eigenen Kursdaten.', lockDesc: 'Spiel den Markt Kerze für Kerze nach. Enthalten im Abo Journal + Backtesting.'}
 ];
 function skinPreview(id){
   const C = [[26, 2], [32, 6], [22, 12, 1], [38, 10], [28, 18, 1], [44, 16], [34, 24, 1], [50, 22]];
@@ -3253,7 +3326,7 @@ function skinGrid(sel){
 function modGrid(mods){
   return `<div class="mod-grid">${MODS.map(m => m.locked
     ? `<div class="mod-card locked" aria-checked="true"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.desc}</small><span class="tg">Immer dabei<span class="tgl"></span></span></div>`
-    : `<button type="button" class="mod-card" role="switch" aria-checked="${mods[m.k] !== false}" data-mod="${m.k}"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.desc}</small><span class="tg">Anzeigen<span class="tgl"></span></span></button>`).join('')}</div>`;
+    : `<button type="button" class="mod-card" role="switch" aria-checked="${mods[m.k] !== false}" data-mod="${m.k}"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.lockDesc && btLocked() ? m.lockDesc : m.desc}</small><span class="tg">Anzeigen<span class="tgl"></span></span></button>`).join('')}</div>`;
 }
 function acctEditor(list, p, fresh){
   return `<div class="acct-ed" data-acct-ed="${p}">

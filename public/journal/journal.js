@@ -2035,16 +2035,61 @@ const btCtx = () => ({
   chartLib: () => window.LightweightCharts ? Promise.resolve() : loadAsset('/journal/vendor/lightweight-charts.js?v=5.3.0'),
   setWide: on => document.documentElement.classList.toggle('bt-wide', !!on)
 });
+// Backtesting belongs to the larger plan. In the smaller one the page says what it does and how to switch;
+// the module and the chart library are not loaded at all.
+const btLocked = () => !!(window.BlotterBackend && window.BlotterBackend.canBacktest === false);
+function btLockFig(){
+  const C = [50, 47, 49, 44, 41, 43, 39, 36, 38, 35, 33, 36, 34, 31, 33, 35, 38, 37, 41, 44, 42, 47, 51, 49, 54, 52, 56, 58];
+  const W = [1.6, 2.4, 1.1, 2.8, 1.9, 1.3, 2.2];
+  const E = 15, HIT = 24, ENTRY = 35, SL = 28, TP = 52;
+  const K = 5.6, y = v => (204 - (v - 27) * K).toFixed(1), x = i => 14 + i * 12;
+  let o = 52, k = '';
+  C.forEach((c, i) => {
+    const up = c >= o, hi = Math.max(o, c) + W[i % 7], lo = Math.min(o, c) - W[(i + 3) % 7];
+    const top = y(Math.max(o, c)), h = Math.max(1.5, Math.abs(o - c) * K).toFixed(1);
+    k += `<g class="${up ? 'u' : 'd'}${i > HIT ? ' after' : ''}"><line x1="${x(i)}" x2="${x(i)}" y1="${y(hi)}" y2="${y(lo)}"/><rect x="${x(i) - 3.5}" y="${top}" width="7" height="${h}" rx="1"/></g>`;
+    o = c;
+  });
+  const x0 = x(E) - 6, x1 = x(HIT) + 6;
+  return `<svg viewBox="0 0 360 214" role="img" aria-label="Beispiel: Long-Trade mit Stop und Ziel auf einem Kerzenchart, das Ziel wird erreicht">
+    <rect class="tp-z" x="${x0}" y="${y(TP)}" width="${x1 - x0}" height="${(y(ENTRY) - y(TP)).toFixed(1)}"/>
+    <rect class="sl-z" x="${x0}" y="${y(ENTRY)}" width="${x1 - x0}" height="${(y(SL) - y(ENTRY)).toFixed(1)}"/>
+    <line class="en" x1="${x0}" x2="${x1}" y1="${y(ENTRY)}" y2="${y(ENTRY)}"/>
+    ${k}
+    <text class="lb tp" x="${x0 + 6}" y="${(+y(TP) + 14).toFixed(1)}">TP <tspan class="rr">+2,4 R</tspan></text>
+    <text class="lb sl" x="${x1 - 6}" y="${(+y(SL) - 6).toFixed(1)}" text-anchor="end">SL</text>
+  </svg>`;
+}
+function btLockHtml(){
+  return `<div class="bt-lock">
+    <div class="page-head"><div class="grow"><h1>Backtesting</h1><p>Spiel den Markt Kerze für Kerze nach und teste dein Setup, bevor echtes Geld im Spiel ist.</p></div></div>
+    <section class="lock-card" aria-labelledby="lock-h">
+      <div class="lock-txt">
+        <h2 id="lock-h">Im Abo Journal + Backtesting</h2>
+        <p>Dein Abo ist das Journal. Mit Journal + Backtesting bekommst du zusätzlich:</p>
+        <ul class="lock-pts">
+          <li>Kerze für Kerze abspielen, von 1 Minute bis Monthly</li>
+          <li>Entry, Stop und Ziel setzen, jeder Trade in R</li>
+          <li>Win-Rate, Profit Factor und Equity-Kurve pro Session</li>
+          <li>Sechs Märkte mit deinen eigenen Kursdaten, privat in deinem Konto</li>
+        </ul>
+        <div class="lock-act"><a class="btn primary" href="/abo?plan=backtest">Auf Journal + Backtesting wechseln</a><small>14,99 € im Monat. Heute zahlst du nur die Differenz für die restlichen Tage.</small></div>
+      </div>
+      <figure class="lock-fig">${btLockFig()}</figure>
+    </section>
+  </div>`;
+}
 Views.backtest = {
-  prep(){ return window.BlotterBT ? Promise.resolve() : Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)]); },
+  prep(){ return window.BlotterBT || btLocked() ? Promise.resolve() : Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)]); },
   mount(el){
+    if (btLocked()) { el.innerHTML = btLockHtml(); return; }
     el.innerHTML = '<div id="bt-root" class="bt-root"><div class="page-head"><div class="grow"><h1>Backtesting</h1><p>Wird geladen…</p></div></div></div>';
     const root = $('#bt-root', el);
     Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)])
       .then(() => { if (S.view === 'backtest' && root.isConnected) window.BlotterBT.mount(root, btCtx()); })
       .catch(() => { if (root.isConnected) root.innerHTML = '<div class="page-head"><div class="grow"><h1>Backtesting</h1><p>Das Backtesting konnte nicht geladen werden. Prüfe deine Verbindung und lade die Seite neu.</p></div></div>'; });
   },
-  update(){ if (window.BlotterBT && $('#bt-root') && $('#bt-root').dataset.ready !== '0') window.BlotterBT.update(); }
+  update(){ if (!btLocked() && window.BlotterBT && $('#bt-root') && $('#bt-root').dataset.ready !== '0') window.BlotterBT.update(); }
 };
 
 const MI = {
@@ -2057,7 +2102,7 @@ const MODS = [
   {k: 'kalender', name: 'Kalender', desc: 'Alle Trades im Monatsüberblick mit TP, BE und SL.', locked: true},
   {k: 'learnings', name: 'Learnings', desc: 'Halte fest, was du aus Trades lernst, mit Text und Screenshots.'},
   {k: 'outlooks', name: 'Outlooks', desc: 'Plane deine Markterwartung vorab und bewerte sie danach.'},
-  {k: 'backtest', name: 'Backtesting', desc: 'Spiel den Markt Kerze für Kerze nach und teste dein Setup mit eigenen Kursdaten.'}
+  {k: 'backtest', name: 'Backtesting', desc: 'Spiel den Markt Kerze für Kerze nach und teste dein Setup mit eigenen Kursdaten.', lockDesc: 'Spiel den Markt Kerze für Kerze nach. Enthalten im Abo Journal + Backtesting.'}
 ];
 function skinPreview(id){
   const C = [[26, 2], [32, 6], [22, 12, 1], [38, 10], [28, 18, 1], [44, 16], [34, 24, 1], [50, 22]];
@@ -2069,7 +2114,7 @@ function skinGrid(sel){
 function modGrid(mods){
   return `<div class="mod-grid">${MODS.map(m => m.locked
     ? `<div class="mod-card locked" aria-checked="true"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.desc}</small><span class="tg">Immer dabei<span class="tgl"></span></span></div>`
-    : `<button type="button" class="mod-card" role="switch" aria-checked="${mods[m.k] !== false}" data-mod="${m.k}"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.desc}</small><span class="tg">Anzeigen<span class="tgl"></span></span></button>`).join('')}</div>`;
+    : `<button type="button" class="mod-card" role="switch" aria-checked="${mods[m.k] !== false}" data-mod="${m.k}"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.lockDesc && btLocked() ? m.lockDesc : m.desc}</small><span class="tg">Anzeigen<span class="tgl"></span></span></button>`).join('')}</div>`;
 }
 function acctEditor(list, p, fresh){
   return `<div class="acct-ed" data-acct-ed="${p}">
@@ -2430,7 +2475,7 @@ function openSettings(){
       <section class="set-sec"><h3>Farbschema</h3>${skinGrid(draft.theme)}</section>
       <section class="set-sec"><h3>Seiten</h3>${modGrid(draft.modules)}</section>
       <section class="set-sec"><h3>Konten</h3>${acctEditor(draft.accounts, 'set')}</section>
-      ${window.BlotterBackend ? `<section class="set-sec"><h3>${window.BlotterBackend.friend ? 'Konto' : 'Konto &amp; Abo'}</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p>${window.BlotterBackend.friend ? '<p class="acct-mail acct-friend">Freundeszugang: Blotter ist für dich kostenlos, ohne Abo.</p>' : ''}<div class="acct-btns">${window.BlotterBackend.friend ? '' : '<button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button>'}<button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}
+      ${window.BlotterBackend ? `<section class="set-sec"><h3>${window.BlotterBackend.friend ? 'Konto' : 'Konto &amp; Abo'}</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p>${window.BlotterBackend.friend ? '<p class="acct-mail acct-friend">Freundeszugang: Blotter ist für dich kostenlos, ohne Abo, Backtesting inklusive.</p>' : `<p class="acct-mail acct-plan">Dein Abo: <b>${window.BlotterBackend.plan === 'backtest' ? 'Journal + Backtesting' : 'Journal'}</b> (${window.BlotterBackend.plan === 'backtest' ? '14,99' : '7,99'} € im Monat)</p>`}<div class="acct-btns">${window.BlotterBackend.friend ? '' : `<a class="btn" href="/abo${window.BlotterBackend.plan === 'backtest' ? '' : '?plan=backtest'}">${window.BlotterBackend.plan === 'backtest' ? 'Abo wechseln' : 'Backtesting dazunehmen'}</a><button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button>`}<button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}
       <section class="set-sec"><h3>Hilfe</h3><p class="set-help">Die kurze Tour zeigt dir noch einmal alle Bereiche deines Journals.</p><div><button type="button" class="btn sm" data-action="set-tour">Tour starten</button></div></section>
       <p class="form-err" id="form-err" role="alert" hidden></p>
     </div>

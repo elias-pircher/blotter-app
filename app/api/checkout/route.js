@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { stripe, isActive } from '@/lib/stripe';
 import { siteUrl } from '@/lib/env';
+import { isPlan, priceIdFor } from '@/lib/plans';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,13 +15,15 @@ export async function POST(req) {
   const body = await req.json().catch(() => ({}));
   if (body.consent !== true) return NextResponse.json({ error: 'consent_required' }, { status: 400 });
 
-  const priceId = process.env.STRIPE_PRICE_ID;
+  const plan = isPlan(body.plan) ? body.plan : 'journal';
+  const priceId = priceIdFor(plan);
   if (!priceId) return NextResponse.json({ error: 'not_configured' }, { status: 500 });
 
   const base = siteUrl(req);
   const admin = createAdminClient();
   const { data: sub } = await admin.from('subscriptions').select('stripe_customer_id,status').eq('user_id', user.id).maybeSingle();
-  if (isActive(sub)) return NextResponse.json({ url: base + '/app' });
+  // already subscribed: a different plan is a switch, which the subscription page handles
+  if (isActive(sub)) return NextResponse.json({ url: base + '/abo?plan=' + plan });
 
   let customerId = sub?.stripe_customer_id;
   if (!customerId) {
@@ -45,10 +48,11 @@ export async function POST(req) {
     client_reference_id: user.id,
     line_items: [{ price: priceId, quantity: 1 }],
     subscription_data: { metadata: { user_id: user.id } },
+    metadata: { plan },
     allow_promotion_codes: true,
     locale: 'de',
     success_url: base + '/abo/danke?session_id={CHECKOUT_SESSION_ID}',
-    cancel_url: base + '/abo?abgebrochen=1',
+    cancel_url: base + '/abo?abgebrochen=1&plan=' + plan,
     ...tax,
   });
   return NextResponse.json({ url: session.url });

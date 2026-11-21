@@ -11,8 +11,15 @@ create table if not exists public.subscriptions (
   current_period_end timestamptz,
   cancel_at_period_end boolean not null default false,
   consent_at timestamptz,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- journal = 7,99 €, backtest = Journal + Backtesting 14,99 €, freund = free friend account (everything)
+  plan text not null default 'journal'
 );
+alter table public.subscriptions add column if not exists plan text not null default 'journal';
+do $$ begin
+  alter table public.subscriptions add constraint subscriptions_plan_check check (plan in ('journal', 'backtest', 'freund'));
+exception when duplicate_object then null; end $$;
+update public.subscriptions set plan = 'freund' where price_id = 'freund' and plan <> 'freund';
 alter table public.subscriptions enable row level security;
 drop policy if exists "subs: eigenes Abo lesen" on public.subscriptions;
 create policy "subs: eigenes Abo lesen" on public.subscriptions
@@ -32,6 +39,18 @@ revoke all on function private.has_active_sub() from public;
 revoke all on function private.has_active_sub() from anon;
 grant execute on function private.has_active_sub() to authenticated;
 
+-- Backtesting is part of "Journal + Backtesting" (and of friend accounts)
+create or replace function private.has_backtest_plan() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.subscriptions s
+    where s.user_id = auth.uid() and s.status in ('active', 'trialing', 'past_due') and s.plan in ('backtest', 'freund')
+  );
+$$;
+revoke all on function private.has_backtest_plan() from public;
+revoke all on function private.has_backtest_plan() from anon;
+grant execute on function private.has_backtest_plan() to authenticated;
+
 -- 2) Journal-Einträge: Trades, Learnings, Outlooks und Einstellungen, getrennt pro Kunde
 create table if not exists public.entries (
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -48,10 +67,11 @@ drop policy if exists "entries: eigene ändern" on public.entries;
 drop policy if exists "entries: eigene löschen" on public.entries;
 create policy "entries: eigene lesen" on public.entries
   for select to authenticated using (user_id = (select auth.uid()));
+-- backtesting sessions ('backtests') can only be written with the backtesting plan; reading and deleting stay open
 create policy "entries: eigene anlegen" on public.entries
-  for insert to authenticated with check (user_id = (select auth.uid()) and (select private.has_active_sub()));
+  for insert to authenticated with check (user_id = (select auth.uid()) and (select private.has_active_sub()) and (kind <> 'backtests' or (select private.has_backtest_plan())));
 create policy "entries: eigene ändern" on public.entries
-  for update to authenticated using (user_id = (select auth.uid()) and (select private.has_active_sub())) with check (user_id = (select auth.uid()));
+  for update to authenticated using (user_id = (select auth.uid()) and (select private.has_active_sub())) with check (user_id = (select auth.uid()) and (kind <> 'backtests' or (select private.has_backtest_plan())));
 create policy "entries: eigene löschen" on public.entries
   for delete to authenticated using (user_id = (select auth.uid()) and (select private.has_active_sub()));
 
@@ -86,10 +106,10 @@ drop policy if exists "marketdata: eigene löschen" on storage.objects;
 create policy "marketdata: eigene lesen" on storage.objects
   for select to authenticated using (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text);
 create policy "marketdata: eigene hochladen" on storage.objects
-  for insert to authenticated with check (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text and (select private.has_active_sub()));
+  for insert to authenticated with check (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text and (select private.has_backtest_plan()));
 create policy "marketdata: eigene ersetzen" on storage.objects
   for update to authenticated
-  using (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text and (select private.has_active_sub()))
+  using (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text and (select private.has_backtest_plan()))
   with check (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text);
 create policy "marketdata: eigene löschen" on storage.objects
   for delete to authenticated using (bucket_id = 'marketdata' and (storage.foldername(name))[1] = (select auth.uid())::text);

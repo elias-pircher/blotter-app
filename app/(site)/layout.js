@@ -4,7 +4,7 @@ export const viewport = { width: 'device-width', initialScale: 1, viewportFit: '
 
 export const metadata = {
   title: 'Blotter – Das Trading Journal',
-  description: 'Trading Journal mit Kalender, TP/BE/SL, Screenshots, Learnings, Outlooks und Backtesting. 7,99 € im Monat, monatlich kündbar.',
+  description: 'Trading Journal mit Kalender, TP/BE/SL, Screenshots, Learnings und Outlooks für 7,99 € im Monat, mit Backtesting für 14,99 €. Monatlich kündbar.',
 };
 
 export default function SiteLayout({ children }) {

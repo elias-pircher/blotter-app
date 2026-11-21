@@ -1,18 +1,21 @@
 'use client';
 import { useState } from 'react';
+import { PLANS, PLAN_IDS } from '@/lib/plans';
 
-export default function CheckoutButton() {
+export default function CheckoutButton({ initial = 'journal' }) {
+  const [plan, setPlan] = useState(PLANS[initial] ? initial : 'journal');
   const [terms, setTerms] = useState(false);
   const [waiver, setWaiver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const p = PLANS[plan];
 
   async function go() {
     setErr('');
     if (!terms || !waiver) { setErr('Bitte bestätige beide Punkte, um fortzufahren.'); return; }
     setBusy(true);
     try {
-      const r = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent: true }) });
+      const r = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consent: true, plan }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.url) throw new Error(j.error || 'checkout');
       window.location.href = j.url;
@@ -24,11 +27,26 @@ export default function CheckoutButton() {
 
   return (
     <>
+      <fieldset className="plans">
+        <legend className="sr">Abo</legend>
+        {PLAN_IDS.map((id) => {
+          const x = PLANS[id];
+          return (
+            <label key={id} className="plan">
+              <input type="radio" name="plan" value={id} checked={plan === id} onChange={() => setPlan(id)} />
+              <span className="rd" aria-hidden="true" />
+              <b>{x.name}</b>
+              <span className="pr">{x.price}<small> / Monat</small></span>
+              <span className="pd">{x.short}</span>
+            </label>
+          );
+        })}
+      </fieldset>
       <label className="chk"><input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} /><span>Ich akzeptiere die <a href="/agb" target="_blank">AGB</a> und habe die <a href="/datenschutz" target="_blank">Datenschutzerklärung</a> gelesen.</span></label>
       <label className="chk"><input type="checkbox" checked={waiver} onChange={(e) => setWaiver(e.target.checked)} /><span>Ich verlange ausdrücklich, dass Blotter sofort mit der Leistung beginnt, und nehme zur Kenntnis, dass ich dadurch mein Rücktrittsrecht verliere.</span></label>
       {err && <div className="msg err" role="alert">{err}</div>}
-      <button type="button" className="btn primary block" onClick={go} disabled={busy}>{busy ? 'Zahlungsseite wird geöffnet…' : 'Weiter zur Zahlung · 7,99 € / Monat'}</button>
-      <p className="muted" style={{ fontSize: 13 }}>Die Zahlung läuft sicher über Stripe. Monatlich kündbar, keine Mindestlaufzeit.</p>
+      <button type="button" className="btn primary block" onClick={go} disabled={busy}>{busy ? 'Zahlungsseite wird geöffnet…' : `Weiter zur Zahlung · ${p.price} / Monat`}</button>
+      <p className="muted" style={{ fontSize: 13 }}>Die Zahlung läuft sicher über Stripe. Monatlich kündbar, keine Mindestlaufzeit. Du kannst jederzeit zwischen den Abos wechseln.</p>
     </>
   );
 }
