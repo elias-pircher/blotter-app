@@ -155,6 +155,13 @@ export function makeBackend(sb, uid, email, opts = {}) {
       if (!r.ok || !j.url) throw { code: r.status === 401 ? 'not_logged_in' : 'unavailable' };
       window.location.href = j.url;
     },
+    // a support request from the help page; resolves with {id, confirm}
+    async support(payload) {
+      const r = await fetch('/api/support', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw { code: j.error || (r.status === 401 ? 'not_logged_in' : 'unavailable') };
+      return j;
+    },
     async logout() {
       await sb.auth.signOut();
       window.location.href = '/';

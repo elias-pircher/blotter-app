@@ -133,3 +133,20 @@ create index if not exists mail_log_rid_idx on public.mail_log (rid);
 create index if not exists mail_log_created_idx on public.mail_log (created_at);
 alter table public.mail_log enable row level security;
 revoke all on table public.mail_log from anon, authenticated;
+
+-- Support requests from the help page in the journal. Only the server (service key) reads and writes them.
+create table if not exists public.support_tickets (
+  id bigint generated always as identity (start with 1001) primary key,
+  created_at timestamptz not null default now(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  email text not null,
+  topic text not null check (topic in ('nutzung', 'fehler', 'abo', 'konto', 'idee', 'sonstiges')),
+  subject text not null check (char_length(subject) between 3 and 140),
+  message text not null check (char_length(message) between 10 and 5000),
+  meta jsonb,
+  mailed boolean not null default false,
+  status text not null default 'offen' check (status in ('offen', 'erledigt'))
+);
+create index if not exists support_tickets_user_idx on public.support_tickets (user_id, created_at desc);
+alter table public.support_tickets enable row level security;
+revoke all on table public.support_tickets from anon, authenticated;

@@ -1125,3 +1125,64 @@ html.vt #view{pointer-events:none}
   .trial-pill .tp-n{display:none}
 }
 @media (max-width:380px){.trial-pill .tp-l{display:none}}
+@media (max-width:420px){
+  .topbar-in:has(.trial-pill:not([hidden])) .mark{font-size:17px}
+  .top-right:has(.trial-pill:not([hidden])){gap:6px}
+  .top-right:has(.trial-pill:not([hidden])) .btn.icon{width:34px}
+}
+/* help & support (#hilfe) */
+.help-btn{color:var(--muted)}
+.help-btn:hover{color:var(--ink)}
+.foot-help{color:var(--muted);text-decoration:none;font-weight:600}
+.foot-help:hover{color:var(--ink)}
+.help .page-head p{margin:8px 0 0;color:var(--muted);max-width:60ch}
+.help .page-head .btn svg{margin-right:2px}
+.help-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,420px);gap:28px;align-items:start;margin-top:10px}
+.hf-list{display:flex;flex-direction:column;gap:26px;min-width:0}
+.hf-group{display:flex;flex-direction:column;gap:8px}
+.hf-group .sec{margin:0 0 4px}
+.hf-qa{background:var(--card);border:1px solid var(--line);border-radius:14px;transition:border-color .2s}
+.hf-qa:hover{border-color:var(--line-strong)}
+.hf-qa[open]{border-color:var(--gold-line)}
+.hf-qa summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:15px 16px;font-weight:600;color:var(--ink);font-size:15px;line-height:1.4;border-radius:14px}
+.hf-qa summary::-webkit-details-marker{display:none}
+.hf-qa summary:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.hf-chev{margin-left:auto;flex:none;display:grid;place-items:center;color:var(--muted);transition:transform .25s var(--ease),color .2s}
+.hf-qa[open] .hf-chev{transform:rotate(90deg);color:var(--gold)}
+.hf-qa p{margin:0;padding:0 16px 16px;color:var(--ink-2);font-size:14.5px;line-height:1.6;max-width:70ch}
+.sup-card{position:sticky;top:96px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 18px 50px rgba(0,0,0,calc(.28 * var(--sh)));scroll-margin-top:96px}
+.sup-form{display:flex;flex-direction:column;gap:16px}
+.sup-head{display:flex;gap:12px;align-items:flex-start}
+.sup-ic{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:var(--gold);background:color-mix(in srgb,var(--gold) 13%,transparent);border:1px solid var(--gold-line)}
+.sup-card h2{margin:0 0 4px;font-size:18px;font-weight:700;line-height:1.3;color:var(--ink)}
+.sup-head p,.sup-done p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55;overflow-wrap:anywhere}
+.sup-head b,.sup-done b{color:var(--ink);font-weight:600}
+.sup-topics .chip[aria-checked="true"]{background:var(--gold-grad);color:var(--on-gold);border-color:transparent;font-weight:600}
+.sup-card textarea.inp{min-height:140px}
+.sup-meta{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--muted);line-height:1.45;cursor:pointer}
+.sup-meta input{flex:none;width:16px;height:16px;margin:2px 0 0;accent-color:var(--gold)}
+.sup-foot .btn{width:100%;height:46px}
+.sup-foot .btn svg{margin-right:4px}
+.sup-foot .btn:disabled{opacity:.6;cursor:progress}
+.sup-done{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:4px 0}
+.sup-ok{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--gold-grad);color:var(--on-gold);box-shadow:0 8px 26px rgba(var(--acc-rgb),.3)}
+.sup-done h2{margin:4px 0 0}
+@media (prefers-reduced-motion:no-preference){.sup-ok{animation:sup-pop .5s var(--ease) both}}
+@keyframes sup-pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+@media (max-width:1000px){
+  .help-grid{grid-template-columns:minmax(0,1fr)}
+  .sup-card{position:static}
+}
+@media (max-width:600px){
+  .sup-card{padding:18px}
+  .hf-qa summary{padding:14px}
+  .hf-qa p{padding:0 14px 14px}
+}
+/* room in the top bar for ? (and the trial): the sync state shows as its dot only where space is short */
+@media (max-width:520px){
+  #status-t{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}
+@media (max-width:1180px){
+  .topbar-in:has(.trial-pill:not([hidden])) .brand .sub{display:none}
+  .top-right:has(.trial-pill:not([hidden])) #status-t{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}

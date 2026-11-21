@@ -13,6 +13,7 @@ Das Blotter Trading Journal als eigene Web-App mit Login, getrennten Kundendaten
 | `/abo` | Abo abschließen (AGB- und Rücktrittsrecht-Bestätigung) → Stripe Checkout |
 | `/abo/danke` | Bestätigt die Zahlung direkt bei Stripe und öffnet das Journal |
 | `/app` | Das Journal. Nur mit aktivem Abo. Neue Kunden starten mit dem Einrichtungs-Assistenten |
+| `/app#hilfe` | Hilfe im Journal: Antworten auf häufige Fragen und eine Support-Anfrage (gespeichert in `support_tickets`, per E-Mail an `SUPPORT_EMAIL`) |
 | `/api/stripe/webhook` | Stripe meldet hier Abschluss, Verlängerung und Kündigung |
 | `/impressum`, `/datenschutz`, `/agb` | **Entwürfe mit Platzhaltern**, vor dem Start ausfüllen und prüfen lassen |
 
@@ -56,6 +57,7 @@ Jeder Kunde sieht nur seine eigenen Daten. Das erzwingt die Datenbank selbst (Ro
 | `STRIPE_PRICE_ID` | `price_…` (Journal, 7,99 €) | nein |
 | `STRIPE_PRICE_ID_BACKTEST` | `price_…` (Journal + Backtesting, 14,99 €) | nein |
 | `STRIPE_AUTOMATIC_TAX` | `false` (später `true` mit Stripe Tax) | nein |
+| `SUPPORT_EMAIL` | Postfach, an das Support-Anfragen gehen (Antworten gehen direkt an den Kunden). Ohne den Eintrag werden Anfragen nur in `support_tickets` gespeichert | nein |
 
 3. **Deploy**.
 

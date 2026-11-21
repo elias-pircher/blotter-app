@@ -17,6 +17,17 @@ _st = '<span class="status" id="status">'
 if markup.count(_st) != 1:
     sys.exit('status pill not found')
 markup = markup.replace(_st, '<a class="trial-pill" id="trial-pill" href="/abo" hidden><span class="tp-l">Test</span><span class="tp-v"></span></a>\n      ' + _st)
+
+# ---- the way to the help page: a ? in the top bar, a link in the footer, the key in the shortcut list
+def mrep(old, new):
+    global markup
+    if markup.count(old) != 1:
+        sys.exit('markup: expected 1, found %d: %r' % (markup.count(old), old[:80]))
+    markup = markup.replace(old, new)
+mrep('<button type="button" class="btn icon ghost gear"',
+     '<a class="btn icon ghost help-btn" href="#hilfe" aria-label="Hilfe und Support" title="Hilfe &amp; Support"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><path d="M12 17.2h.01"/></svg></a>\n      <button type="button" class="btn icon ghost gear"')
+mrep('Blotter</span>\n    <span class="keys">', 'Blotter</span>\n    <a class="foot-help" href="#hilfe">Hilfe &amp; Support</a>\n    <span class="keys">')
+mrep('<span id="keys-pages">', '<span><kbd>?</kbd> Hilfe</span><span id="keys-pages">')
 js = s[main_start + len('<script>'):s.rindex('</script>')]
 
 def rep(text, old, new, count=1):
@@ -27,6 +38,23 @@ def rep(text, old, new, count=1):
 
 # ---- backend instead of claude.ai capabilities
 js = rep(js, "    const c = window.claude;\n", "    const c = window.BlotterBackend || window.claude;\n")
+
+# ---- help & support page (#hilfe): answers to common questions and a support request by e-mail
+HELP_JS = open(os.path.join(HERE, 'journal-help.js'), encoding='utf-8').read()
+js = rep(js, "Views.backtest = {", HELP_JS + "\nViews.backtest = {")
+js = rep(js, "const PL_NAMES = {kalender: 'Kalender', learnings: 'Learnings', outlooks: 'Outlooks', backtest: 'Backtesting'};",
+         "const PL_NAMES = {kalender: 'Kalender', learnings: 'Learnings', outlooks: 'Outlooks', backtest: 'Backtesting', hilfe: 'Hilfe'};")
+# the help page has no tab: the tab marker steps aside, a swipe does not page from there, N does not open a form
+js = rep(js, "  if (!ind || !a || !a.offsetWidth) return;", "  if (!ind) return;\n  if (!a || !a.offsetWidth) { ind.style.opacity = '0'; return; }")
+js = rep(js, "    if (e.pointerType !== 'touch' || !e.isPrimary || pagesOn().length < 2) return;",
+         "    if (e.pointerType !== 'touch' || !e.isPrimary || pagesOn().length < 2 || !pagesOn().includes(S.view)) return;")
+js = rep(js, "  else if (k === 'n' && S.view !== 'backtest') openForm",
+         "  else if (e.key === '?') location.hash = 'hilfe';\n  else if (k === 'n' && S.view !== 'backtest' && S.view !== 'hilfe') openForm")
+js = rep(js, '<div><button type="button" class="btn sm" data-action="set-tour">Tour starten</button></div>',
+         '<div class="acct-btns"><button type="button" class="btn sm" data-action="set-help">Hilfe &amp; Support</button><button type="button" class="btn sm" data-action="set-tour">Tour starten</button></div>')
+js = rep(js, "        else if (act === 'set-tour') {",
+         "        else if (act === 'set-help') { if (Modal.cur) Modal.cur.dirty = false; Modal.close(); setTimeout(() => { location.hash = 'hilfe'; }, 200); }\n        else if (act === 'set-tour') {")
+
 js = rep(js, "    return '/_blob/' + ref;\n", "    return window.BlotterBackend ? window.BlotterBackend.imgSrc(ref) : '/_blob/' + ref;\n")
 js = rep(js, "  if (c === 'revoked') return 'Der Zugriff auf dieses Journal wurde entzogen.';\n",
          "  if (c === 'revoked') return 'Der Zugriff auf dieses Journal wurde entzogen.';\n"
@@ -66,7 +94,12 @@ css = css + """
   .trial-pill .tp-n{display:none}
 }
 @media (max-width:380px){.trial-pill .tp-l{display:none}}
-"""
+@media (max-width:420px){
+  .topbar-in:has(.trial-pill:not([hidden])) .mark{font-size:17px}
+  .top-right:has(.trial-pill:not([hidden])){gap:6px}
+  .top-right:has(.trial-pill:not([hidden])) .btn.icon{width:34px}
+}
+""" + open(os.path.join(HERE, 'journal-help.css'), encoding='utf-8').read()
 
 RESET = (":root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}\n"
          "html,body{margin:0}body{font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}\n")
