@@ -51,9 +51,12 @@ const MARKETS = [
 const MK = Object.fromEntries(MARKETS.map(m => [m.id, m]));
 const HIST_URL = m => 'https://www.histdata.com/download-free-forex-historical-data/?/ascii/1-minute-bar-quotes/' + m.hist;
 const TFS = [
-  {id: '1m', min: 1, label: '1m'}, {id: '5m', min: 5, label: '5m'}, {id: '15m', min: 15, label: '15m'},
-  {id: '30m', min: 30, label: '30m'}, {id: '1h', min: 60, label: '1h'}, {id: '4h', min: 240, label: '4h'}, {id: '1D', min: 1440, label: 'D'},
+  {id: '1m', min: 1, label: '1m', name: '1 Minute'}, {id: '3m', min: 3, label: '3m', name: '3 Minuten'}, {id: '5m', min: 5, label: '5m', name: '5 Minuten'},
+  {id: '15m', min: 15, label: '15m', name: '15 Minuten'}, {id: '30m', min: 30, label: '30m', name: '30 Minuten'}, {id: '1h', min: 60, label: '1h', name: '1 Stunde'},
+  {id: '4h', min: 240, label: '4h', name: '4 Stunden'}, {id: '1D', min: 1440, label: 'D', name: 'Täglich'},
+  {id: '1W', min: 10080, label: 'W', name: 'Wöchentlich'}, {id: '1M', min: 43200, label: 'M', name: 'Monatlich'},
 ];
+const WEEK = 7 * DAY, MONTH_MIN = 43200;
 const TF = Object.fromEntries(TFS.map(t => [t.id, t]));
 const LOOKBACK_BARS = 1200;
 
@@ -452,15 +455,28 @@ async function firstMinuteFrom(market, ms) {
 }
 
 /* ---------------------------------------------------------------- timeframes
-   bars up to 1h start on the UTC clock; 4h and daily bars start at 17:00 New York (the FX/CFD trading day) */
+   bars up to 1h start on the UTC clock; 4h, daily, weekly and monthly bars follow the FX/CFD trading day,
+   which starts at 17:00 New York: the week opens Sunday 17:00, the month with its first trading day */
+const nyShift = ms => nyOffset(ms) + 7 * HOUR;      // shifted so 17:00 New York becomes 00:00 of the trading day
 function barStart(ms, tfMin) {
   if (tfMin < 240) return Math.floor(ms / (tfMin * MIN)) * tfMin * MIN;
-  const off = nyOffset(ms) + 7 * HOUR;       // shift so 17:00 New York becomes 00:00
+  const off = nyShift(ms), t = ms + off;
+  // weeks and months: one fixed start per bar, taken at the bar's own start (daylight saving can change within it)
+  if (tfMin === MONTH_MIN) { const d = new Date(t), m0 = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1); return m0 - nyShift(m0); }
+  if (tfMin === 10080) { const w0 = Math.floor((t - 4 * DAY) / WEEK) * WEEK + 4 * DAY; return w0 - nyShift(w0); }   // 5 Jan 1970 was a Monday
+  if (tfMin === 1440) {
+    // prints after the Friday close count to Friday, anything before the Sunday open to Monday: no weekend candles
+    let d = Math.floor(t / DAY); const wd = (d + 4) % 7;   // 1 Jan 1970 was a Thursday; 0 = Sunday, 6 = Saturday
+    if (wd === 6) d -= 1; else if (wd === 0) d += 1;
+    return d * DAY - off;
+  }
   const span = tfMin * MIN;
-  return Math.floor((ms + off) / span) * span - off;
+  return Math.floor(t / span) * span - off;
 }
+// the trading date of a daily, weekly or monthly bar (00:00 of that day, as the chart shows it)
+const tradingDay = bs => Math.round((bs + nyShift(bs)) / DAY) * DAY;
 function aggregate(src, tfMin, untilMs) {
-  const out = emptyBars(Math.ceil(src.n / Math.max(1, tfMin / 60)) + 4 + Math.ceil(src.n / tfMin));
+  const out = emptyBars(src.n + 1);    // never more bars than source bars (a guess by trading hours fell short on weekly and daily bars)
   let k = -1, cur = -Infinity;
   for (let i = 0; i < src.n; i++) {
     const t = src.t[i];
@@ -765,7 +781,7 @@ function openNew() {
     <label class="bt-fl">Markt<select class="inp" id="bt-n-mk">${have.map(m => `<option value="${m.id}">${esc(m.name)} (${esc(m.tag)})</option>`).join('')}</select></label>
     <div class="bt-2">
       <label class="bt-fl">Start (deine Zeit)<input class="inp" type="datetime-local" id="bt-n-start" value="${toLocalInput(defStart(m0.id) + 8 * HOUR)}"></label>
-      <label class="bt-fl">Zeiteinheit<select class="inp" id="bt-n-tf">${TFS.map(t => `<option value="${t.id}"${t.id === '5m' ? ' selected' : ''}>${t.id === '1D' ? 'Täglich' : t.label}</option>`).join('')}</select></label>
+      <label class="bt-fl">Zeiteinheit<select class="inp" id="bt-n-tf">${TFS.map(t => `<option value="${t.id}"${t.id === '5m' ? ' selected' : ''}>${t.min >= 1440 ? t.name : t.label}</option>`).join('')}</select></label>
     </div>
     <label class="bt-fl">Name (optional)<input class="inp" id="bt-n-name" maxlength="60" placeholder="z. B. London Sweep, Q1"></label>
     <p class="bt-note" id="bt-n-span"></p>
@@ -828,7 +844,7 @@ class Workspace {
         <button type="button" class="btn sm ghost" data-ws="back" aria-label="Zurück zu den Sessions">‹ Sessions</button>
         <div class="bt-title"><b>${esc(this.s.name)}</b><span><span class="bt-mk-tag">${esc(this.m.tag)}</span><span id="bt-clock">–</span></span></div>
         <span class="spacer"></span>
-        <div class="seg bt-tfs" role="radiogroup" aria-label="Zeiteinheit">${TFS.map(t => `<button type="button" role="radio" aria-checked="${t.id === this.tf}" data-tf="${t.id}">${t.label}</button>`).join('')}</div>
+        <div class="seg bt-tfs" role="radiogroup" aria-label="Zeiteinheit">${TFS.map(t => `<button type="button" role="radio" aria-checked="${t.id === this.tf}" data-tf="${t.id}" title="${t.name}" aria-label="${t.name}">${t.label}</button>`).join('')}</div>
       </div>
       <div class="bt-main">
         <div class="bt-chartbox">
@@ -876,7 +892,7 @@ class Workspace {
   async loadAround(cursor) {
     const tfm = TF[this.tf].min;
     const back = tfm < 60 ? Math.max(LOOKBACK_BARS * tfm * MIN, 2 * DAY) : 2 * DAY + 4 * DAY;
-    const from = cursor - back, to = monthStart(nextMonth(nextMonth(monthKey(cursor))));
+    const from = Math.min(cursor - back, barStart(cursor, tfm)), to = monthStart(nextMonth(nextMonth(monthKey(cursor))));
     this.min = await minutes(this.s.market, from, to);
     this.i = lowerBound(this.min.t, this.min.n, cursor + 1) - 1;
     if (this.i < 0 && this.min.n) this.i = 0;
@@ -912,7 +928,7 @@ class Workspace {
       layout: {background: {type: 'solid', color: 'transparent'}, textColor: this.col.mute, fontFamily: font, fontSize: 11, attributionLogo: true},
       grid: {vertLines: {color: this.col.grid}, horzLines: {color: this.col.grid}},
       rightPriceScale: {borderColor: this.col.grid, scaleMargins: {top: 0.12, bottom: 0.1}},
-      timeScale: {borderColor: this.col.grid, timeVisible: true, secondsVisible: false, rightOffset: 12, barSpacing: 8, shiftVisibleRangeOnNewBar: true},
+      timeScale: {borderColor: this.col.grid, timeVisible: TF[this.tf].min < 1440, secondsVisible: false, rightOffset: 12, barSpacing: 8, shiftVisibleRangeOnNewBar: true},
       crosshair: {mode: 0, vertLine: {color: this.col.mute, labelBackgroundColor: '#1b2a52'}, horzLine: {color: this.col.mute, labelBackgroundColor: '#1b2a52'}},
       localization: {locale: LOC, priceFormatter: p => nf(p, this.digits)},
     });
@@ -929,6 +945,7 @@ class Workspace {
     this.drag = new LineDrag(this);
   }
   ct(ms) { return Math.floor((ms + localOffset(ms)) / 1000); }      // chart time: local clock shown as UTC
+  bt(bs) { return TF[this.tf].min >= 1440 ? tradingDay(bs) / 1000 : this.ct(bs); }   // chart time of a bar
   barOf(ms) { return barStart(ms, TF[this.tf].min); }
   redraw(fit) {
     const tfm = TF[this.tf].min, now = this.now;
@@ -948,7 +965,7 @@ class Workspace {
     const data = [];
     let lastT = -Infinity;
     for (let i = 0; i < bars.n; i++) {
-      const t = this.ct(bars.t[i]);
+      const t = this.bt(bars.t[i]);
       if (t <= lastT) continue;
       lastT = t;
       data.push({time: t, open: bars.o[i], high: bars.h[i], low: bars.l[i], close: bars.c[i]});
@@ -960,8 +977,8 @@ class Workspace {
     this.refreshLines();
     this.clock();
   }
-  // reveal one more minute; returns false at the end of the data
-  async tick() {
+  // reveal one more minute; returns false at the end of the data. quiet: the chart catches up in syncBar()
+  async tick(quiet) {
     if (this.i + 1 >= this.min.n) {
       const n = await this.more();
       if (!n) return false;
@@ -975,25 +992,33 @@ class Workspace {
       if (this.min.l[this.i] < v.l[k]) v.l[k] = this.min.l[this.i];
       v.c[k] = this.min.c[this.i];
     } else {
+      if (this.pend) this.syncBar();
       if (v.t.length <= v.n) { const g = emptyBars(v.n * 2 + 64); for (const f of ['t', 'o', 'h', 'l', 'c']) g[f].set(v[f].subarray(0, v.n)); g.n = v.n; this.view = g; }
       const w = this.view, j = w.n++;
       w.t[j] = bs; w.o[j] = this.min.o[this.i]; w.h[j] = this.min.h[this.i]; w.l[j] = this.min.l[this.i]; w.c[j] = this.min.c[this.i];
     }
-    const w = this.view, j = w.n - 1, ctime = this.ct(w.t[j]);
-    if (ctime >= this.lastBarT) { this.series.update({time: ctime, open: w.o[j], high: w.h[j], low: w.l[j], close: w.c[j]}); this.lastBarT = ctime; }
+    if (quiet) this.pend = true; else this.syncBar();
     this.fill();
     return true;
+  }
+  // bring the chart's last bar up to date
+  syncBar() {
+    this.pend = false;
+    const w = this.view, j = w.n - 1; if (j < 0) return;
+    const ctime = this.bt(w.t[j]);
+    if (ctime >= this.lastBarT) { this.series.update({time: ctime, open: w.o[j], high: w.h[j], low: w.l[j], close: w.c[j]}); this.lastBarT = ctime; }
   }
   // reveals minutes until the bar in progress is complete (or, if it just completed, the whole next bar)
   async stepBar() {
     if (this.busy) return; this.busy = true;
     try {
-      for (let moved = 0; moved < 50000; moved++) {
+      for (let moved = 0; moved < 60000; moved++) {
         if (this.i + 1 >= this.min.n && !(await this.more())) { this.endOfData(); break; }
         if (moved > 0 && this.barOf(this.min.t[this.i + 1]) !== this.barOf(this.now)) break;
-        await this.tick();
+        await this.tick(true);
         if (this.stopFlag) { this.stopFlag = false; break; }
       }
+      this.syncBar();
       this.after();
     } finally { this.busy = false; }
   }
@@ -1006,12 +1031,13 @@ class Workspace {
       if (!this.playing) return;
       const dt = Math.min(100, now - this.t0); this.t0 = now;
       this.acc += dt / 1000 * this.speed * TF[this.tf].min;
-      let k = Math.min(Math.floor(this.acc), 600);
+      let k = Math.min(Math.floor(this.acc), 2400);
       this.acc -= k;
       while (k-- > 0 && this.playing) {
-        if (!(await this.tick())) { this.endOfData(); break; }
+        if (!(await this.tick(true))) { this.endOfData(); break; }
         if (this.stopFlag) { this.stopFlag = false; this.pause(); break; }
       }
+      this.syncBar();
       this.after();
       if (this.playing) this.raf = requestAnimationFrame(loop);
     };
@@ -1035,8 +1061,10 @@ class Workspace {
     this.pause();
     this.tf = id; this.s.tf = id;
     $$('.bt-tfs [data-tf]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.tf === id)));
-    if (TF[id].min >= 60 && !this.hist || TF[id].min < 60) await this.loadAround(this.now);
+    const covered = this.min.n && this.min.t[0] <= this.barOf(this.now);
+    if (TF[id].min < 60 || !this.hist || !covered) await this.loadAround(this.now);
     else this.hist = await hours(this.s.market, this.now - LOOKBACK_BARS * TF[id].min * MIN * (TF[id].min >= 1440 ? 1.45 : 1.1), this.barOf(this.now) - 1);
+    this.chart.applyOptions({timeScale: {timeVisible: TF[id].min < 1440}});
     if (this.wm) { try { this.wm.applyOptions({lines: this.wmLine(id)}); } catch (e) {} }
     this.redraw(true);
     this.markDirty();
@@ -1103,6 +1131,7 @@ class Workspace {
   }
   close(exit, t) {
     const o = this.s.order; if (!o || !o.open) return;
+    if (this.pend) this.syncBar();
     const tr = {id: o.id, side: o.side, kind: o.kind, entry: o.entry, sl0: o.sl0, sl: o.sl, tp: o.tp, entryTime: o.entryTime, exitTime: t, exit};
     tr.r = Math.round(rOf(tr, exit) * 100) / 100;
     (this.s.trades = this.s.trades || []).push(tr);
@@ -1137,9 +1166,9 @@ class Workspace {
   }
   applyMarkers() {
     if (!this.markers) return;
-    const ms = [], lastT = this.lastBarT, firstT = this.view.n ? this.ct(this.view.t[0]) : Infinity;
+    const ms = [], lastT = this.lastBarT, firstT = this.view.n ? this.bt(this.view.t[0]) : Infinity;
     for (const t of this.s.trades || []) {
-      const et = this.ct(this.barOf(t.entryTime)), xt = this.ct(this.barOf(t.exitTime));
+      const et = this.bt(this.barOf(t.entryTime)), xt = this.bt(this.barOf(t.exitTime));
       if (et >= firstT && et <= lastT) ms.push({time: et, position: t.side === 'long' ? 'belowBar' : 'aboveBar', color: this.col.mute, shape: t.side === 'long' ? 'arrowUp' : 'arrowDown', text: ''});
       const k = resultOf(t.r);
       if (xt >= firstT && xt <= lastT) ms.push({time: xt, position: t.side === 'long' ? 'aboveBar' : 'belowBar', color: k === 'tp' ? this.col.up : k === 'sl' ? this.col.dn : this.col.mute, shape: 'circle', text: fR(t.r)});
@@ -1337,7 +1366,7 @@ class PositionPrimitive {
     const ye = y(lv.entry), ys = y(lv.sl), yt = y(lv.tp);
     if (ye == null || ys == null || yt == null) return;
     const o = lv.o;
-    let x0 = o.open || o.placedAt ? ts.timeToCoordinate(ws.ct(ws.barOf(o.entryTime || o.placedAt))) : null;
+    let x0 = o.open || o.placedAt ? ts.timeToCoordinate(ws.bt(ws.barOf(o.entryTime || o.placedAt))) : null;
     const xl = ts.timeToCoordinate(ws.lastBarT);
     if (x0 == null) x0 = xl == null ? null : xl;
     if (x0 == null) return;

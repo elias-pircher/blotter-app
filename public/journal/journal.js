@@ -2016,7 +2016,7 @@ function applySettings(){
 }
 
 /* ---------- backtesting (its code and the chart load on the first visit) ---------- */
-const BT_V = '2';
+const BT_V = '3';
 const assetP = {};
 function loadAsset(src){
   if (assetP[src]) return assetP[src];

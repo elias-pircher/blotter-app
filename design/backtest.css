@@ -1,6 +1,6 @@
 /* Blotter · Backtesting (loaded with the backtest module) */
 html.bt-wide .shell{max-width:1720px}
-html.bt-wide #bg-wrap{opacity:0;transition:opacity .4s}
+html.bt-wide #bg-wrap{opacity:0!important;transition:opacity .4s}
 
 /* ---------- overview */
 .bt-h{margin:0 0 12px;font-family:var(--f-display);font-stretch:110%;font-weight:700;font-size:19px;letter-spacing:-.005em}
