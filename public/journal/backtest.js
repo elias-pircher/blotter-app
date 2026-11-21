@@ -832,6 +832,7 @@ class Workspace {
     this.view = emptyBars();                  // displayed bars
     this.playing = false; this.speed = 2; this.draft = null;
     this.dirty = false; this.saveT = 0;
+    this.cs = loadCS();
     this.build();
     this.load();
   }
@@ -845,10 +846,18 @@ class Workspace {
         <div class="bt-title"><b>${esc(this.s.name)}</b><span><span class="bt-mk-tag">${esc(this.m.tag)}</span><span id="bt-clock">–</span></span></div>
         <span class="spacer"></span>
         <div class="seg bt-tfs" role="radiogroup" aria-label="Zeiteinheit">${TFS.map(t => `<button type="button" role="radio" aria-checked="${t.id === this.tf}" data-tf="${t.id}" title="${t.name}" aria-label="${t.name}">${t.label}</button>`).join('')}</div>
+        <div class="bt-acts" role="group" aria-label="Chart">
+          <button type="button" class="btn icon ghost" data-ws="undo" aria-label="Rückgängig" title="Rückgängig (${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Strg+'}Z)" disabled>${UI_ICON.undo}</button>
+          <button type="button" class="btn icon ghost" data-ws="redo" aria-label="Wiederholen" title="Wiederholen (${/Mac|iPhone|iPad/.test(navigator.platform) ? '⇧⌘' : 'Strg+Umschalt+'}Z)" disabled>${UI_ICON.redo}</button>
+          <button type="button" class="btn icon ghost" data-ws="chartset" aria-label="Chart-Einstellungen" title="Chart-Einstellungen">${UI_ICON.gear}</button>
+        </div>
       </div>
       <div class="bt-main">
         <div class="bt-chartbox">
-          <div class="bt-chart" id="bt-chart"><div class="bt-loading" id="bt-loading">Kursdaten werden geladen…</div></div>
+          <div class="bt-chartrow">
+            <div class="bt-tools" id="bt-tools" role="toolbar" aria-label="Zeichenwerkzeuge"></div>
+            <div class="bt-chart" id="bt-chart"><div class="bt-loading" id="bt-loading">Kursdaten werden geladen…</div></div>
+          </div>
           <div class="bt-ctrl" role="group" aria-label="Wiedergabe">
             <button type="button" class="btn icon" data-ws="play" id="bt-play" aria-label="Abspielen" title="Abspielen (Leertaste)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="pl" d="M8 5.5v13l11-6.5z" fill="currentColor"/><path class="pa" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg></button>
             <button type="button" class="btn icon" data-ws="step" aria-label="Nächste Kerze" title="Nächste Kerze (→)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 5.5v13l9-6.5z" fill="currentColor"/><path d="M16.5 5H19v14h-2.5z" fill="currentColor"/></svg></button>
@@ -878,6 +887,8 @@ class Workspace {
     V.el && V.el.removeEventListener('click', this.onClick);
     V.el && V.el.removeEventListener('input', this.onInput);
     if (this.ro) this.ro.disconnect();
+    if (this.draw) { this.draw.destroy(); this.draw = null; }
+    clearTimeout(csTimer); saveCS(this.cs, true);
     if (this.chart) { try { this.chart.remove(); } catch (e) {} this.chart = null; }
   }
   /* ---------- data */
@@ -922,7 +933,9 @@ class Workspace {
     const up = 'rgb(' + (rgb('--up-rgb') || '67,216,150') + ')', dn = 'rgb(' + (rgb('--down-rgb') || '255,115,119') + ')';
     const fg = rgb('--fg-rgb') || '230,236,245';
     this.col = {up, dn, fg: 'rgba(' + fg + ',.92)', mute: 'rgba(' + fg + ',.55)', grid: 'rgba(' + fg + ',.06)', upA: 'rgba(' + (rgb('--up-rgb') || '67,216,150') + ',', dnA: 'rgba(' + (rgb('--down-rgb') || '255,115,119') + ','};
+    this.col.bg = getComputedStyle(this.box.closest('.bt-chartbox')).backgroundColor || '#0b1222';
     const font = (cs.getPropertyValue('--f-mono') || '').trim() || 'ui-monospace, Menlo, monospace';
+    this.font = font;
     this.chart = L.createChart(this.box, {
       autoSize: true,
       layout: {background: {type: 'solid', color: 'transparent'}, textColor: this.col.mute, fontFamily: font, fontSize: 11, attributionLogo: true},
@@ -932,17 +945,98 @@ class Workspace {
       crosshair: {mode: 0, vertLine: {color: this.col.mute, labelBackgroundColor: '#1b2a52'}, horzLine: {color: this.col.mute, labelBackgroundColor: '#1b2a52'}},
       localization: {locale: LOC, priceFormatter: p => nf(p, this.digits)},
     });
-    this.series = this.chart.addSeries(L.CandlestickSeries, {
-      upColor: up, downColor: dn, borderUpColor: up, borderDownColor: dn, wickUpColor: up, wickDownColor: dn,
-      priceFormat: {type: 'price', precision: this.digits, minMove: Math.pow(10, -this.digits)}, priceLineVisible: true, lastValueVisible: true,
-    });
-    this.markers = L.createSeriesMarkers ? L.createSeriesMarkers(this.series, []) : null;
     this.wmLine = t => [{text: this.m.tag + ' · ' + TF[t].label, color: 'rgba(' + fg + ',.05)', fontSize: 64, fontStyle: '700'}];
     try { this.wm = L.createTextWatermark(this.chart.panes()[0], {horzAlign: 'center', vertAlign: 'center', lines: this.wmLine(this.tf)}); } catch (e) { this.wm = null; }
     this.pos = new PositionPrimitive(this);
-    this.series.attachPrimitive(this.pos);
     this.lines = {};
-    this.drag = new LineDrag(this);
+    this.dataT = []; this.dataIdx = [];
+    this.drag = new LineDrag(this);      // before the drawings: a grabbed SL or TP line wins
+    this.draw = new DrawLayer(this);
+    this.makeSeries();
+    this.applyStyle();
+    this.legendInit();
+  }
+  /* ---------- style: series type, colours, background, grid, scales */
+  seriesOpts() {
+    const cs = this.cs, col = this.col, up = cs.upBody || col.up, dn = cs.dnBody || col.dn, none = 'rgba(0,0,0,0)';
+    const base = {priceFormat: {type: 'price', precision: this.digits, minMove: Math.pow(10, -this.digits)}, priceLineVisible: cs.lastPrice, lastValueVisible: cs.lastPrice};
+    const k = seriesKind(cs.type);
+    if (k === 'bar') return Object.assign(base, {upColor: up, downColor: dn, openVisible: true, thinBars: false});
+    if (k === 'line') return Object.assign(base, {color: cs.lineColor || '#2962ff', lineWidth: cs.lineWidth});
+    if (k === 'area') { const lc = cs.lineColor || '#2962ff'; return Object.assign(base, {lineColor: lc, topColor: rgba(lc, 0.32), bottomColor: rgba(lc, 0.02), lineWidth: cs.lineWidth}); }
+    const hollow = cs.type === 'hollow';
+    return Object.assign(base, {
+      upColor: hollow || !cs.body ? none : up, downColor: cs.body ? dn : none,
+      borderVisible: cs.border || hollow || !cs.body, borderUpColor: cs.upBorder || up, borderDownColor: cs.dnBorder || dn,
+      wickVisible: cs.wick, wickUpColor: cs.upWick || up, wickDownColor: cs.dnWick || dn,
+    });
+  }
+  makeSeries() {
+    const L = window.LightweightCharts, k = seriesKind(this.cs.type);
+    if (this.series) {
+      try { if (this.markers && this.markers.detach) this.markers.detach(); } catch (e) {}
+      for (const key of Object.keys(this.lines || {})) { try { this.series.removePriceLine(this.lines[key]); } catch (e) {} }
+      try { this.series.detachPrimitive(this.pos); } catch (e) {}
+      try { this.series.detachPrimitive(this.draw.prim); } catch (e) {}
+      try { this.chart.removeSeries(this.series); } catch (e) {}
+    }
+    this.lines = {};
+    const T = {candle: L.CandlestickSeries, bar: L.BarSeries, line: L.LineSeries, area: L.AreaSeries}[k];
+    this.series = this.chart.addSeries(T, this.seriesOpts());
+    this.stype = k; this.htype = this.cs.type;
+    this.markers = L.createSeriesMarkers ? L.createSeriesMarkers(this.series, []) : null;
+    this.series.attachPrimitive(this.pos);
+    this.series.attachPrimitive(this.draw.prim);
+  }
+  applyStyle() {
+    const cs = this.cs, col = this.col;
+    const bg = cs.bgMode === 'solid' ? {type: 'solid', color: cs.bg} : cs.bgMode === 'gradient' ? {type: 'gradient', topColor: cs.bg, bottomColor: cs.bg2} : {type: 'solid', color: 'transparent'};
+    const gc = cs.gridColor || col.grid, cc = cs.crossColor || col.mute;
+    this.chart.applyOptions({
+      layout: {background: bg, textColor: cs.textColor || col.mute, fontSize: cs.fontSize},
+      grid: {vertLines: {visible: cs.grid === 'both' || cs.grid === 'vert', color: gc}, horzLines: {visible: cs.grid === 'both' || cs.grid === 'horz', color: gc}},
+      crosshair: {mode: this.draw && this.draw.tool === 'pointer' ? 2 : 0, vertLine: {color: cc, style: cs.cross}, horzLine: {color: cc, style: cs.cross}},
+      rightPriceScale: {mode: cs.scale},
+      timeScale: {rightOffset: cs.rightOffset},
+    });
+    if (this.wm) { try { this.wm.applyOptions({visible: cs.watermark}); } catch (e) {} }
+    if (seriesKind(cs.type) !== this.stype || (this.htype === 'ha') !== (cs.type === 'ha')) {
+      this.makeSeries();
+      if (this.view && this.view.n) { this.redraw(false); this.renderLegend(); }
+    } else { this.series.applyOptions(this.seriesOpts()); this.htype = cs.type; }
+    this.renderLegend();
+  }
+  // a bar as the series wants it: OHLC, Heikin Ashi, or the close for line and area
+  haAt(j) {
+    const w = this.view, H = this.ha || (this.ha = {o: [], c: []});
+    const c = (w.o[j] + w.h[j] + w.l[j] + w.c[j]) / 4;
+    const o = j > 0 && H.o[j - 1] != null ? (H.o[j - 1] + H.c[j - 1]) / 2 : (w.o[j] + w.c[j]) / 2;
+    H.o[j] = o; H.c[j] = c;
+    return {open: o, high: Math.max(w.h[j], o, c), low: Math.min(w.l[j], o, c), close: c};
+  }
+  point(j, time) {
+    const w = this.view;
+    if (this.stype === 'line' || this.stype === 'area') return {time, value: w.c[j]};
+    if (this.cs.type === 'ha') return Object.assign({time}, this.haAt(j));
+    return {time, open: w.o[j], high: w.h[j], low: w.l[j], close: w.c[j]};
+  }
+  /* ---------- status line: market, timeframe and the bar under the crosshair */
+  legendInit() {
+    const el = document.createElement('div');
+    el.className = 'bt-legend'; el.setAttribute('aria-hidden', 'true');
+    this.box.appendChild(el); this.legend = el;
+    this.chart.subscribeCrosshairMove(p => { this.legendAt = p && p.time != null && p.seriesData ? p.seriesData.get(this.series) || null : null; this.renderLegend(); });
+  }
+  renderLegend() {
+    const el = this.legend; if (!el) return;
+    el.hidden = !this.cs.legend;
+    if (!this.cs.legend) return;
+    const b = this.legendAt || this.lastPt; if (!b) { el.textContent = ''; return; }
+    const v = k => b[k] != null ? b[k] : b.value;
+    const o = v('open'), h = v('high'), l = v('low'), c = v('close'), dg = this.digits;
+    const ch = c - o, pct = o ? ch / o * 100 : 0, cl = ch > 0 ? 'up' : ch < 0 ? 'dn' : '';
+    const sg = ch > 0 ? '+' : ch < 0 ? '−' : '';
+    el.innerHTML = `<b>${esc(this.m.tag)} · ${esc(TF[this.tf].label)}</b><span class="lg-o">O <i class="${cl}">${nf(o, dg)}</i></span><span class="lg-o">H <i class="${cl}">${nf(h, dg)}</i></span><span class="lg-o">L <i class="${cl}">${nf(l, dg)}</i></span><span>C <i class="${cl}">${nf(c, dg)}</i></span><span class="${cl}">${sg}${nf(Math.abs(ch), dg)} (${sg}${nf(Math.abs(pct), 2)} %)</span>`;
   }
   ct(ms) { return Math.floor((ms + localOffset(ms)) / 1000); }      // chart time: local clock shown as UTC
   bt(bs) { return TF[this.tf].min >= 1440 ? tradingDay(bs) / 1000 : this.ct(bs); }   // chart time of a bar
@@ -962,16 +1056,21 @@ class Workspace {
       bars = concatBars([slice(h, Math.max(0, z - LOOKBACK_BARS), z), cur]);
     }
     this.view = bars;
-    const data = [];
+    this.ha = null;
+    const data = [], dT = [], dI = [];
     let lastT = -Infinity;
     for (let i = 0; i < bars.n; i++) {
       const t = this.bt(bars.t[i]);
+      const pt = this.point(i, t);
       if (t <= lastT) continue;
       lastT = t;
-      data.push({time: t, open: bars.o[i], high: bars.h[i], low: bars.l[i], close: bars.c[i]});
+      data.push(pt); dT.push(bars.t[i]); dI.push(i);
     }
     this.series.setData(data);
+    this.dataT = dT; this.dataIdx = dI;
+    this.lastPt = data[data.length - 1] || null;
     this.lastBarT = lastT;
+    this.renderLegend && this.renderLegend();
     if (fit) this.chart.timeScale().scrollToRealTime();
     this.applyMarkers();
     this.refreshLines();
@@ -1006,7 +1105,11 @@ class Workspace {
     this.pend = false;
     const w = this.view, j = w.n - 1; if (j < 0) return;
     const ctime = this.bt(w.t[j]);
-    if (ctime >= this.lastBarT) { this.series.update({time: ctime, open: w.o[j], high: w.h[j], low: w.l[j], close: w.c[j]}); this.lastBarT = ctime; }
+    if (ctime >= this.lastBarT) {
+      if (ctime > this.lastBarT) { this.dataT.push(w.t[j]); this.dataIdx.push(j); }
+      this.lastPt = this.point(j, ctime);
+      this.series.update(this.lastPt); this.lastBarT = ctime;
+    }
   }
   // reveals minutes until the bar in progress is complete (or, if it just completed, the whole next bar)
   async stepBar() {
@@ -1051,6 +1154,7 @@ class Workspace {
   after() {
     this.s.cursor = this.now;
     this.clock();
+    if (!this.legendAt) this.renderLegend();
     this.refreshLines();
     this.renderLive();
     this.markDirty();
@@ -1067,6 +1171,7 @@ class Workspace {
     this.chart.applyOptions({timeScale: {timeVisible: TF[id].min < 1440}});
     if (this.wm) { try { this.wm.applyOptions({lines: this.wmLine(id)}); } catch (e) {} }
     this.redraw(true);
+    this.renderLegend();
     this.markDirty();
   }
   /* ---------- orders and positions
@@ -1251,8 +1356,9 @@ class Workspace {
   }
   /* ---------- input */
   click(e) {
-    const b = e.target.closest('[data-ws],[data-tf],[data-speed],[data-rr],[data-kind]');
+    const b = e.target.closest('[data-ws],[data-tf],[data-speed],[data-rr],[data-kind],[data-dtool],[data-dfly],[data-dopt],[data-dpick]');
     if (!b || b.disabled) return;
+    if (b.dataset.dtool || b.dataset.dfly || b.dataset.dopt || b.dataset.dpick) { if (this.draw) this.draw.toolClick(b); return; }
     if (b.dataset.tf) { this.setTf(b.dataset.tf); return; }
     if (b.dataset.speed) { this.speed = +b.dataset.speed; $$('.bt-speed [data-speed]').forEach(x => x.setAttribute('aria-checked', String(x === b))); return; }
     if (b.dataset.rr && this.draft) {
@@ -1276,6 +1382,9 @@ class Workspace {
     else if (a === 'closepos') this.closeNow();
     else if (a === 'be') this.toBe();
     else if (a === 'jump') this.openJump();
+    else if (a === 'undo') this.draw && this.draw.undo();
+    else if (a === 'redo') this.draw && this.draw.redo();
+    else if (a === 'chartset') { this.pause(); openChartSettings(this); }
     else if (a === 'deltrade') { this.s.trades = (this.s.trades || []).filter(t => t.id !== b.dataset.id); this.applyMarkers(); this.renderSide(); this.markDirty(true); }
   }
   input(e) {
@@ -1290,8 +1399,10 @@ class Workspace {
     if (!this.draft) this.markDirty();
   }
   key(e) {
-    if (V.mode !== 'ws' || V.dlg || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (V.mode !== 'ws' || V.dlg) return;
     if (CTX.S.view !== 'backtest' || !this.box.isConnected) { if (!this.box.isConnected) { this.flush(); this.destroy(); if (V.ws === this) { V.ws = null; V.mode = 'list'; } } return; }
+    if (this.draw && this.draw.key(e)) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
     const tg = e.target;
     if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) { if (e.key === 'Enter' && this.draft && tg.dataset.lv) { e.preventDefault(); this.place(); } return; }
     const k = e.key;
@@ -1403,10 +1514,12 @@ class LineDrag {
   }
   over(e) {
     if (this.on) return;
+    if ((this.ws.draw && this.ws.draw.busy()) || (e.target.closest && e.target.closest(OVERLAYS))) { this.ws.box.classList.remove('bt-grab'); return; }
     const k = this.pick(e.clientY);
     this.ws.box.classList.toggle('bt-grab', !!k);
   }
   start(e) {
+    if ((this.ws.draw && this.ws.draw.busy() && !this.on) || (e.target.closest && e.target.closest(OVERLAYS))) return;
     const pt = e.touches ? e.touches[0] : e;
     const k = this.pick(pt.clientY);
     if (!k) return;
@@ -1439,6 +1552,1077 @@ class LineDrag {
     window.addEventListener('pointermove', move, true); window.addEventListener('touchmove', move, {capture: true, passive: false});
     window.addEventListener('pointerup', up, true); window.addEventListener('touchend', up, true); window.addEventListener('pointercancel', up, true);
   }
+}
+
+/* ================================================================ chart style (TradingView-like settings)
+   One style per user (journal settings, falls back to this browser). null colours follow the colour scheme. */
+const CS_DEF = {
+  type: 'candles', body: true, border: true, wick: true,
+  upBody: null, dnBody: null, upBorder: null, dnBorder: null, upWick: null, dnWick: null,
+  lineColor: null, lineWidth: 2,
+  bgMode: 'theme', bg: '#0b1222', bg2: '#16213d',
+  grid: 'both', gridColor: null, cross: 2, crossColor: null,
+  watermark: true, legend: true, textColor: null, fontSize: 11, scale: 0, lastPrice: true, rightOffset: 12,
+  magnet: false, stay: false,
+};
+const CS_TYPES = [['candles', 'Kerzen'], ['hollow', 'Hohle Kerzen'], ['ha', 'Heikin Ashi'], ['bars', 'Balken'], ['line', 'Linie'], ['area', 'Fläche']];
+const HEX = /^#[0-9a-f]{6}$/i;
+function pickCS(o) {
+  const r = {};
+  if (!o || typeof o !== 'object') return r;
+  for (const k of Object.keys(CS_DEF)) {
+    const v = o[k], d = CS_DEF[k];
+    if (v === undefined) continue;
+    if (d === null || k === 'bg' || k === 'bg2') { if (v === null || (typeof v === 'string' && HEX.test(v))) r[k] = v; }
+    else if (typeof v === typeof d) r[k] = v;
+  }
+  if (!CS_TYPES.some(t => t[0] === r.type)) delete r.type;
+  return r;
+}
+function loadCS() {
+  let src = null;
+  try { src = CTX && CTX.chartStyle ? CTX.chartStyle() : JSON.parse(localStorage.getItem('blotter.btChart') || 'null'); } catch (e) { src = null; }
+  return Object.assign({}, CS_DEF, pickCS(src));
+}
+let csTimer = 0;
+function saveCS(st, now) {
+  clearTimeout(csTimer);
+  const go = () => {
+    const diff = {};
+    for (const k of Object.keys(CS_DEF)) if (st[k] !== CS_DEF[k]) diff[k] = st[k];
+    try {
+      if (CTX && CTX.saveChartStyle) Promise.resolve(CTX.saveChartStyle(diff)).catch(() => CTX.toast('Die Chart-Einstellungen konnten nicht gespeichert werden. Prüfe deine Verbindung.'));
+      else localStorage.setItem('blotter.btChart', JSON.stringify(diff));
+    } catch (e) {}
+  };
+  if (now) go(); else csTimer = setTimeout(go, 700);
+}
+const seriesKind = t => t === 'bars' ? 'bar' : t === 'line' ? 'line' : t === 'area' ? 'area' : 'candle';
+// '#rrggbb' or 'rgb(r,g,b)' with an alpha
+function rgba(c, a) {
+  if (HEX.test(c)) { const n = parseInt(c.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+  const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (m) { const p = m[1].split(',').slice(0, 3).map(s => s.trim()); return `rgba(${p.join(',')},${a})`; }
+  return c;
+}
+function toHex(c) {
+  if (HEX.test(c)) return c.toLowerCase();
+  const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return '#888888';
+  return '#' + m[1].split(',').slice(0, 3).map(s => clamp(Math.round(+s), 0, 255).toString(16).padStart(2, '0')).join('');
+}
+function lightColor(c) { const h = toHex(c), n = parseInt(h.slice(1), 16); return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 150; }
+
+/* ================================================================ drawings
+   Kept with the session as s.drawings = [{id, type, pts: [{t, p}], st, lock}]: t is UTC ms, p a price, so a
+   drawing stays at its place on every timeframe. One series primitive paints them; the pointer handling sits
+   on the chart box in front of the chart's own panning. */
+const D_COLORS = ['#2962ff', '#00bcd4', '#089981', '#4caf50', '#ffeb3b', '#ff9800', '#f23645', '#e91e63', '#9c27b0', '#ffffff', '#b2b5be', '#787b86', '#434651', '#131722'];
+const FIB_LV = [[0, '#787b86'], [0.236, '#f23645'], [0.382, '#ff9800'], [0.5, '#4caf50'], [0.618, '#089981'], [0.786, '#00bcd4'], [1, '#787b86'], [1.618, '#2962ff'], [2.618, '#9c27b0']];
+const FIBX_LV = [[0, '#787b86'], [0.618, '#ff9800'], [1, '#089981'], [1.272, '#00bcd4'], [1.618, '#2962ff'], [2, '#9c27b0'], [2.618, '#f23645']];
+const MAX_DRAWINGS = 400, MAX_BRUSH = 600;
+const OVERLAYS = '.bt-ftb,.bt-pop,.bt-txted,.bt-legend';
+const ic = (d, sw) => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="${sw || 1.6}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const dot = (x, y) => `<circle cx="${x}" cy="${y}" r="2" fill="currentColor" stroke="none"/>`;
+const TOOLS = {
+  cross: {name: 'Fadenkreuz', cursor: true, icon: ic('<path d="M12 3v7M12 14v7M3 12h7M14 12h7"/>')},
+  pointer: {name: 'Zeiger', cursor: true, icon: ic('<path d="M6.5 3.5l11 8.6-4.9.9 2.9 5.9-2.4 1.2-2.9-6-3.7 3.3z"/>')},
+  eraser: {name: 'Radierer', cursor: true, icon: ic('<path d="M9 20h11"/><path d="M5.6 14.6l8.5-8.5a2 2 0 0 1 2.8 0l1.6 1.6a2 2 0 0 1 0 2.8L11 18H8.4z"/><path d="M9.6 10.6l4.4 4.4"/>')},
+  trend: {name: 'Trendlinie', n: 2, key: 'T', icon: ic('<path d="M6 18L18 6"/>' + dot(5, 19) + dot(19, 5))},
+  ray: {name: 'Strahl', n: 2, icon: ic('<path d="M6.5 17.5L21 4"/>' + dot(5.5, 18.5))},
+  ext: {name: 'Verlängerte Linie', n: 2, icon: ic('<path d="M2.5 21.5l19-19"/>' + dot(8, 16) + dot(16, 8))},
+  info: {name: 'Info-Linie', n: 2, icon: ic('<path d="M4 20l9-9"/>' + dot(4, 20) + '<rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><path d="M15.5 6h3M15.5 8h2"/>')},
+  arrowline: {name: 'Pfeil', n: 2, icon: ic('<path d="M5 19L19 5M11 5h8v8"/>')},
+  hline: {name: 'Horizontale Linie', n: 1, key: 'H', icon: ic('<path d="M3 12h18"/>' + dot(12, 12))},
+  hray: {name: 'Horizontaler Strahl', n: 1, key: 'J', icon: ic('<path d="M8 12h13"/>' + dot(6, 12))},
+  vline: {name: 'Vertikale Linie', n: 1, key: 'V', icon: ic('<path d="M12 3v18"/>' + dot(12, 12))},
+  crossline: {name: 'Kreuzlinie', n: 1, key: 'C', icon: ic('<path d="M12 3v18M3 12h18"/>')},
+  channel: {name: 'Paralleler Kanal', n: 3, icon: ic('<path d="M3 14L15 4M9 20L21 10"/><path d="M6 17l12-10" stroke-dasharray="1.5 2.6"/>')},
+  fib: {name: 'Fib-Retracement', n: 2, key: 'F', icon: ic('<path d="M3 5h18M3 9.7h18M3 14.3h18M3 19h18"/><path d="M6 19L18 5" stroke-dasharray="1.5 2.6"/>')},
+  fibext: {name: 'Trendbasierte Fib-Extension', n: 3, icon: ic('<path d="M3 20l5-8 4 4"/><path d="M12 5h9M12 9h9M12 13h9" /><path d="M12 16l9-11" stroke-dasharray="1.5 2.6"/>')},
+  rect: {name: 'Rechteck', n: 2, key: 'R', icon: ic('<rect x="4" y="6" width="16" height="12" rx="1.5"/>')},
+  ellipse: {name: 'Ellipse', n: 2, icon: ic('<ellipse cx="12" cy="12" rx="9" ry="6.2"/>')},
+  triangle: {name: 'Dreieck', n: 3, icon: ic('<path d="M12 4.5l8.5 15h-17z"/>')},
+  path: {name: 'Pfad', n: Infinity, icon: ic('<path d="M3 18l5-8 5 5 4-9 4 3"/>' + dot(3, 18) + dot(21, 9))},
+  brush: {name: 'Pinsel', free: true, icon: ic('<path d="M3.5 17.5c2.6 0 2.8-4.2 5.6-4.2 2.8 0 2.6 4.4 5.6 4.4 2.6 0 3.5-5.8 5.8-8.2"/>')},
+  text: {name: 'Text', n: 1, icon: ic('<path d="M5 6.5V5h14v1.5M12 5v14M9 19h6"/>')},
+  callout: {name: 'Sprechblase', n: 2, icon: ic('<path d="M4 4.5h16v10H11l-4.5 4.5v-4.5H4z"/>')},
+  pricelabel: {name: 'Preis-Label', n: 1, icon: ic('<path d="M3 12l5-6h13v12H8z"/><path d="M11 12h6"/>')},
+  up: {name: 'Pfeil nach oben', n: 1, icon: ic('<path d="M12 4l7 8h-4v8H9v-8H5z"/>')},
+  down: {name: 'Pfeil nach unten', n: 1, icon: ic('<path d="M12 20l7-8h-4V4H9v8H5z"/>')},
+  long: {name: 'Long-Position', n: 1, icon: ic('<rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 13h16"/><path d="M9 9.5l3-3 3 3"/>')},
+  short: {name: 'Short-Position', n: 1, icon: ic('<rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 11h16"/><path d="M9 14.5l3 3 3-3"/>')},
+  range: {name: 'Datum- und Preisbereich', n: 2, icon: ic('<rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="2 2.4"/><path d="M12 7.5v9M9.5 9.5L12 7l2.5 2.5M9.5 14.5L12 17l2.5-2.5"/>')},
+};
+const TGROUPS = [
+  {id: 'cursor', name: 'Cursor', tools: ['cross', 'pointer', 'eraser']},
+  {id: 'lines', name: 'Linien', tools: ['trend', 'ray', 'ext', 'info', 'arrowline', 'hline', 'hray', 'vline', 'crossline', 'channel']},
+  {id: 'fib', name: 'Fibonacci', tools: ['fib', 'fibext']},
+  {id: 'shapes', name: 'Formen', tools: ['rect', 'ellipse', 'triangle', 'path', 'brush']},
+  {id: 'notes', name: 'Text und Marker', tools: ['text', 'callout', 'pricelabel', 'up', 'down']},
+  {id: 'pos', name: 'Positionen und Messen', tools: ['long', 'short', 'range']},
+];
+const UI_ICON = {
+  magnet: ic('<path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4z"/><path d="M6 8h4M14 8h4"/>'),
+  stay: ic('<path d="M14.5 4.5l5 5L9 20H4v-5z"/><path d="M12.5 6.5l5 5"/>'),
+  lock: ic('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
+  unlock: ic('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.7-1.5"/>'),
+  eye: ic('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>'),
+  eyeOff: ic('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><path d="M4 20L20 4"/>'),
+  trash: ic('<path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>'),
+  clone: ic('<rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/>'),
+  undo: ic('<path d="M9 6L4 11l5 5"/><path d="M4 11h10.5a5.5 5.5 0 0 1 0 11H12"/>'),
+  redo: ic('<path d="M15 6l5 5-5 5"/><path d="M20 11H9.5a5.5 5.5 0 0 0 0 11H12"/>'),
+  gear: ic('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>'),
+  caret: '<svg viewBox="0 0 8 8" width="8" height="8" aria-hidden="true"><path d="M7 1v6H1z" fill="currentColor"/></svg>',
+  text: ic('<path d="M5 6.5V5h14v1.5M12 5v14M9 19h6"/>'),
+  order: ic('<path d="M4 12h12M12 7l5 5-5 5"/><path d="M20 5v14"/>'),
+  flip: ic('<path d="M7 4v16M17 4v16M7 8l-3 3M7 8l3 3M17 16l-3-3M17 16l3-3"/>'),
+  ext: ic('<path d="M3 12h18M6 9l-3 3 3 3M18 9l3 3-3 3"/>' + dot(9, 12) + dot(15, 12)),
+};
+const LINE_TYPES = new Set(['trend', 'ray', 'ext', 'info', 'arrowline', 'channel', 'fib', 'fibext', 'path']);
+const FILL_TYPES = new Set(['rect', 'ellipse', 'triangle', 'channel', 'range', 'text']);
+const TEXT_TYPES = new Set(['text', 'callout', 'hline', 'up', 'down', 'rect']);
+const EXT_TYPES = new Set(['trend', 'rect', 'channel', 'fib']);
+const NO_LINE = new Set(['text', 'pricelabel', 'up', 'down', 'long', 'short']);
+function defStyle(type) {
+  const s = {color: '#2962ff', width: 2, dash: 0, fill: false, alpha: 0.2, text: '', size: 14, extL: false, extR: false, rev: false};
+  if (type === 'hline' || type === 'hray' || type === 'vline' || type === 'crossline') s.width = 1;
+  if (type === 'rect' || type === 'ellipse' || type === 'triangle' || type === 'channel' || type === 'range') { s.fill = true; s.width = 1; }
+  if (type === 'fib' || type === 'fibext') { s.color = '#787b86'; s.width = 1; s.fill = true; s.alpha = 0.08; }
+  if (type === 'text') { s.color = '#ffffff'; s.alpha = 0.7; s.fill = false; }
+  if (type === 'callout' || type === 'pricelabel') { s.color = '#2962ff'; s.size = 13; }
+  if (type === 'up') s.color = '#089981';
+  if (type === 'down') s.color = '#f23645';
+  if (type === 'brush') s.color = '#ff9800';
+  return s;
+}
+const dashOf = (k, w) => k === 1 ? [Math.max(4, w * 3), Math.max(3, w * 2.5)] : k === 2 ? [w, Math.max(3, w * 2.4)] : [];
+function segDist(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1, l = dx * dx + dy * dy;
+  let t = l ? ((px - x1) * dx + (py - y1) * dy) / l : 0; t = clamp(t, 0, 1);
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+function inPoly(px, py, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i], b = pts[j];
+    if ((a.y > py) !== (b.y > py) && px < (b.x - a.x) * (py - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+const fAxT = new Intl.DateTimeFormat(LOC, {day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit'});
+const fAxD = new Intl.DateTimeFormat(LOC, {weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit'});
+function durText(ms) {
+  const m = Math.round(Math.abs(ms) / MIN), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
+  return [d ? d + ' T' : '', h ? h + ' Std' : '', mm && d < 3 ? mm + ' Min' : ''].filter(Boolean).join(' ') || '0 Min';
+}
+
+class DrawPrimitive {
+  constructor(layer) {
+    this.L = layer; this._req = null; this._pa = []; this._ta = [];
+    this._pv = [{zOrder: () => 'top', renderer: () => ({draw: t => this.L.render(t)})}];
+  }
+  attached(p) { this.chart = p.chart; this.series = p.series; this._req = p.requestUpdate; }
+  detached() { this._req = null; }
+  update() { this._req && this._req(); }
+  updateAllViews() { const v = this.L.axisViews(); this._pa = v.price; this._ta = v.time; }
+  paneViews() { return this._pv; }
+  priceAxisViews() { return this._pa; }
+  timeAxisViews() { return this._ta; }
+}
+
+class DrawLayer {
+  constructor(ws) {
+    this.ws = ws;
+    if (!Array.isArray(ws.s.drawings)) ws.s.drawings = [];
+    if (!ws.s.drawOpt || typeof ws.s.drawOpt !== 'object') ws.s.drawOpt = {};
+    this.tool = 'cross';
+    this.last = {}; for (const g of TGROUPS) this.last[g.id] = g.tools[0];
+    this.sel = null; this.mk = null; this.drag = null; this.pop = null; this.ed = null;
+    this.undoS = []; this.redoS = [];
+    this.geo = new Map();
+    this.prim = new DrawPrimitive(this);
+    this.font = (getComputedStyle(document.body).fontFamily || 'system-ui, sans-serif');
+    this.bind();
+    this.renderTools();
+  }
+  get list() { return this.ws.s.drawings; }
+  get opt() { return this.ws.s.drawOpt; }
+  get ts() { return this.ws.chart.timeScale(); }
+  byId(id) { return this.list.find(d => d.id === id) || null; }
+  update() { this.prim.update(); }
+  busy() { return !!(this.mk || this.drag || !TOOLS[this.tool].cursor); }
+  /* ---------- time and price ↔ screen */
+  lg(ms) {
+    const T = this.ws.dataT, n = T ? T.length : 0; if (!n) return null;
+    const st = TF[this.ws.tf].min * MIN;
+    if (ms <= T[0]) return (ms - T[0]) / st;
+    if (ms >= T[n - 1]) return n - 1 + (ms - T[n - 1]) / st;
+    const i = lowerBound(T, n, ms + 1) - 1, a = T[i], b = T[i + 1];
+    return i + (ms - a) / (b - a);
+  }
+  msAt(l) {
+    const T = this.ws.dataT, n = T.length, st = TF[this.ws.tf].min * MIN;
+    if (l <= 0) return T[0] + l * st;
+    if (l >= n - 1) return T[n - 1] + (l - (n - 1)) * st;
+    const i = Math.floor(l); return T[i] + (l - i) * (T[i + 1] - T[i]);
+  }
+  // the chart converts whole bar indices only; between two bars the position is interpolated
+  lgAt(x) {
+    const ts = this.ts, r = ts.coordinateToLogical(x); if (r == null) return null;
+    const i = Math.round(r), a = ts.logicalToCoordinate(i), b = ts.logicalToCoordinate(i + 1);
+    return a == null || b == null || b === a ? r : i + (x - a) / (b - a);
+  }
+  X(ms) {
+    const l = this.lg(ms); if (l == null) return null;
+    const i = Math.floor(l), f = l - i, a = this.ts.logicalToCoordinate(i);
+    if (a == null || f < 1e-9) return a;
+    const b = this.ts.logicalToCoordinate(i + 1);
+    return b == null ? a : a + f * (b - a);
+  }
+  Y(p) { const s = this.ws.series; return s ? s.priceToCoordinate(p) : null; }
+  rp(p) { return +(+p).toFixed(this.ws.digits); }
+  ptAt(x, y, snap) {
+    const ws = this.ws; if (!ws.dataT || !ws.dataT.length) return null;
+    const l = this.lgAt(x); if (l == null) return null;
+    let p = ws.series.coordinateToPrice(y); if (p == null) return null;
+    const L = snap ? Math.round(l) : l;
+    if (snap && ws.cs.magnet) {
+      const vi = ws.dataIdx && ws.dataIdx[L], v = ws.view;
+      if (vi != null && vi < v.n) {
+        let best = null, bd = 30;
+        for (const c of [v.o[vi], v.h[vi], v.l[vi], v.c[vi]]) { const cy = this.Y(c); if (cy == null) continue; const dd = Math.abs(cy - y); if (dd < bd) { bd = dd; best = c; } }
+        if (best != null) p = best;
+      }
+    }
+    return {t: Math.round(this.msAt(L)), p: this.rp(p)};
+  }
+  pane() { const r = this.ws.box.getBoundingClientRect(); return {r, w: this.ts.width(), h: r.height - this.ts.height()}; }
+  loc(e) {
+    const pt = e.touches ? e.touches[0] || e.changedTouches[0] : e;
+    const {r, w, h} = this.pane();
+    const x = pt.clientX - r.left, y = pt.clientY - r.top;
+    return {x, y, inPane: x >= 0 && y >= 0 && x <= w && y <= h};
+  }
+  /* ---------- painting */
+  render(target) {
+    this.geo.clear();
+    const ws = this.ws;
+    if (this.opt.hidden || !ws.dataT || !ws.dataT.length || !ws.series) return;
+    target.useMediaCoordinateSpace(({context: c, mediaSize: sz}) => {
+      this.W = sz.width; this.H = sz.height;
+      for (const d of this.list) {
+        const P = d.pts.map(pt => ({x: this.X(pt.t), y: this.Y(pt.p)}));
+        if (P.some(q => q.x == null || q.y == null || !Number.isFinite(q.x) || !Number.isFinite(q.y))) continue;
+        const g = {segs: [], polys: [], rects: [], ells: [], handles: P.map((q, i) => ({x: q.x, y: q.y, i}))};
+        c.save();
+        try { (RENDER[d.type] || RENDER.trend)(this, c, d, P, g); } catch (e) {}
+        c.restore();
+        this.geo.set(d.id, g);
+      }
+      const s = this.sel && this.byId(this.sel), g = s && this.geo.get(s.id);
+      if (g) for (const h of g.handles) {
+        c.beginPath(); c.arc(h.x, h.y, 5, 0, Math.PI * 2);
+        c.fillStyle = ws.col.bg || '#0b1222'; c.fill();
+        c.lineWidth = 1.6; c.strokeStyle = (s.type === 'long' || s.type === 'short') ? '#ffffff' : s.st.color; c.stroke();
+      }
+    });
+  }
+  pen(c, st, w) { c.strokeStyle = st.color; c.lineWidth = w || st.width; c.setLineDash(dashOf(st.dash, c.lineWidth)); c.lineCap = 'round'; c.lineJoin = 'round'; }
+  seg(c, g, x1, y1, x2, y2, extL, extR) {
+    if (extL || extR) {
+      const dx = x2 - x1, dy = y2 - y1;
+      if (Math.abs(dx) < 1e-6) { if (extL || extR) { y1 = extL ? (dy > 0 ? -10 : this.H + 10) : y1; y2 = extR ? (dy > 0 ? this.H + 10 : -10) : y2; } }
+      else {
+        const k = dy / dx, L0 = -10, R0 = this.W + 10;
+        if (extL) { const xe = dx > 0 ? L0 : R0; y1 = y1 + k * (xe - x1); x1 = xe; }
+        if (extR) { const xe = dx > 0 ? R0 : L0; y2 = y2 + k * (xe - x2); x2 = xe; }
+      }
+    }
+    c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    g.segs.push([x1, y1, x2, y2]);
+  }
+  label(c, txt, x, y, o) {
+    o = o || {};
+    const lines = String(txt).split('\n'), fs = o.size || 12, lh = Math.round(fs * 1.35);
+    c.font = `${o.bold ? '600 ' : ''}${fs}px ${o.mono ? (this.ws.font || 'monospace') : this.font}`;
+    const w = Math.max(...lines.map(l => c.measureText(l).width)) + (o.pad || 0) * 2, h = lines.length * lh + (o.pad || 0) * 2 - (lh - fs) + 2;
+    let bx = o.align === 'center' ? x - w / 2 : o.align === 'right' ? x - w : x;
+    let by = o.base === 'bottom' ? y - h : o.base === 'middle' ? y - h / 2 : y;
+    if (o.bg) { c.fillStyle = o.bg; c.beginPath(); c.roundRect ? c.roundRect(bx, by, w, h, o.radius || 4) : c.rect(bx, by, w, h); c.fill(); if (o.border) { c.strokeStyle = o.border; c.lineWidth = 1; c.setLineDash([]); c.stroke(); } }
+    c.fillStyle = o.color || '#fff'; c.textBaseline = 'top';
+    lines.forEach((l, i) => c.fillText(l, bx + (o.pad || 0), by + (o.pad || 0) + i * lh + 1));
+    return [bx, by, w, h];
+  }
+  priceTxt(p) { return nf(p, this.ws.digits); }
+  moveTxt(a, b, t0, t1) {
+    const m = this.ws.m, dp = b - a, pct = a ? dp / a * 100 : 0;
+    const unit = m.pip < 1 ? nf(dp / m.pip, 1) + ' ' + m.unit : '';
+    const bars = Math.round((this.lg(t1) || 0) - (this.lg(t0) || 0));
+    return `${dp >= 0 ? '+' : '−'}${nf(Math.abs(dp), this.ws.digits)} (${dp >= 0 ? '+' : '−'}${nf(Math.abs(pct), 2)} %)${unit ? ' · ' + unit.replace('-', '−') : ''}\n${Math.abs(bars)} Kerzen · ${durText(t1 - t0)}`;
+  }
+  /* ---------- axis labels: horizontal and vertical lines always, the selected drawing's points */
+  axisViews() {
+    const price = [], time = [], ws = this.ws;
+    if (this.opt.hidden || !ws.series || !ws.dataT || !ws.dataT.length) return {price, time};
+    const pv = (p, col) => ({coordinate: () => { const y = this.Y(p); return y == null ? -100 : y; }, text: () => this.priceTxt(p), textColor: () => lightColor(col) ? '#131722' : '#ffffff', backColor: () => col, visible: () => true, tickVisible: () => true});
+    const tv = (t, col) => ({coordinate: () => { const x = this.X(t); return x == null ? -100 : x; }, text: () => (TF[ws.tf].min >= 1440 ? fAxD : fAxT).format(new Date(t)), textColor: () => lightColor(col) ? '#131722' : '#ffffff', backColor: () => col, visible: () => true, tickVisible: () => true});
+    for (const d of this.list) {
+      if (d.type === 'hline' || d.type === 'hray' || d.type === 'crossline') price.push(pv(d.pts[0].p, d.st.color));
+      if (d.type === 'vline' || d.type === 'crossline') time.push(tv(d.pts[0].t, d.st.color));
+    }
+    const s = this.sel && this.byId(this.sel);
+    if (s && !['hline', 'hray', 'vline', 'crossline'].includes(s.type)) {
+      const col = s.type === 'long' || s.type === 'short' ? '#2962ff' : s.st.color;
+      const ps = new Set(), tsSet = new Set();
+      for (const pt of s.pts) { if (!ps.has(pt.p)) { ps.add(pt.p); price.push(pv(pt.p, col)); } if (!tsSet.has(pt.t)) { tsSet.add(pt.t); time.push(tv(pt.t, col)); } }
+    }
+    return {price, time};
+  }
+  /* ---------- hit test */
+  hit(x, y, tol) {
+    if (this.opt.hidden) return null;
+    const sg = this.sel && this.geo.get(this.sel);
+    if (sg) for (let k = 0; k < sg.handles.length; k++) { const h = sg.handles[k]; if (Math.hypot(h.x - x, h.y - y) <= tol + 2) return {id: this.sel, h: k}; }
+    for (let i = this.list.length - 1; i >= 0; i--) {
+      const d = this.list[i], g = this.geo.get(d.id); if (!g) continue;
+      if (g.segs.some(s => segDist(x, y, s[0], s[1], s[2], s[3]) <= tol)) return {id: d.id, h: -1};
+      if (g.rects.some(r => x >= r[0] - tol && x <= r[0] + r[2] + tol && y >= r[1] - tol && y <= r[1] + r[3] + tol)) return {id: d.id, h: -1};
+      if (g.polys.some(p => inPoly(x, y, p))) return {id: d.id, h: -1};
+      if (g.ells.some(e => { const nx = (x - e[0]) / (e[2] + tol), ny = (y - e[1]) / (e[3] + tol); return nx * nx + ny * ny <= 1; })) return {id: d.id, h: -1};
+      if (g.handles.some(h => Math.hypot(h.x - x, h.y - y) <= tol)) return {id: d.id, h: -1};
+    }
+    return null;
+  }
+  /* ---------- pointer handling */
+  bind() {
+    const box = this.ws.box;
+    this.onDown = e => this.down(e);
+    this.onHover = e => this.hover(e);
+    this.onMove = e => this.move(e);
+    this.onUp = e => this.up(e);
+    this.onDbl = e => this.dbl(e);
+    this.onCtx = e => { if (this.mk) { e.preventDefault(); this.finishOrCancel(); } };
+    ['pointerdown', 'mousedown', 'touchstart'].forEach(t => box.addEventListener(t, this.onDown, {capture: true, passive: false}));
+    box.addEventListener('pointermove', this.onHover);
+    box.addEventListener('dblclick', this.onDbl);
+    box.addEventListener('contextmenu', this.onCtx);
+    this.onOut = e => { if (this.pop && !e.target.closest('.bt-pop,.bt-ftb,.bt-fly,.bt-tools')) this.closePop(); };
+    document.addEventListener('pointerdown', this.onOut, true);
+  }
+  unbind() {
+    const box = this.ws.box;
+    ['pointerdown', 'mousedown', 'touchstart'].forEach(t => box.removeEventListener(t, this.onDown, {capture: true}));
+    box.removeEventListener('pointermove', this.onHover);
+    box.removeEventListener('dblclick', this.onDbl);
+    box.removeEventListener('contextmenu', this.onCtx);
+    document.removeEventListener('pointerdown', this.onOut, true);
+    this.release();
+  }
+  take(e) { if (e.cancelable) e.preventDefault(); e.stopPropagation(); this.eat = true; }
+  capture() {
+    if (this.capt) return; this.capt = true;
+    window.addEventListener('pointermove', this.onMove, true);
+    window.addEventListener('pointerup', this.onUp, true);
+    window.addEventListener('pointercancel', this.onUp, true);
+    window.addEventListener('touchmove', this.onTouchBlock = e => { if (e.cancelable) e.preventDefault(); }, {capture: true, passive: false});
+    this.ws.chart.applyOptions({handleScroll: false, handleScale: false});
+  }
+  release() {
+    if (!this.capt) return; this.capt = false;
+    window.removeEventListener('pointermove', this.onMove, true);
+    window.removeEventListener('pointerup', this.onUp, true);
+    window.removeEventListener('pointercancel', this.onUp, true);
+    window.removeEventListener('touchmove', this.onTouchBlock, {capture: true});
+    this.ws.chart && this.ws.chart.applyOptions({handleScroll: true, handleScale: true});
+  }
+  down(e) {
+    const ws = this.ws;
+    if (e.target && e.target.closest && e.target.closest(OVERLAYS)) return;
+    if (e.type !== 'pointerdown') { if (this.eat) { if (e.cancelable) e.preventDefault(); e.stopPropagation(); } return; }
+    this.eat = false;
+    if (ws.drag && ws.drag.on) return;
+    if (this.ed) return;
+    if (e.button > 0) return;
+    const {x, y, inPane} = this.loc(e);
+    if (!inPane) return;
+    this.closePop();
+    if (this.mk) { this.take(e); this.mkDown(x, y, e); return; }
+    const tool = TOOLS[this.tool];
+    if (!tool.cursor) { this.take(e); this.begin(x, y, e); return; }
+    const h = this.hit(x, y, e.pointerType === 'touch' ? 14 : 6);
+    if (this.tool === 'eraser') { const dh = h && this.byId(h.id); if (dh && !(dh.lock || this.opt.locked)) { this.take(e); this.remove(h.id); } return; }
+    if (!h) { if (this.sel) this.select(null); return; }
+    this.take(e);
+    if (this.sel !== h.id) this.select(h.id);
+    const d = this.byId(h.id);
+    if (!d || d.lock || this.opt.locked) return;
+    this.snap();
+    this.drag = {d, h: h.h, x0: x, y0: y, orig: JSON.parse(JSON.stringify(d.pts)), l0: this.lgAt(x), p0: ws.series.coordinateToPrice(y), moved: false};
+    this.capture();
+  }
+  hover(e) {
+    if (this.capt || this.ed) return;
+    if (e.target && e.target.closest && e.target.closest(OVERLAYS)) { this.ws.box.classList.remove('bt-c-move', 'bt-c-pt', 'bt-c-draw'); return; }
+    const {x, y, inPane} = this.loc(e);
+    const box = this.ws.box;
+    box.classList.toggle('bt-c-draw', !TOOLS[this.tool].cursor && inPane);
+    if (!TOOLS[this.tool].cursor || !inPane) { box.classList.remove('bt-c-move', 'bt-c-pt'); return; }
+    const h = this.hit(x, y, 6), d = h && this.byId(h.id);
+    box.classList.toggle('bt-c-pt', !!h && (h.h >= 0 || this.tool === 'eraser') && !(d && (d.lock || this.opt.locked) && this.tool !== 'eraser'));
+    box.classList.toggle('bt-c-move', !!h && h.h < 0 && this.tool !== 'eraser' && !(d.lock || this.opt.locked));
+  }
+  move(e) {
+    const {x, y} = this.loc(e);
+    if (this.mk) this.mkMove(x, y, e);
+    else if (this.drag) this.dragMove(x, y, e);
+  }
+  up(e) {
+    const {x, y} = this.loc(e);
+    if (this.mk) { this.mkUp(x, y, e); return; }
+    if (this.drag) {
+      const g = this.drag; this.drag = null; this.release();
+      if (!g.moved) { this.undoS.pop(); return; }
+      this.changed();
+    }
+  }
+  dbl(e) {
+    if (e.target && e.target.closest && e.target.closest(OVERLAYS)) return;
+    const {x, y, inPane} = this.loc(e); if (!inPane) return;
+    if (this.mk && this.mk.d.type === 'path') { e.preventDefault(); e.stopPropagation(); this.finishOrCancel(); return; }
+    if (!TOOLS[this.tool].cursor) return;
+    const h = this.hit(x, y, 8), d = h && this.byId(h.id);
+    if (d && TEXT_TYPES.has(d.type) && !(d.lock || this.opt.locked)) { e.preventDefault(); e.stopPropagation(); this.select(d.id); this.editText(d); }
+  }
+  /* ---------- creating */
+  begin(x, y, e) {
+    const t = this.tool, def = TOOLS[t];
+    if (this.list.length >= MAX_DRAWINGS) { CTX.toast('Diese Session hat schon ' + MAX_DRAWINGS + ' Zeichnungen. Lösch ein paar, um neue anzulegen.'); return; }
+    const p = this.ptAt(x, y, t !== 'brush'); if (!p) return;
+    this.snap();
+    const d = {id: rid('d'), type: t, pts: [p], st: defStyle(t)};
+    if (t === 'text') d.st.color = toHex(this.ws.col.fg);
+    if (t === 'long' || t === 'short') {
+      const top = this.ws.series.coordinateToPrice(0), bot = this.ws.series.coordinateToPrice(this.pane().h);
+      const risk = Math.max(Math.abs(top - bot) * 0.05, Math.pow(10, -this.ws.digits) * 5), sgn = t === 'long' ? 1 : -1;
+      const t1 = Math.round(this.msAt(Math.round(this.lg(p.t)) + 24));
+      d.pts = [p, {t: t1, p: this.rp(p.p + sgn * 2 * risk)}, {t: t1, p: this.rp(p.p - sgn * risk)}];
+      this.list.push(d); this.finish(d); return;
+    }
+    if (def.n === 1) { this.list.push(d); this.finish(d); return; }
+    this.list.push(d);
+    if (def.free) { this.mk = {d, brush: true, lx: x, ly: y}; this.capture(); this.update(); return; }
+    d.pts.push({t: p.t, p: p.p});
+    this.mk = {d, i: 1, down: true, first: true, x0: x, y0: y, moved: false};
+    this.capture(); this.update();
+  }
+  mkDown(x, y, e) {
+    const m = this.mk; if (m.brush) return;
+    m.down = true; m.x0 = x; m.y0 = y; m.moved = false;
+    this.mkMove(x, y, e);
+  }
+  mkMove(x, y, e) {
+    const m = this.mk, d = m.d;
+    if (m.brush) {
+      if (Math.hypot(x - m.lx, y - m.ly) < 2.5 || d.pts.length >= MAX_BRUSH) return;
+      const p = this.ptAt(x, y, false); if (p) { d.pts.push(p); m.lx = x; m.ly = y; this.update(); }
+      return;
+    }
+    if (m.down && Math.hypot(x - m.x0, y - m.y0) > 5) m.moved = true;
+    const p = this.ptAt(x, y, true); if (!p) return;
+    if (e.shiftKey && LINE_TYPES.has(d.type) && m.i > 0) p.p = d.pts[m.i - 1].p;
+    d.pts[m.i] = p; this.update();
+  }
+  mkUp(x, y, e) {
+    const m = this.mk;
+    if (m.brush) { if (m.d.pts.length < 2) this.cancel(); else this.finish(m.d); return; }
+    const wasDown = m.down; m.down = false;
+    if (!wasDown) return;
+    if (m.first && !m.moved) { m.first = false; return; }   // a click: the next point follows the pointer
+    m.first = false;
+    this.mkMove(x, y, e);
+    const d = m.d, n = TOOLS[d.type].n;
+    m.i++;
+    if (m.i >= n) { this.finish(d); return; }
+    d.pts.push({t: d.pts[m.i - 1].t, p: d.pts[m.i - 1].p});
+    this.update();
+  }
+  finishOrCancel() {
+    const m = this.mk; if (!m) return;
+    const d = m.d;
+    if (d.type === 'path') {
+      // the point that follows the pointer, and the double click's twin points, go
+      d.pts.pop();
+      while (d.pts.length > 2) { const a = d.pts[d.pts.length - 1], b = d.pts[d.pts.length - 2]; if (Math.abs((this.X(a.t) || 0) - (this.X(b.t) || 0)) < 4 && Math.abs((this.Y(a.p) || 0) - (this.Y(b.p) || 0)) < 4) d.pts.pop(); else break; }
+      if (d.pts.length >= 2) { this.finish(d); return; }
+    }
+    this.cancel();
+  }
+  finish(d) {
+    this.mk = null; this.release();
+    const P = d.pts.map(pt => [this.X(pt.t), this.Y(pt.p)]);
+    const flat = P.length > 1 && P.every(q => Math.abs(q[0] - P[0][0]) < 3 && Math.abs(q[1] - P[0][1]) < 3) && !['long', 'short'].includes(d.type);
+    if (flat && TOOLS[d.type].n !== 1) { this.list.splice(this.list.indexOf(d), 1); this.undoS.pop(); this.update(); return; }
+    this.select(d.id);
+    this.changed();
+    if (!this.ws.cs.stay) this.setTool('cross');
+    if (d.type === 'text' || d.type === 'callout') this.editText(d, true);
+  }
+  cancel() {
+    const m = this.mk; if (!m) return;
+    this.mk = null; this.release();
+    const i = this.list.indexOf(m.d); if (i >= 0) this.list.splice(i, 1);
+    this.undoS.pop();
+    this.update();
+  }
+  dragMove(x, y, e) {
+    const g = this.drag, d = g.d;
+    if (!g.moved && Math.hypot(x - g.x0, y - g.y0) < 3) return;
+    g.moved = true;
+    if (g.h >= 0) {
+      const geo = this.geo.get(d.id), hd = geo && geo.handles[g.h];
+      const p = this.ptAt(x, y, d.type !== 'brush'); if (!p || !hd) return;
+      if (hd.set) hd.set(p, e);
+      else {
+        if (e.shiftKey && LINE_TYPES.has(d.type) && d.pts.length === 2) p.p = d.pts[1 - hd.i].p;
+        d.pts[hd.i] = p;
+        if (d.type === 'hline' || d.type === 'hray' || d.type === 'crossline' || d.type === 'vline') d.pts[0] = p;
+      }
+    } else {
+      const l = this.lgAt(x), pr = this.ws.series.coordinateToPrice(y);
+      if (l == null || pr == null || g.l0 == null || g.p0 == null) return;
+      const dl = d.type === 'brush' ? l - g.l0 : Math.round(l - g.l0), dp = pr - g.p0;
+      d.pts = g.orig.map(pt => ({t: Math.round(this.msAt(this.lg(pt.t) + dl)), p: this.rp(pt.p + dp)}));
+    }
+    this.update();
+    this.renderFtb(true);
+  }
+  /* ---------- changes, undo, saving */
+  snap() {
+    this.undoS.push(JSON.stringify(this.list));
+    if (this.undoS.length > 80) this.undoS.shift();
+    this.redoS = [];
+    this.syncBtns();
+  }
+  changed() { this.ws.markDirty(); this.update(); this.renderFtb(); this.syncBtns(); }
+  restore(json) {
+    this.ws.s.drawings = JSON.parse(json);
+    if (this.sel && !this.byId(this.sel)) this.sel = null;
+    this.closeEd(false);
+    this.changed();
+  }
+  undo() { if (this.mk) { this.cancel(); return; } if (!this.undoS.length) return; this.redoS.push(JSON.stringify(this.list)); this.restore(this.undoS.pop()); }
+  redo() { if (!this.redoS.length) return; this.undoS.push(JSON.stringify(this.list)); this.restore(this.redoS.pop()); }
+  syncBtns() {
+    const u = document.querySelector('.bt-ws [data-ws="undo"]'), r = document.querySelector('.bt-ws [data-ws="redo"]');
+    if (u) u.disabled = !this.undoS.length && !this.mk;
+    if (r) r.disabled = !this.redoS.length;
+  }
+  select(id) {
+    if (this.sel === id) return;
+    this.sel = id; this.closePop();
+    this.update(); this.renderFtb();
+  }
+  remove(id) {
+    const i = this.list.findIndex(d => d.id === id); if (i < 0) return;
+    this.snap(); this.list.splice(i, 1);
+    if (this.sel === id) this.sel = null;
+    this.changed();
+  }
+  clone(id) {
+    const d = this.byId(id); if (!d) return;
+    this.snap();
+    const c = JSON.parse(JSON.stringify(d)); c.id = rid('d'); c.lock = false;
+    const dl = 6, dp = (this.ws.series.coordinateToPrice(0) - this.ws.series.coordinateToPrice(24)) || 0;
+    c.pts = c.pts.map(pt => ({t: Math.round(this.msAt(this.lg(pt.t) + dl)), p: this.rp(pt.p - dp)}));
+    this.list.push(c); this.sel = c.id; this.changed();
+  }
+  setSt(patch, coalesce) {
+    const d = this.byId(this.sel); if (!d) return;
+    const now = Date.now();
+    if (!(coalesce && this.lastSt && this.lastSt.k === coalesce && this.lastSt.id === d.id && now - this.lastSt.t < 1200)) this.snap();
+    this.lastSt = {k: coalesce, id: d.id, t: now};
+    Object.assign(d.st, patch);
+    this.changed();
+  }
+  clearAll() {
+    if (!this.list.length) return;
+    const dl = dialog(`<div class="bt-dlg-head"><h2>Alle Zeichnungen löschen?</h2><button type="button" class="btn icon ghost" data-bt="close" aria-label="Schließen">✕</button></div>
+      <p class="bt-note">Das entfernt alle ${this.list.length} Zeichnungen dieser Session. Mit Rückgängig holst du sie zurück, solange die Session offen ist.</p>
+      <div class="row-btns end"><button type="button" class="btn ghost" data-bt="close">Abbrechen</button><button type="button" class="btn primary" id="bt-dc-go">Alle löschen</button></div>`);
+    $('#bt-dc-go', dl).addEventListener('click', () => { this.snap(); this.ws.s.drawings = []; this.sel = null; closeDialog(); this.changed(); this.renderTools(); });
+  }
+  /* ---------- keys (called by the workspace) */
+  key(e) {
+    const tg = e.target;
+    if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) return false;
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && !e.altKey && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); return true; }
+    if (mod && !e.altKey && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); this.redo(); return true; }
+    if (e.altKey && !mod) {
+      const k = (e.code || '').replace('Key', '');
+      const t = Object.keys(TOOLS).find(id => TOOLS[id].key === k);
+      if (t) { e.preventDefault(); this.setTool(t); return true; }
+      return false;
+    }
+    if (mod) return false;
+    if (e.key === 'Escape') {
+      if (this.pop) { e.preventDefault(); e.stopPropagation(); this.closePop(); return true; }
+      if (this.mk) { e.preventDefault(); e.stopPropagation(); this.finishOrCancel(); return true; }
+      if (this.sel) { e.preventDefault(); e.stopPropagation(); this.select(null); return true; }
+      if (this.tool !== 'cross') { e.preventDefault(); e.stopPropagation(); this.setTool('cross'); return true; }
+      return false;
+    }
+    if (e.key === 'Enter' && this.mk && this.mk.d.type === 'path') { e.preventDefault(); this.finishOrCancel(); return true; }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && this.sel) {
+      const d = this.byId(this.sel);
+      if (d && !(d.lock || this.opt.locked)) { e.preventDefault(); this.remove(this.sel); return true; }
+    }
+    return false;
+  }
+  /* ---------- left toolbar */
+  setTool(t) {
+    if (!TOOLS[t]) return;
+    if (this.mk) this.cancel();
+    this.tool = t;
+    const g = TGROUPS.find(x => x.tools.includes(t)); if (g) this.last[g.id] = t;
+    if (!TOOLS[t].cursor) this.select(null);
+    this.ws.chart && this.ws.chart.applyOptions({crosshair: {mode: t === 'pointer' ? 2 : 0}});
+    this.ws.box.classList.toggle('bt-c-erase', t === 'eraser');
+    this.closePop();
+    this.renderTools();
+  }
+  renderTools() {
+    const el = document.getElementById('bt-tools'); if (!el) return;
+    const cs = this.ws.cs, o = this.opt;
+    const grp = g => {
+      const cur = this.last[g.id], on = g.tools.includes(this.tool);
+      const t = on ? this.tool : cur;
+      return `<div class="bt-tg${on ? ' on' : ''}"><button type="button" class="bt-tb" data-dtool="${t}" aria-pressed="${on}" aria-label="${esc(TOOLS[t].name)}" title="${esc(TOOLS[t].name)}${TOOLS[t].key ? ' (Alt+' + TOOLS[t].key + ')' : ''}">${TOOLS[t].icon}</button>${g.tools.length > 1 ? `<button type="button" class="bt-tc" data-dfly="${g.id}" aria-haspopup="menu" aria-expanded="${this.pop && this.pop.fly === g.id}" aria-label="${esc(g.name)}: alle Werkzeuge" title="${esc(g.name)}">${UI_ICON.caret}</button>` : ''}</div>`;
+    };
+    el.innerHTML = TGROUPS.map(grp).join('') + `<span class="bt-tsep" aria-hidden="true"></span>
+      <button type="button" class="bt-tb" data-dopt="magnet" aria-pressed="${!!cs.magnet}" aria-label="Magnet: Punkte rasten an Open, High, Low und Close ein" title="Magnet">${UI_ICON.magnet}</button>
+      <button type="button" class="bt-tb" data-dopt="stay" aria-pressed="${!!cs.stay}" aria-label="Zeichenmodus beibehalten" title="Zeichenmodus beibehalten">${UI_ICON.stay}</button>
+      <button type="button" class="bt-tb" data-dopt="locked" aria-pressed="${!!o.locked}" aria-label="Alle Zeichnungen sperren" title="Alle Zeichnungen sperren">${o.locked ? UI_ICON.lock : UI_ICON.unlock}</button>
+      <button type="button" class="bt-tb" data-dopt="hidden" aria-pressed="${!!o.hidden}" aria-label="Alle Zeichnungen ausblenden" title="Alle Zeichnungen ausblenden">${o.hidden ? UI_ICON.eyeOff : UI_ICON.eye}</button>
+      <button type="button" class="bt-tb" data-dopt="clear" aria-label="Alle Zeichnungen löschen" title="Alle Zeichnungen löschen">${UI_ICON.trash}</button>`;
+  }
+  toolClick(b) {
+    if (b.dataset.dtool) { const t = b.dataset.dtool; this.setTool(this.tool === t && !TOOLS[t].cursor ? 'cross' : t); return; }
+    if (b.dataset.dfly) { this.openFly(b.dataset.dfly, b); return; }
+    if (b.dataset.dpick) { this.setTool(b.dataset.dpick); return; }
+    const k = b.dataset.dopt;
+    if (k === 'magnet' || k === 'stay') { this.ws.cs[k] = !this.ws.cs[k]; saveCS(this.ws.cs); this.renderTools(); }
+    else if (k === 'locked') { this.opt.locked = !this.opt.locked; this.ws.markDirty(); this.renderTools(); this.renderFtb(); }
+    else if (k === 'hidden') { this.opt.hidden = !this.opt.hidden; if (this.opt.hidden) this.select(null); this.ws.markDirty(); this.update(); this.renderTools(); }
+    else if (k === 'clear') this.clearAll();
+  }
+  openFly(gid, btn) {
+    if (this.pop && this.pop.fly === gid) { this.closePop(); return; }
+    this.closePop();
+    const g = TGROUPS.find(x => x.id === gid); if (!g) return;
+    const el = document.createElement('div');
+    el.className = 'bt-fly bt-pop'; el.setAttribute('role', 'menu'); el.setAttribute('aria-label', g.name);
+    el.innerHTML = `<p class="bt-fly-h">${esc(g.name)}</p>` + g.tools.map(t => `<button type="button" role="menuitemradio" aria-checked="${this.tool === t}" data-dpick="${t}">${TOOLS[t].icon}<span>${esc(TOOLS[t].name)}</span>${TOOLS[t].key ? `<kbd>Alt+${TOOLS[t].key}</kbd>` : ''}</button>`).join('');
+    const host = this.ws.box.closest('.bt-chartbox');
+    host.appendChild(el);
+    const hr = host.getBoundingClientRect(), br = btn.closest('.bt-tg').getBoundingClientRect();
+    const vertical = getComputedStyle(document.getElementById('bt-tools')).flexDirection === 'column';
+    if (vertical) { el.style.left = (br.right - hr.left + 6) + 'px'; el.style.top = Math.max(6, Math.min(br.top - hr.top, hr.height - el.offsetHeight - 6)) + 'px'; }
+    else { el.style.left = Math.max(6, Math.min(br.left - hr.left, hr.width - el.offsetWidth - 6)) + 'px'; el.style.top = (br.bottom - hr.top + 6) + 'px'; }
+    this.pop = {el, fly: gid};
+    this.renderTools();
+    const first = el.querySelector('[aria-checked="true"]') || el.querySelector('button'); first && first.focus({preventScroll: true});
+    el.addEventListener('keydown', e => {
+      const bs = $$('button', el), i = bs.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); bs[(i + (e.key === 'ArrowDown' ? 1 : -1) + bs.length) % bs.length].focus(); }
+    });
+  }
+  closePop() {
+    if (!this.pop) return;
+    const p = this.pop; this.pop = null; p.el.remove();
+    if (p.fly) this.renderTools();
+  }
+  /* ---------- floating toolbar of the selected drawing */
+  renderFtb(onlyPos) {
+    let el = this.ws.box.querySelector('.bt-ftb');
+    const d = this.sel && this.byId(this.sel);
+    if (!d || this.opt.hidden) { if (el) el.remove(); return; }
+    if (onlyPos && el) return;
+    if (!el) { el = document.createElement('div'); el.className = 'bt-ftb'; el.setAttribute('role', 'toolbar'); el.setAttribute('aria-label', 'Zeichnung bearbeiten'); this.ws.box.appendChild(el); el.addEventListener('click', e => { const b = e.target.closest('[data-fx]'); if (b && !b.disabled) this.fx(b.dataset.fx, b); }); }
+    const st = d.st, locked = d.lock || this.opt.locked, T = d.type;
+    const b = (k, inner, label, extra) => `<button type="button" class="bt-fb" data-fx="${k}" aria-label="${esc(label)}" title="${esc(label)}"${locked && k !== 'lock' ? ' disabled' : ''}${extra || ''}>${inner}</button>`;
+    let h = `<span class="bt-fname">${esc(TOOLS[T].name)}</span>`;
+    if (T !== 'long' && T !== 'short') h += b('color', `<i class="bt-sw" style="background:${st.color}"></i>`, T === 'text' ? 'Textfarbe' : 'Farbe');
+    if (FILL_TYPES.has(T)) h += b('fill', `<i class="bt-sw fill${st.fill ? '' : ' off'}" style="background:${st.fill ? rgba(st.fillColor || st.color, Math.max(st.alpha, 0.35)) : 'transparent'}"></i>`, T === 'text' ? 'Hintergrund' : 'Füllung');
+    if (!NO_LINE.has(T) || T === 'long' || T === 'short') { if (!NO_LINE.has(T)) { h += b('width', `<span class="bt-fw"><i style="height:${st.width}px"></i></span>`, 'Linienstärke'); h += b('dash', `<span class="bt-fd d${st.dash}"></span>`, 'Linienstil'); } }
+    if (TEXT_TYPES.has(T)) h += b('text', UI_ICON.text, 'Text bearbeiten');
+    if (T === 'text' || T === 'callout' || T === 'pricelabel' || (TEXT_TYPES.has(T) && st.text)) h += b('size', `<span class="bt-fs">${st.size}</span>`, 'Schriftgröße');
+    if (EXT_TYPES.has(T)) h += b('ext', UI_ICON.ext, 'Verlängern');
+    if (T === 'fib') h += b('rev', UI_ICON.flip, 'Umkehren', ` aria-pressed="${!!st.rev}"`);
+    if (T === 'long' || T === 'short') h += b('order', UI_ICON.order + '<span>Als Order</span>', 'Als Order übernehmen');
+    h += `<span class="bt-fsep"></span>` + b('lock', d.lock ? UI_ICON.lock : UI_ICON.unlock, d.lock ? 'Entsperren' : 'Sperren', ` aria-pressed="${!!d.lock}"`) + b('clone', UI_ICON.clone, 'Duplizieren') + b('del', UI_ICON.trash, 'Löschen (Entf)');
+    el.innerHTML = h;
+  }
+  fx(k, btn) {
+    const d = this.byId(this.sel); if (!d) return;
+    if (k === 'del') { this.remove(d.id); return; }
+    if (k === 'clone') { this.clone(d.id); return; }
+    if (k === 'lock') { this.snap(); d.lock = !d.lock; this.changed(); return; }
+    if (k === 'text') { this.editText(d); return; }
+    if (k === 'rev') { this.setSt({rev: !d.st.rev}); return; }
+    if (k === 'order') { this.toOrder(d); return; }
+    if (this.pop && this.pop.fx === k) { this.closePop(); return; }
+    this.closePop();
+    const el = document.createElement('div');
+    el.className = 'bt-pop bt-fpop';
+    const st = d.st;
+    if (k === 'color' || k === 'fill') {
+      const cur = k === 'fill' ? (st.fillColor || st.color) : st.color;
+      el.innerHTML = `<div class="bt-pal">${D_COLORS.map(c => `<button type="button" class="bt-pc${c === cur ? ' on' : ''}" data-c="${c}" style="background:${c}" aria-label="Farbe ${c}"></button>`).join('')}</div>
+        <label class="bt-prow">Eigene Farbe <input type="color" value="${toHex(cur)}" data-cc></label>
+        ${k === 'fill' ? `<label class="bt-prow"><input type="checkbox" data-fon${st.fill ? ' checked' : ''}> ${d.type === 'text' ? 'Hintergrund anzeigen' : 'Füllung anzeigen'}</label><label class="bt-prow">Deckkraft <input type="range" min="5" max="100" step="5" value="${Math.round(st.alpha * 100)}" data-alpha></label>` : ''}`;
+      el.addEventListener('click', e => { const c = e.target.closest('[data-c]'); if (!c) return; this.setSt(k === 'fill' ? {fillColor: c.dataset.c, fill: true} : {color: c.dataset.c}); this.refreshPop(el, k); });
+      el.addEventListener('input', e => {
+        if (e.target.matches('[data-cc]')) this.setSt(k === 'fill' ? {fillColor: e.target.value, fill: true} : {color: e.target.value}, 'cc' + k);
+        if (e.target.matches('[data-alpha]')) this.setSt({alpha: +e.target.value / 100, fill: true}, 'alpha');
+        if (e.target.matches('[data-fon]')) this.setSt({fill: e.target.checked});
+      });
+    } else if (k === 'width') {
+      el.innerHTML = [1, 2, 3, 4].map(w => `<button type="button" class="bt-pl${st.width === w ? ' on' : ''}" data-w="${w}"><i style="height:${w}px"></i><span>${w} px</span></button>`).join('');
+      el.addEventListener('click', e => { const c = e.target.closest('[data-w]'); if (c) { this.setSt({width: +c.dataset.w}); this.closePop(); } });
+    } else if (k === 'dash') {
+      el.innerHTML = [[0, 'Durchgezogen'], [1, 'Gestrichelt'], [2, 'Gepunktet']].map(([v, n]) => `<button type="button" class="bt-pl${st.dash === v ? ' on' : ''}" data-dash="${v}"><span class="bt-fd d${v}"></span><span>${n}</span></button>`).join('');
+      el.addEventListener('click', e => { const c = e.target.closest('[data-dash]'); if (c) { this.setSt({dash: +c.dataset.dash}); this.closePop(); } });
+    } else if (k === 'size') {
+      el.innerHTML = [10, 12, 14, 16, 20, 24, 28, 36].map(s => `<button type="button" class="bt-pl${st.size === s ? ' on' : ''}" data-size="${s}"><span>${s}</span></button>`).join('');
+      el.addEventListener('click', e => { const c = e.target.closest('[data-size]'); if (c) { this.setSt({size: +c.dataset.size}); this.closePop(); } });
+    } else if (k === 'ext') {
+      el.innerHTML = `<label class="bt-prow"><input type="checkbox" data-ext="extL"${st.extL ? ' checked' : ''}> Nach links verlängern</label><label class="bt-prow"><input type="checkbox" data-ext="extR"${st.extR ? ' checked' : ''}> Nach rechts verlängern</label>`;
+      el.addEventListener('change', e => { const c = e.target.closest('[data-ext]'); if (c) this.setSt({[c.dataset.ext]: c.checked}); });
+    } else return;
+    this.ws.box.appendChild(el);
+    const br = btn.getBoundingClientRect(), hr = this.ws.box.getBoundingClientRect();
+    el.style.left = Math.max(6, Math.min(br.left - hr.left, hr.width - el.offsetWidth - 6)) + 'px';
+    el.style.top = (br.bottom - hr.top + 6) + 'px';
+    this.pop = {el, fx: k};
+  }
+  refreshPop(el, k) {
+    const d = this.byId(this.sel); if (!d) return;
+    const cur = k === 'fill' ? (d.st.fillColor || d.st.color) : d.st.color;
+    $$('[data-c]', el).forEach(b => b.classList.toggle('on', b.dataset.c === cur));
+    const cc = $('[data-cc]', el); if (cc) cc.value = toHex(cur);
+    const fo = $('[data-fon]', el); if (fo) fo.checked = !!d.st.fill;
+  }
+  toOrder(d) {
+    const ws = this.ws;
+    if (ws.s.order) { CTX.toast('Schließe zuerst die offene Position.'); return; }
+    const side = d.type === 'long' ? 'long' : 'short';
+    const e0 = d.pts[0].p, tp = d.pts[1].p, sl = d.pts[2].p;
+    const lp = ws.last, near = Math.abs(e0 - lp) <= Math.pow(10, -ws.digits) * 2;
+    ws.draft = {side, kind: near ? 'market' : 'pending', entry: this.rp(e0), sl: this.rp(sl), tp: this.rp(tp)};
+    ws.renderSide(); ws.refreshLines();
+    const err = ws.validate(Object.assign({}, ws.draft, {kind: near ? 'market' : (side === 'long') === (e0 < lp) ? 'limit' : 'stop'}));
+    CTX.toast(err ? 'Als Entwurf übernommen. ' + err : 'Als Order-Entwurf übernommen. Prüf ihn rechts und platziere ihn.');
+  }
+  /* ---------- text editing on the chart */
+  editText(d, fresh) {
+    this.closeEd(true);
+    const P = this.X(d.pts[d.type === 'callout' ? 1 : 0].t), Q = this.Y(d.pts[d.type === 'callout' ? 1 : 0].p);
+    if (P == null || Q == null) return;
+    const ta = document.createElement('textarea');
+    ta.className = 'bt-txted'; ta.value = d.st.text || ''; ta.rows = 2;
+    ta.setAttribute('aria-label', 'Text der Zeichnung');
+    ta.placeholder = d.type === 'hline' || d.type === 'rect' || d.type === 'up' || d.type === 'down' ? 'Beschriftung' : 'Text';
+    ta.style.left = Math.max(4, Math.min(P, this.W - 180)) + 'px';
+    ta.style.top = Math.max(4, Math.min(Q - (d.type === 'hline' ? 34 : 0), this.H - 70)) + 'px';
+    ta.style.fontSize = Math.min(20, d.st.size || 14) + 'px';
+    this.ws.box.appendChild(ta);
+    const before = JSON.stringify(this.list);
+    this.ed = {ta, d, fresh, before};
+    ta.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.closeEd(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); this.closeEd(false); }
+    });
+    ta.addEventListener('blur', () => setTimeout(() => this.closeEd(true), 0));
+    setTimeout(() => { ta.focus(); ta.select(); }, 0);
+  }
+  closeEd(keep) {
+    const ed = this.ed; if (!ed) return;
+    this.ed = null;
+    const v = ed.ta.value.replace(/\s+$/, '').slice(0, 500);
+    ed.ta.remove();
+    const d = ed.d;
+    if (keep && v !== (d.st.text || '')) {
+      if (!ed.fresh) { this.undoS.push(ed.before); this.redoS = []; }
+      d.st.text = v;
+    }
+    if ((d.type === 'text' || d.type === 'callout') && !(d.st.text || '').trim() && this.byId(d.id)) {
+      if (ed.fresh) { this.list.splice(this.list.indexOf(d), 1); this.undoS.pop(); if (this.sel === d.id) this.sel = null; }
+    }
+    this.changed();
+  }
+  destroy() { this.closeEd(false); this.closePop(); this.unbind(); }
+}
+
+/* how each drawing paints itself; g collects what can be hit and the handles */
+const RENDER = {
+  trend(L, c, d, P, g) {
+    const s = d.st, T = d.type;
+    L.pen(c, s);
+    L.seg(c, g, P[0].x, P[0].y, P[1].x, P[1].y, T === 'ext' || (T === 'trend' && s.extL), T === 'ray' || T === 'ext' || (T === 'trend' && s.extR));
+    if (T === 'arrowline') {
+      const a = Math.atan2(P[1].y - P[0].y, P[1].x - P[0].x), len = 8 + s.width * 2.5;
+      c.setLineDash([]); c.beginPath();
+      c.moveTo(P[1].x - len * Math.cos(a - 0.45), P[1].y - len * Math.sin(a - 0.45)); c.lineTo(P[1].x, P[1].y); c.lineTo(P[1].x - len * Math.cos(a + 0.45), P[1].y - len * Math.sin(a + 0.45)); c.stroke();
+    }
+    if (T === 'info') {
+      const r = L.label(c, L.moveTxt(d.pts[0].p, d.pts[1].p, d.pts[0].t, d.pts[1].t), P[1].x + 10, P[1].y, {size: 11, mono: true, pad: 6, bg: rgba(s.color, 0.88), color: lightColor(s.color) ? '#131722' : '#fff', base: 'middle'});
+      g.rects.push(r);
+    }
+  },
+  hline(L, c, d, P, g) {
+    const s = d.st; L.pen(c, s);
+    L.seg(c, g, 0, P[0].y, L.W, P[0].y);
+    g.handles = [{x: Math.min(L.W - 40, Math.max(40, P[0].x)), y: P[0].y, i: 0}];
+    if (s.text) g.rects.push(L.label(c, s.text, 8, P[0].y - 4, {size: s.size, color: s.color, base: 'bottom'}));
+  },
+  hray(L, c, d, P, g) { L.pen(c, d.st); L.seg(c, g, P[0].x, P[0].y, L.W, P[0].y); },
+  vline(L, c, d, P, g) {
+    L.pen(c, d.st); L.seg(c, g, P[0].x, 0, P[0].x, L.H);
+    g.handles = [{x: P[0].x, y: Math.min(L.H - 30, Math.max(30, P[0].y)), i: 0}];
+  },
+  crossline(L, c, d, P, g) { L.pen(c, d.st); L.seg(c, g, 0, P[0].y, L.W, P[0].y); L.seg(c, g, P[0].x, 0, P[0].x, L.H); },
+  channel(L, c, d, P, g) {
+    const s = d.st, [a, b] = P, q = P[2] || P[1];
+    const k = Math.abs(b.x - a.x) < 1e-6 ? 0 : (b.y - a.y) / (b.x - a.x);
+    const off = q.y - (a.y + k * (q.x - a.x));
+    let x1 = a.x, y1 = a.y, x2 = b.x, y2 = b.y;
+    if (s.extL) { const xe = x2 > x1 ? -10 : L.W + 10; y1 += k * (xe - x1); x1 = xe; }
+    if (s.extR) { const xe = x2 > x1 ? L.W + 10 : -10; y2 += k * (xe - x2); x2 = xe; }
+    if (s.fill) { c.fillStyle = rgba(s.fillColor || s.color, s.alpha); c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.lineTo(x2, y2 + off); c.lineTo(x1, y1 + off); c.closePath(); c.fill(); }
+    g.polys.push([{x: x1, y: y1}, {x: x2, y: y2}, {x: x2, y: y2 + off}, {x: x1, y: y1 + off}]);
+    L.pen(c, s); L.seg(c, g, x1, y1, x2, y2); L.seg(c, g, x1, y1 + off, x2, y2 + off);
+    c.globalAlpha = 0.6; c.setLineDash([4, 4]); c.lineWidth = 1; c.beginPath(); c.moveTo(x1, y1 + off / 2); c.lineTo(x2, y2 + off / 2); c.stroke(); c.globalAlpha = 1;
+    if (P[2]) g.handles[2] = {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + off, set: p => { d.pts[2] = p; }};
+  },
+  fib(L, c, d, P, g) {
+    const s = d.st, [a, b] = P, p0 = d.pts[0].p, p1 = d.pts[1].p;
+    const xa = Math.min(a.x, b.x), xb = s.extR ? L.W : Math.max(a.x, b.x), xl = s.extL ? 0 : xa;
+    c.setLineDash([3, 4]); c.strokeStyle = rgba(s.color, 0.7); c.lineWidth = 1; c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+    g.segs.push([a.x, a.y, b.x, b.y]);
+    let prevY = null;
+    for (let i = 0; i < FIB_LV.length; i++) {
+      const [lv, col] = FIB_LV[i];
+      const pr = s.rev ? p0 + (p1 - p0) * lv : p1 + (p0 - p1) * lv;
+      const y = L.Y(pr); if (y == null) continue;
+      if (s.fill && prevY != null) { c.fillStyle = rgba(col, s.alpha); c.fillRect(xl, Math.min(prevY, y), xb - xl, Math.abs(y - prevY)); }
+      prevY = y;
+      c.setLineDash(dashOf(s.dash, s.width)); c.strokeStyle = col; c.lineWidth = s.width;
+      L.seg(c, g, xl, y, xb, y);
+      L.label(c, `${nf(lv, lv % 1 ? 3 : 0)} (${L.priceTxt(pr)})`, xl + 4, y - 2, {size: 11, mono: true, color: col, base: 'bottom'});
+    }
+    g.rects.push([xl, Math.min(a.y, b.y), xb - xl, Math.abs(b.y - a.y)]);
+  },
+  fibext(L, c, d, P, g) {
+    const s = d.st, [a, b, q] = P;
+    c.setLineDash([3, 4]); c.strokeStyle = rgba(s.color, 0.7); c.lineWidth = 1; c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); if (q) c.lineTo(q.x, q.y); c.stroke();
+    g.segs.push([a.x, a.y, b.x, b.y]); if (q) g.segs.push([b.x, b.y, q.x, q.y]);
+    if (!q) return;
+    const dp = d.pts[1].p - d.pts[0].p, base = d.pts[2].p;
+    const xa = q.x, xb = q.x + Math.max(60, Math.abs(b.x - a.x));
+    let prevY = null;
+    for (const [lv, col] of FIBX_LV) {
+      const pr = base + dp * lv, y = L.Y(pr); if (y == null) continue;
+      if (s.fill && prevY != null) { c.fillStyle = rgba(col, s.alpha); c.fillRect(xa, Math.min(prevY, y), xb - xa, Math.abs(y - prevY)); }
+      prevY = y;
+      c.setLineDash(dashOf(s.dash, s.width)); c.strokeStyle = col; c.lineWidth = s.width;
+      L.seg(c, g, xa, y, xb, y);
+      L.label(c, `${nf(lv, lv % 1 ? 3 : 0)} (${L.priceTxt(pr)})`, xa + 4, y - 2, {size: 11, mono: true, color: col, base: 'bottom'});
+    }
+  },
+  rect(L, c, d, P, g) {
+    const s = d.st;
+    let x1 = Math.min(P[0].x, P[1].x), x2 = Math.max(P[0].x, P[1].x);
+    const y1 = Math.min(P[0].y, P[1].y), y2 = Math.max(P[0].y, P[1].y);
+    if (s.extL) x1 = 0; if (s.extR) x2 = L.W;
+    if (s.fill) { c.fillStyle = rgba(s.fillColor || s.color, s.alpha); c.fillRect(x1, y1, x2 - x1, y2 - y1); }
+    L.pen(c, s); c.strokeRect(x1, y1, x2 - x1, y2 - y1);
+    g.rects.push([x1, y1, x2 - x1, y2 - y1]);
+    if (s.text) L.label(c, s.text, (x1 + x2) / 2, (y1 + y2) / 2, {size: s.size, color: s.color, align: 'center', base: 'middle'});
+    // the other two corners can be dragged as well
+    const [p0, p1] = d.pts;
+    g.handles.push({x: P[1].x, y: P[0].y, set: p => { d.pts[1] = {t: p.t, p: p1.p}; d.pts[0] = {t: p0.t, p: p.p}; }});
+    g.handles.push({x: P[0].x, y: P[1].y, set: p => { d.pts[0] = {t: p.t, p: p0.p}; d.pts[1] = {t: p1.t, p: p.p}; }});
+  },
+  ellipse(L, c, d, P, g) {
+    const s = d.st, cx = (P[0].x + P[1].x) / 2, cy = (P[0].y + P[1].y) / 2, rx = Math.abs(P[1].x - P[0].x) / 2, ry = Math.abs(P[1].y - P[0].y) / 2;
+    c.beginPath(); c.ellipse(cx, cy, Math.max(rx, 0.5), Math.max(ry, 0.5), 0, 0, Math.PI * 2);
+    if (s.fill) { c.fillStyle = rgba(s.fillColor || s.color, s.alpha); c.fill(); }
+    L.pen(c, s); c.stroke();
+    g.ells.push([cx, cy, rx, ry]);
+  },
+  triangle(L, c, d, P, g) {
+    const s = d.st;
+    c.beginPath(); c.moveTo(P[0].x, P[0].y); for (let i = 1; i < P.length; i++) c.lineTo(P[i].x, P[i].y); c.closePath();
+    if (s.fill && P.length > 2) { c.fillStyle = rgba(s.fillColor || s.color, s.alpha); c.fill(); }
+    L.pen(c, s); c.stroke();
+    for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; g.segs.push([a.x, a.y, b.x, b.y]); }
+    if (P.length > 2) g.polys.push(P);
+  },
+  path(L, c, d, P, g) {
+    L.pen(c, d.st);
+    c.beginPath(); c.moveTo(P[0].x, P[0].y); for (let i = 1; i < P.length; i++) c.lineTo(P[i].x, P[i].y); c.stroke();
+    for (let i = 1; i < P.length; i++) g.segs.push([P[i - 1].x, P[i - 1].y, P[i].x, P[i].y]);
+  },
+  brush(L, c, d, P, g) {
+    L.pen(c, d.st);
+    c.beginPath(); c.moveTo(P[0].x, P[0].y);
+    for (let i = 1; i < P.length - 1; i++) { const mx = (P[i].x + P[i + 1].x) / 2, my = (P[i].y + P[i + 1].y) / 2; c.quadraticCurveTo(P[i].x, P[i].y, mx, my); }
+    if (P.length > 1) c.lineTo(P[P.length - 1].x, P[P.length - 1].y);
+    c.stroke();
+    for (let i = 1; i < P.length; i++) g.segs.push([P[i - 1].x, P[i - 1].y, P[i].x, P[i].y]);
+    g.handles = [];
+  },
+  text(L, c, d, P, g) {
+    const s = d.st;
+    const r = L.label(c, s.text || ' ', P[0].x, P[0].y, {size: s.size, color: s.color, pad: s.fill ? 6 : 0, bg: s.fill ? rgba(s.fillColor || '#131722', s.alpha) : null});
+    g.rects.push(r);
+  },
+  callout(L, c, d, P, g) {
+    const s = d.st;
+    const r = L.label(c, s.text || ' ', P[1].x, P[1].y, {size: s.size, color: lightColor(s.color) ? '#131722' : '#fff', pad: 8, bg: s.color, radius: 6});
+    const cx = clamp(P[0].x, r[0] + 6, r[0] + r[2] - 6), cy = P[0].y < r[1] ? r[1] : P[0].y > r[1] + r[3] ? r[1] + r[3] : r[1] + r[3] / 2;
+    c.fillStyle = s.color; c.beginPath(); c.moveTo(P[0].x, P[0].y); c.lineTo(cx - 7, cy); c.lineTo(cx + 7, cy); c.closePath(); c.fill();
+    g.rects.push(r); g.segs.push([P[0].x, P[0].y, cx, cy]);
+  },
+  pricelabel(L, c, d, P, g) {
+    const s = d.st, txt = L.priceTxt(d.pts[0].p);
+    const r = L.label(c, txt, P[0].x + 8, P[0].y - 12, {size: s.size, mono: true, color: lightColor(s.color) ? '#131722' : '#fff', pad: 6, bg: s.color, base: 'bottom', radius: 5});
+    c.fillStyle = s.color; c.beginPath(); c.moveTo(P[0].x, P[0].y); c.lineTo(r[0] + 4, r[1] + r[3] - 1); c.lineTo(r[0] + 16, r[1] + r[3] - 1); c.closePath(); c.fill();
+    g.rects.push(r);
+  },
+  up(L, c, d, P, g) { RENDER.mark(L, c, d, P, g, 1); },
+  down(L, c, d, P, g) { RENDER.mark(L, c, d, P, g, -1); },
+  mark(L, c, d, P, g, dir) {
+    const s = d.st, x = P[0].x, y = P[0].y, h = 22, w = 16, k = dir;   // tip at the point, body away from it
+    c.fillStyle = s.color; c.beginPath();
+    c.moveTo(x, y); c.lineTo(x + w / 2, y + k * 9); c.lineTo(x + 3.5, y + k * 9); c.lineTo(x + 3.5, y + k * h); c.lineTo(x - 3.5, y + k * h); c.lineTo(x - 3.5, y + k * 9); c.lineTo(x - w / 2, y + k * 9); c.closePath(); c.fill();
+    g.rects.push([x - w / 2, Math.min(y, y + k * h), w, h]);
+    if (s.text) g.rects.push(L.label(c, s.text, x, y + k * (h + 4), {size: s.size, color: s.color, align: 'center', base: k > 0 ? 'top' : 'bottom'}));
+  },
+  long(L, c, d, P, g) { RENDER.pos(L, c, d, P, g, 1); },
+  short(L, c, d, P, g) { RENDER.pos(L, c, d, P, g, -1); },
+  pos(L, c, d, P, g, k) {
+    const ws = L.ws, [E, T, S] = P, xa = Math.min(E.x, T.x), xb = Math.max(E.x, T.x, xa + 30);
+    const pe = d.pts[0].p, pt = d.pts[1].p, ps = d.pts[2].p;
+    c.fillStyle = ws.col.upA + '0.22)'; c.fillRect(xa, Math.min(E.y, T.y), xb - xa, Math.abs(T.y - E.y));
+    c.fillStyle = ws.col.dnA + '0.22)'; c.fillRect(xa, Math.min(E.y, S.y), xb - xa, Math.abs(S.y - E.y));
+    c.setLineDash([]); c.lineWidth = 1; c.strokeStyle = ws.col.fg; c.beginPath(); c.moveTo(xa, E.y); c.lineTo(xb, E.y); c.stroke();
+    const risk = Math.abs(pe - ps), rew = Math.abs(pt - pe), rr = risk ? rew / risk : 0, m = ws.m;
+    const amt = v => m.pip < 1 ? nf(v / m.pip, 1) + ' ' + m.unit : nf(v, ws.digits) + ' ' + m.unit;
+    const pct = v => pe ? nf(v / pe * 100, 2) + ' %' : '';
+    const lb = (txt, y, up, col) => L.label(c, txt, (xa + xb) / 2, y + (up ? -4 : 4), {size: 11, mono: true, pad: 5, bg: col, color: '#fff', align: 'center', base: up ? 'bottom' : 'top', radius: 4});
+    const tUp = T.y < E.y;
+    lb(`Ziel: ${amt(rew)} (${pct(rew)})`, T.y, tUp, ws.col.up);
+    lb(`Stop: ${amt(risk)} (${pct(risk)})`, S.y, !tUp, ws.col.dn);
+    L.label(c, `R:R ${nf(rr, 2)}`, (xa + xb) / 2, E.y + (tUp ? 4 : -4), {size: 11, mono: true, pad: 4, bg: 'rgba(19,23,34,.75)', color: '#fff', align: 'center', base: tUp ? 'top' : 'bottom', radius: 4});
+    g.rects.push([xa, Math.min(T.y, S.y), xb - xa, Math.abs(S.y - T.y)]);
+    g.handles = [
+      {x: E.x, y: E.y, set: p => { d.pts[0] = {t: p.t, p: p.p}; }},
+      {x: E.x, y: T.y, set: p => { d.pts[1] = {t: d.pts[1].t, p: p.p}; }},
+      {x: E.x, y: S.y, set: p => { d.pts[2] = {t: d.pts[2].t, p: p.p}; }},
+      {x: T.x, y: E.y, set: p => { d.pts[1] = {t: p.t, p: d.pts[1].p}; d.pts[2] = {t: p.t, p: d.pts[2].p}; }},
+    ];
+    void k;
+  },
+  range(L, c, d, P, g) {
+    const s = d.st, [a, b] = P, x1 = Math.min(a.x, b.x), x2 = Math.max(a.x, b.x), y1 = Math.min(a.y, b.y), y2 = Math.max(a.y, b.y);
+    const up = d.pts[1].p >= d.pts[0].p, col = s.color;
+    if (s.fill) { c.fillStyle = rgba(col, s.alpha * 0.8); c.fillRect(x1, y1, x2 - x1, y2 - y1); }
+    c.strokeStyle = col; c.lineWidth = 1; c.setLineDash([]);
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    c.beginPath(); c.moveTo(mx, a.y); c.lineTo(mx, b.y); c.moveTo(a.x, my); c.lineTo(b.x, my); c.stroke();
+    const head = (x, y, ang) => { c.beginPath(); c.moveTo(x - 6 * Math.cos(ang - 0.5), y - 6 * Math.sin(ang - 0.5)); c.lineTo(x, y); c.lineTo(x - 6 * Math.cos(ang + 0.5), y - 6 * Math.sin(ang + 0.5)); c.stroke(); };
+    head(mx, b.y, b.y > a.y ? Math.PI / 2 : -Math.PI / 2); head(b.x, my, b.x > a.x ? 0 : Math.PI);
+    const r = L.label(c, L.moveTxt(d.pts[0].p, d.pts[1].p, d.pts[0].t, d.pts[1].t), mx, up ? y1 - 6 : y2 + 6, {size: 11, mono: true, pad: 6, bg: rgba(col, 0.9), color: lightColor(col) ? '#131722' : '#fff', align: 'center', base: up ? 'bottom' : 'top', radius: 4});
+    g.rects.push([x1, y1, x2 - x1, y2 - y1], r);
+  },
+};
+RENDER.ray = RENDER.ext = RENDER.info = RENDER.arrowline = RENDER.trend;
+
+/* ================================================================ chart settings panel */
+function openChartSettings(ws) {
+  const cs = ws.cs, col = ws.col;
+  const tab = (id, label, on) => `<button type="button" role="tab" id="bt-cst-${id}" aria-controls="bt-csp-${id}" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-cst="${id}">${label}</button>`;
+  const colIn = (k, def, label) => `<input type="color" data-csc="${k}" value="${toHex(cs[k] || def)}" aria-label="${esc(label)}">`;
+  const chk = (k, label) => `<label class="bt-csk"><input type="checkbox" data-csb="${k}"${cs[k] ? ' checked' : ''}> ${label}</label>`;
+  const sel = (k, opts, label) => `<select class="inp sm" data-css="${k}" aria-label="${esc(label)}">${opts.map(([v, n]) => `<option value="${v}"${String(cs[k]) === String(v) ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
+  const html = `<div class="bt-dlg-head"><h2>Chart-Einstellungen</h2><button type="button" class="btn icon ghost" data-bt="close" aria-label="Schließen">✕</button></div>
+    <div class="bt-cs-tabs" role="tablist" aria-label="Bereiche">${tab('sym', 'Kerzen', true)}${tab('look', 'Darstellung', false)}${tab('scale', 'Skalen', false)}</div>
+    <div class="bt-cs-p" role="tabpanel" id="bt-csp-sym" aria-labelledby="bt-cst-sym">
+      <div class="bt-cs-row"><span>Chart-Typ</span>${sel('type', CS_TYPES, 'Chart-Typ')}</div>
+      <div class="bt-cs-c" data-show="candle">
+        <div class="bt-cs-row"><span>${chk('body', 'Körper')}</span><span class="bt-cs-pair">${colIn('upBody', col.up, 'Körper steigend')}${colIn('dnBody', col.dn, 'Körper fallend')}</span></div>
+        <div class="bt-cs-row"><span>${chk('border', 'Rahmen')}</span><span class="bt-cs-pair">${colIn('upBorder', cs.upBody || col.up, 'Rahmen steigend')}${colIn('dnBorder', cs.dnBody || col.dn, 'Rahmen fallend')}</span></div>
+        <div class="bt-cs-row"><span>${chk('wick', 'Docht')}</span><span class="bt-cs-pair">${colIn('upWick', cs.upBody || col.up, 'Docht steigend')}${colIn('dnWick', cs.dnBody || col.dn, 'Docht fallend')}</span></div>
+        <p class="bt-cs-hint">Links steigende, rechts fallende Kerzen.</p>
+      </div>
+      <div class="bt-cs-c" data-show="bar"><div class="bt-cs-row"><span>Balken</span><span class="bt-cs-pair">${colIn('upBody', col.up, 'Balken steigend')}${colIn('dnBody', col.dn, 'Balken fallend')}</span></div></div>
+      <div class="bt-cs-c" data-show="line"><div class="bt-cs-row"><span>Linie</span><span class="bt-cs-pair">${colIn('lineColor', '#2962ff', 'Linienfarbe')}${sel('lineWidth', [[1, '1 px'], [2, '2 px'], [3, '3 px'], [4, '4 px']], 'Linienstärke')}</span></div></div>
+    </div>
+    <div class="bt-cs-p" role="tabpanel" id="bt-csp-look" aria-labelledby="bt-cst-look" hidden>
+      <div class="bt-cs-row"><span>Hintergrund</span><span class="bt-cs-pair">${sel('bgMode', [['theme', 'Farbschema'], ['solid', 'Einfarbig'], ['gradient', 'Verlauf']], 'Hintergrund')}<span data-bg1>${colIn('bg', '#0b1222', 'Hintergrundfarbe')}</span><span data-bg2>${colIn('bg2', '#16213d', 'Zweite Hintergrundfarbe')}</span></span></div>
+      <div class="bt-cs-row"><span>Gitterlinien</span><span class="bt-cs-pair">${sel('grid', [['both', 'Beide'], ['vert', 'Vertikal'], ['horz', 'Horizontal'], ['none', 'Keine']], 'Gitterlinien')}${colIn('gridColor', toHex(col.grid), 'Farbe der Gitterlinien')}</span></div>
+      <div class="bt-cs-row"><span>Fadenkreuz</span><span class="bt-cs-pair">${sel('cross', [[0, 'Durchgezogen'], [2, 'Gestrichelt'], [1, 'Gepunktet']], 'Linienstil des Fadenkreuzes')}${colIn('crossColor', toHex(col.mute), 'Farbe des Fadenkreuzes')}</span></div>
+      <div class="bt-cs-row"><span>Anzeigen</span><span class="bt-cs-list">${chk('legend', 'Statuszeile mit OHLC')}${chk('watermark', 'Wasserzeichen')}</span></div>
+    </div>
+    <div class="bt-cs-p" role="tabpanel" id="bt-csp-scale" aria-labelledby="bt-cst-scale" hidden>
+      <div class="bt-cs-row"><span>Preisskala</span>${sel('scale', [[0, 'Normal'], [1, 'Logarithmisch'], [2, 'Prozent']], 'Preisskala')}</div>
+      <div class="bt-cs-row"><span>Letzter Kurs</span>${chk('lastPrice', 'Linie und Label anzeigen')}</div>
+      <div class="bt-cs-row"><span>Schrift</span><span class="bt-cs-pair">${colIn('textColor', toHex(col.mute), 'Schriftfarbe der Skalen')}${sel('fontSize', [[10, '10'], [11, '11'], [12, '12'], [13, '13'], [14, '14']], 'Schriftgröße der Skalen')}</span></div>
+      <div class="bt-cs-row"><span>Freiraum rechts</span><span class="bt-cs-pair"><input type="range" min="0" max="60" step="2" value="${cs.rightOffset}" data-csr="rightOffset" aria-label="Freiraum rechts in Kerzen"><output>${cs.rightOffset}</output></span></div>
+    </div>
+    <div class="row-btns end"><button type="button" class="btn ghost" id="bt-cs-reset">Standard</button><button type="button" class="btn primary" data-bt="close">Fertig</button></div>`;
+  const d = dialog(html, 'wide bt-cs');
+  d.closest('.bt-dlg-wrap').classList.add('bt-cs-wrap');
+  const sync = () => {
+    const k = seriesKind(cs.type);
+    $$('[data-show]', d).forEach(x => { x.hidden = x.dataset.show !== (k === 'area' ? 'line' : k); });
+    $('[data-bg1]', d).hidden = cs.bgMode === 'theme'; $('[data-bg2]', d).hidden = cs.bgMode !== 'gradient';
+  };
+  sync();
+  const apply = () => { ws.applyStyle(); saveCS(cs); sync(); };
+  d.addEventListener('input', e => {
+    const t = e.target;
+    if (t.dataset.csc) { cs[t.dataset.csc] = t.value; if (t.dataset.csc === 'bg' || t.dataset.csc === 'bg2') { if (cs.bgMode === 'theme') cs.bgMode = 'solid'; const s = $('[data-css="bgMode"]', d); if (s) s.value = cs.bgMode; } apply(); }
+    else if (t.dataset.csr) { cs[t.dataset.csr] = +t.value; const o = t.nextElementSibling; if (o) o.textContent = t.value; apply(); }
+  });
+  d.addEventListener('change', e => {
+    const t = e.target;
+    if (t.dataset.csb) { cs[t.dataset.csb] = t.checked; apply(); }
+    else if (t.dataset.css) { const k = t.dataset.css, v = t.value; cs[k] = typeof CS_DEF[k] === 'number' ? +v : v; apply(); }
+  });
+  d.addEventListener('click', e => {
+    const tb = e.target.closest('[data-cst]');
+    if (tb) {
+      $$('[data-cst]', d).forEach(x => { const on = x === tb; x.setAttribute('aria-selected', String(on)); x.tabIndex = on ? 0 : -1; });
+      $$('.bt-cs-p', d).forEach(p => { p.hidden = p.id !== 'bt-csp-' + tb.dataset.cst; });
+    }
+  });
+  d.addEventListener('keydown', e => {
+    const tb = e.target.closest && e.target.closest('[data-cst]');
+    if (!tb || !/^(ArrowLeft|ArrowRight)$/.test(e.key)) return;
+    const tabs = $$('[data-cst]', d), i = tabs.indexOf(tb), j = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    e.preventDefault(); tabs[j].click(); tabs[j].focus();
+  });
+  $('#bt-cs-reset', d).addEventListener('click', () => {
+    const keep = {magnet: cs.magnet, stay: cs.stay};
+    for (const k of Object.keys(CS_DEF)) cs[k] = CS_DEF[k];
+    Object.assign(cs, keep);
+    ws.applyStyle(); saveCS(cs, true);
+    closeDialog(); openChartSettings(ws);
+  });
 }
 
 /* ================================================================ module API */

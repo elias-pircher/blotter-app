@@ -1963,6 +1963,8 @@ function normSettings(d){
   if (typeof d.name === 'string') o.name = d.name.trim().slice(0, 30);
   if (d.modules && typeof d.modules === 'object') { o.modules.learnings = d.modules.learnings !== false; o.modules.outlooks = d.modules.outlooks !== false; o.modules.backtest = d.modules.backtest !== false; }
   o.accounts = normAccounts(d);
+  // the backtesting chart's look (candle colours, background, grid …), kept as the chart module wrote it
+  if (d.btChart && typeof d.btChart === 'object' && !Array.isArray(d.btChart) && JSON.stringify(d.btChart).length < 4000) o.btChart = d.btChart;
   return o;
 }
 /* Accounts: 1 to 10, each {id, name, color}. Trades point to an id. Older journals stored two fixed
@@ -2017,7 +2019,7 @@ function applySettings(){
 }
 
 /* ---------- backtesting (its code and the chart load on the first visit) ---------- */
-const BT_V = '3';
+const BT_V = '4';
 const assetP = {};
 function loadAsset(src){
   if (assetP[src]) return assetP[src];
@@ -2034,7 +2036,9 @@ const btCtx = () => ({
   S, toast, md: Store.md || null,
   Store: {save: (k, o) => Store.save(k, o), remove: (k, id) => Store.remove(k, id)},
   chartLib: () => window.LightweightCharts ? Promise.resolve() : loadAsset('/journal/vendor/lightweight-charts.js?v=5.3.0'),
-  setWide: on => document.documentElement.classList.toggle('bt-wide', !!on)
+  setWide: on => document.documentElement.classList.toggle('bt-wide', !!on),
+  chartStyle: () => S.settings.btChart || null,
+  saveChartStyle: st => { S.settings = normSettings(Object.assign({}, S.settings, {btChart: st})); return Store.saveSettings(); }
 });
 // Backtesting belongs to the larger plan. In the smaller one the page says what it does and how to switch;
 // the module and the chart library are not loaded at all.
@@ -2071,6 +2075,7 @@ function btLockHtml(){
         <ul class="lock-pts">
           <li>Kerze für Kerze abspielen, von 1 Minute bis Monthly</li>
           <li>Entry, Stop und Ziel setzen, jeder Trade in R</li>
+          <li>Zeichnen wie bei TradingView: Trendlinien, Fibonacci, Rechtecke, Long und Short</li>
           <li>Win-Rate, Profit Factor und Equity-Kurve pro Session</li>
           <li>Sechs Märkte mit deinen eigenen Kursdaten, privat in deinem Konto</li>
         </ul>
@@ -2104,6 +2109,8 @@ const HELP_FAQ = [
   ['pages', 'Wie finde ich alte Learnings wieder?', 'Über die Suche oben auf der Seite Learnings oder über die Kategorien darunter. Die Kategorie vergibst du beim Eintragen.'],
   ['bt', 'Warum ist das Backtesting bei mir gesperrt?', 'Das Backtesting gehört zum Abo „Journal + Backtesting“ für 14,99 € im Monat. In den Einstellungen wechselst du mit „Backtesting dazunehmen“, danach ist es sofort frei. Im kostenlosen Test kostet der Wechsel nichts.'],
   ['bt', 'Woher bekomme ich Kursdaten?', 'Du lädst 1-Minuten-Daten einmal selbst herunter, zum Beispiel kostenlos bei HistData, und importierst sie auf der Backtesting-Seite. Dort steht eine Schritt-für-Schritt-Anleitung. Exporte aus MetaTrader und von Dukascopy gehen auch. Es gibt Nasdaq 100, S&P 500, DAX 40, Gold, EUR/USD und GBP/USD.'],
+  ['bt', 'Kann ich im Backtesting-Chart zeichnen?', 'Ja. Links neben dem Chart findest du die Werkzeuge: Trendlinien, horizontale und vertikale Linien, Kanäle, Fibonacci, Rechtecke, Text, Pfeile, Long- und Short-Position und mehr. Ein Klick auf eine Zeichnung zeigt oben Farbe, Stärke und Stil. Die Zeichnungen gehören zur Session und bleiben auf jedem Zeitrahmen an ihrer Stelle. Mit ' + (HELP_MAC ? '⌘Z' : 'Strg+Z') + ' machst du einen Schritt rückgängig.'],
+  ['bt', 'Wie ändere ich Kerzenfarben und Hintergrund?', 'Über das Zahnrad oben rechts im Backtesting öffnest du die Chart-Einstellungen: Chart-Typ (auch Heikin Ashi, Balken, Linie), Farben für Körper, Rahmen und Docht, Hintergrund, Gitter, Fadenkreuz und Preisskala. Die Einstellungen gelten für alle deine Sessions.'],
   ['abo', 'Wie funktioniert der kostenlose Test?', 'Neue Kunden testen 3 Tage kostenlos. Die Zahlungsmethode hinterlegst du bei Stripe, abgebucht wird erst, wenn der Test endet. Kündigst du vorher, zahlst du nichts. Den Test gibt es einmal pro Konto.'],
   ['abo', 'Wie wechsle ich mein Abo?', 'In den Einstellungen unter „Konto & Abo“. Beim Wechsel zu Journal + Backtesting zahlst du nur die Differenz für die restlichen Tage des Monats. Wechselst du zurück, wird der nicht genutzte Teil mit der nächsten Rechnung verrechnet. Deine Backtests bleiben gespeichert.'],
   ['abo', 'Wie kündige ich, und wo finde ich meine Rechnungen?', 'In den Einstellungen öffnet „Abo verwalten oder kündigen“ das Kundenportal von Stripe. Dort kündigst du, änderst deine Zahlungsmethode und lädst deine Rechnungen herunter. Nach der Kündigung läuft das Abo bis zum Ende des bezahlten Monats.'],

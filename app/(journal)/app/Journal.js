@@ -24,7 +24,7 @@ export default function Journal({ userId, email, friend, plan, trial }) {
       pill.hidden = false;
     }
     const s = document.createElement('script');
-    s.src = '/journal/journal.js?v=29';
+    s.src = '/journal/journal.js?v=30';
     s.async = false;
     document.body.appendChild(s);
   }, [userId, email, friend, plan, trial]);

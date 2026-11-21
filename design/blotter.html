@@ -3174,6 +3174,8 @@ function normSettings(d){
   if (typeof d.name === 'string') o.name = d.name.trim().slice(0, 30);
   if (d.modules && typeof d.modules === 'object') { o.modules.learnings = d.modules.learnings !== false; o.modules.outlooks = d.modules.outlooks !== false; o.modules.backtest = d.modules.backtest !== false; }
   o.accounts = normAccounts(d);
+  // the backtesting chart's look (candle colours, background, grid …), kept as the chart module wrote it
+  if (d.btChart && typeof d.btChart === 'object' && !Array.isArray(d.btChart) && JSON.stringify(d.btChart).length < 4000) o.btChart = d.btChart;
   return o;
 }
 /* Accounts: 1 to 10, each {id, name, color}. Trades point to an id. Older journals stored two fixed
@@ -3228,7 +3230,7 @@ function applySettings(){
 }
 
 /* ---------- backtesting (its code and the chart load on the first visit) ---------- */
-const BT_V = '3';
+const BT_V = '4';
 const assetP = {};
 function loadAsset(src){
   if (assetP[src]) return assetP[src];
@@ -3245,7 +3247,9 @@ const btCtx = () => ({
   S, toast, md: Store.md || null,
   Store: {save: (k, o) => Store.save(k, o), remove: (k, id) => Store.remove(k, id)},
   chartLib: () => window.LightweightCharts ? Promise.resolve() : loadAsset('/journal/vendor/lightweight-charts.js?v=5.3.0'),
-  setWide: on => document.documentElement.classList.toggle('bt-wide', !!on)
+  setWide: on => document.documentElement.classList.toggle('bt-wide', !!on),
+  chartStyle: () => S.settings.btChart || null,
+  saveChartStyle: st => { S.settings = normSettings(Object.assign({}, S.settings, {btChart: st})); return Store.saveSettings(); }
 });
 // Backtesting belongs to the larger plan. In the smaller one the page says what it does and how to switch;
 // the module and the chart library are not loaded at all.
@@ -3282,6 +3286,7 @@ function btLockHtml(){
         <ul class="lock-pts">
           <li>Kerze für Kerze abspielen, von 1 Minute bis Monthly</li>
           <li>Entry, Stop und Ziel setzen, jeder Trade in R</li>
+          <li>Zeichnen wie bei TradingView: Trendlinien, Fibonacci, Rechtecke, Long und Short</li>
           <li>Win-Rate, Profit Factor und Equity-Kurve pro Session</li>
           <li>Sechs Märkte mit deinen eigenen Kursdaten, privat in deinem Konto</li>
         </ul>
