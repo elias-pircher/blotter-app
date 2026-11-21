@@ -43,6 +43,8 @@ export async function POST(req) {
       }
     }
   } catch (err) {
+    // nothing to sync for subscriptions without a Blotter account; answering 200 stops Stripe from retrying for days
+    if (err?.code === 'no_user') { console.warn('Stripe webhook: Abo ohne Blotter-Konto ignoriert', event.type); return NextResponse.json({ received: true, ignored: true }); }
     console.error('Stripe webhook', event.type, err);
     return NextResponse.json({ error: 'sync_failed' }, { status: 500 });
   }
