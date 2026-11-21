@@ -1,15 +1,10 @@
 import { redirect } from 'next/navigation';
 import { previewPassword, safeNext } from '@/lib/preview';
+import { Logo } from '../chrome';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Blotter – bald verfügbar', robots: { index: false, follow: false } };
 
-const LOGO = (
-  <svg viewBox="0 0 28 28" width="24" height="24" aria-hidden="true">
-    <g stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M6 15v9M14 9v14M22 2v15" /></g>
-    <g fill="currentColor"><rect x="3.5" y="17" width="5" height="5" rx="1" /><rect x="11.5" y="11" width="5" height="8" rx="1" /><rect x="19.5" y="4" width="5" height="10" rx="1" /></g>
-  </svg>
-);
 
 // Shown to everyone until launch while the access lock (PREVIEW_PASSWORD) is active.
 export default function AccessPage({ searchParams }) {
@@ -17,7 +12,7 @@ export default function AccessPage({ searchParams }) {
   if (!previewPassword()) redirect(next);
   return (
     <>
-      <header className="nav"><div className="wrap"><span className="logo">{LOGO}Blotter</span></div></header>
+      <header className="nav"><div className="wrap"><span className="logo"><Logo />Blotter</span></div></header>
       <main className="wrap center">
         <form className="card" method="post" action="/api/zugang">
           <span className="eyebrow">Bald verfügbar</span>

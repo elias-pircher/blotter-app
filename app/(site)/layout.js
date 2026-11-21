@@ -11,8 +11,7 @@ export default function SiteLayout({ children }) {
   return (
     <html lang="de">
       <head>
-        <link rel="preload" href="/fonts/archivo-wdth.woff2" as="font" type="font/woff2" crossOrigin="" />
-        <link rel="preload" href="/fonts/plex-sans-400.woff2" as="font" type="font/woff2" crossOrigin="" />
+        <link rel="preload" href="/fonts/sora-wght.woff2" as="font" type="font/woff2" crossOrigin="" />
         <link rel="stylesheet" href="/fonts/fonts.css" />
       </head>
       <body>{children}</body>

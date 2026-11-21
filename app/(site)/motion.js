@@ -1,6 +1,6 @@
 'use client';
-// Landing page scenes: every section plays with the scroll. Pinned stages report a progress from 0 to 1,
-// the CSS turns it into motion; the month, the phone and the replay also change their content.
+// Landing page motion: entrances as sections come into view, a few scroll-linked scenes (the CSS turns
+// their progress into movement) and the backtesting replay, which plays candle by candle with the scroll.
 import { useEffect, useRef } from 'react';
 
 const reduced = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -12,9 +12,8 @@ export function Scenes() {
   useEffect(() => {
     const reduce = reduced();
     const nav = document.querySelector('.nav');
-    const root = document.documentElement;
 
-    // entrances for what is not a scene: rises once when it comes into view
+    // entrances: what is below the fold rises once when it comes into view
     let io = null;
     if (!reduce && 'IntersectionObserver' in window) {
       io = new IntersectionObserver((es) => es.forEach((e) => {
@@ -26,56 +25,17 @@ export function Scenes() {
       });
     }
 
-    const scenes = [...document.querySelectorAll('[data-scene]')].map((el) => ({ el, kind: el.dataset.scene, stage: el.querySelector('.stage'), pinned: false, last: null }));
-    const measure = () => scenes.forEach((s) => { s.pinned = !!s.stage && getComputedStyle(s.stage).position === 'sticky'; s.top = s.stage ? parseFloat(getComputedStyle(s.stage).top) || 0 : 0; });
-
-    // the month: days in trading order, their results, the numbers beside them
-    const cal = scenes.find((s) => s.kind === 'cal');
-    const days = cal ? [...cal.el.querySelectorAll('.cd[data-k]')].sort((a, b) => a.dataset.k - b.dataset.k) : [];
-    const sums = days.reduce((a, d) => { const l = a[a.length - 1]; a.push({ tp: l.tp + +d.dataset.tp, be: l.be + +d.dataset.be, sl: l.sl + +d.dataset.sl }); return a; }, [{ tp: 0, be: 0, sl: 0 }]);
-    const v = (k) => cal && cal.el.querySelector(`[data-v="${k}"]`);
-    const out = { n: v('n'), tp: v('tp'), be: v('be'), sl: v('sl'), wr: v('wr') };
-    const dial = cal && cal.el.querySelector('.d1');
-
-    const steps = scenes.find((s) => s.kind === 'steps');
-    const stepLis = steps ? [...steps.el.querySelectorAll('.steps li')] : [];
-    const stepImgs = steps ? [...steps.el.querySelectorAll('.phone2 img')] : [];
-
+    const scenes = [...document.querySelectorAll('[data-scene]')].map((el) => ({ el, kind: el.dataset.scene, last: '' }));
+    const set = (s, name, v) => { const t = v.toFixed(4); if (t !== s.last) { s.last = t; s.el.style.setProperty(name, t); } };
     const H = {
-      // the hero text drifts up and fades as the journal comes in
-      hero(s, vh) {
-        const r = s.el.getBoundingClientRect(), q = reduce ? 0 : clamp(-r.top / Math.max(1, r.height * 0.9), 0, 1);
-        s.el.style.setProperty('--q', q.toFixed(4));
-      },
-      // the journal rises from below, straightens and grows to full size
-      shot(s, vh, p) {
-        const r = s.el.getBoundingClientRect(), come = clamp((vh - r.top) / Math.max(1, vh - s.top), 0, 1);
-        const e = reduce || !s.pinned ? 1 : ease(clamp(come * 0.3 + clamp(p / 0.65, 0, 1) * 0.7, 0, 1));
-        s.el.style.setProperty('--e', e.toFixed(4));
-      },
-      words(s, vh, p) { s.el.style.setProperty('--p', clamp(p * 1.12, 0, 1).toFixed(4)); },
-      cal(s, vh, p) {
-        const k = Math.round(clamp(p / 0.88, 0, 1) * days.length);
-        if (k === s.last) return; s.last = k;
-        days.forEach((d, i) => { d.classList.toggle('on', i < k); d.classList.toggle('now', i === k - 1 && k < days.length); });
-        const t = sums[k], n = t.tp + t.be + t.sl, wr = t.tp + t.sl ? Math.round(t.tp / (t.tp + t.sl) * 100) : 0;
-        out.n.textContent = n; out.tp.textContent = t.tp; out.be.textContent = t.be; out.sl.textContent = t.sl; out.wr.textContent = wr + ' %';
-        if (dial) dial.style.strokeDashoffset = String(100 - wr);
-      },
-      steps(s, vh, p) {
-        s.el.style.setProperty('--p', p.toFixed(4));
-        const i = Math.min(stepLis.length - 1, Math.floor(p * stepLis.length * 0.999));
-        if (i === s.last) return;
-        const back = s.last != null && i < s.last; s.last = i;
-        s.el.classList.toggle('back', back);
-        stepLis.forEach((li, j) => li.classList.toggle('on', j === i));
-        stepImgs.forEach((im, j) => { im.classList.toggle('on', j === i); im.classList.toggle('past', j < i); });
-      },
-      // the closing line: wide and faint far down, tight and bright in the middle of the screen
-      close(s, vh) {
-        const r = s.el.getBoundingClientRect(), t = reduce ? 1 : clamp((vh - r.top) / (vh * 0.75), 0, 1);
-        s.el.style.setProperty('--p', ease(t).toFixed(4));
-      },
+      // the hero drifts apart as you scroll away: the widgets faster than the phone
+      hero(s, vh, r) { set(s, '--q', reduce ? 0 : clamp(-r.top / Math.max(1, r.height * 0.8), 0, 1)); },
+      // the journal swings in from the right and lies flat once it reaches the upper half of the screen
+      tilt(s, vh, r) { set(s, '--e', reduce ? 1 : ease(clamp((vh - r.top) / (vh * 0.75), 0, 1))); },
+      // two phones drift against each other while the section passes
+      duo(s, vh, r) { set(s, '--p', reduce ? 0.5 : clamp((vh - r.top) / (vh + r.height), 0, 1)); },
+      // the closing aurora comes up as the line reaches the middle of the screen
+      end(s, vh, r) { set(s, '--p', reduce ? 1 : ease(clamp((vh - r.top) / (vh * 0.85), 0, 1))); },
     };
 
     let raf = 0;
@@ -85,20 +45,16 @@ export function Scenes() {
       if (nav) nav.classList.toggle('is-scrolled', scrollY > 8);
       for (const s of scenes) {
         const f = H[s.kind]; if (!f) continue;
-        if (reduce) { f(s, vh, 1); continue; }
         const r = s.el.getBoundingClientRect();
         if (r.bottom < -vh || r.top > vh * 2) continue;
-        let p = 1;
-        if (s.pinned) p = clamp((s.top - r.top) / Math.max(1, r.height - s.stage.offsetHeight), 0, 1);
-        f(s, vh, p);
+        f(s, vh, r);
       }
     };
     const on = () => { if (!raf) raf = requestAnimationFrame(tick); };
-    const resize = () => { measure(); on(); };
-    measure(); tick();
+    tick();
     addEventListener('scroll', on, { passive: true });
-    addEventListener('resize', resize);
-    return () => { removeEventListener('scroll', on); removeEventListener('resize', resize); if (raf) cancelAnimationFrame(raf); if (io) io.disconnect(); };
+    addEventListener('resize', on);
+    return () => { removeEventListener('scroll', on); removeEventListener('resize', on); if (raf) cancelAnimationFrame(raf); if (io) io.disconnect(); };
   }, []);
   return null;
 }
