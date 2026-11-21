@@ -1,8 +1,9 @@
 'use client';
 import { useState } from 'react';
-import { PLANS, PLAN_IDS } from '@/lib/plans';
+import { PLANS, PLAN_IDS, TRIAL_DAYS } from '@/lib/plans';
 
-export default function CheckoutButton({ initial = 'journal' }) {
+// trial: whether this customer starts with the free trial; trialEnd: its last day, e.g. "24. November"
+export default function CheckoutButton({ initial = 'journal', trial = false, trialEnd = null }) {
   const [plan, setPlan] = useState(PLANS[initial] ? initial : 'journal');
   const [terms, setTerms] = useState(false);
   const [waiver, setWaiver] = useState(false);
@@ -21,7 +22,7 @@ export default function CheckoutButton({ initial = 'journal' }) {
       window.location.href = j.url;
     } catch (e) {
       setBusy(false);
-      setErr('Die Zahlungsseite konnte nicht geöffnet werden. Versuch es in einem Moment erneut.');
+      setErr(trial ? 'Der Test konnte nicht gestartet werden. Versuch es in einem Moment erneut.' : 'Die Zahlungsseite konnte nicht geöffnet werden. Versuch es in einem Moment erneut.');
     }
   }
 
@@ -42,11 +43,19 @@ export default function CheckoutButton({ initial = 'journal' }) {
           );
         })}
       </fieldset>
+      {trial && (
+        <ol className="trial-tl" aria-label="So läuft der Test">
+          <li><b>Heute</b><span>Voller Zugang zu {p.name}. Es wird nichts abgebucht.</span></li>
+          <li><b>{trialEnd || `In ${TRIAL_DAYS} Tagen`}</b><span>Der Test endet. Ab dann {p.price} im Monat, außer du kündigst vorher.</span></li>
+        </ol>
+      )}
       <label className="chk"><input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} /><span>Ich akzeptiere die <a href="/agb" target="_blank">AGB</a> und habe die <a href="/datenschutz" target="_blank">Datenschutzerklärung</a> gelesen.</span></label>
       <label className="chk"><input type="checkbox" checked={waiver} onChange={(e) => setWaiver(e.target.checked)} /><span>Ich verlange ausdrücklich, dass Blotter sofort mit der Leistung beginnt, und nehme zur Kenntnis, dass ich dadurch mein Rücktrittsrecht verliere.</span></label>
       {err && <div className="msg err" role="alert">{err}</div>}
-      <button type="button" className="btn primary block" onClick={go} disabled={busy}>{busy ? 'Zahlungsseite wird geöffnet…' : `Weiter zur Zahlung · ${p.price} / Monat`}</button>
-      <p className="muted" style={{ fontSize: 13 }}>Die Zahlung läuft sicher über Stripe. Monatlich kündbar, keine Mindestlaufzeit. Du kannst jederzeit zwischen den Abos wechseln.</p>
+      <button type="button" className="btn primary block" onClick={go} disabled={busy}>{busy ? (trial ? 'Test wird vorbereitet…' : 'Zahlungsseite wird geöffnet…') : trial ? `${TRIAL_DAYS} Tage kostenlos testen` : `Weiter zur Zahlung · ${p.price} / Monat`}</button>
+      <p className="muted" style={{ fontSize: 13 }}>{trial
+        ? 'Stripe fragt deine Zahlungsmethode ab, abgebucht wird erst nach dem Test. Du bekommst eine E-Mail mit dem genauen Enddatum. Monatlich kündbar, keine Mindestlaufzeit.'
+        : 'Die Zahlung läuft sicher über Stripe. Monatlich kündbar, keine Mindestlaufzeit. Du kannst jederzeit zwischen den Abos wechseln.'}</p>
     </>
   );
 }

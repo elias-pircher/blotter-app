@@ -29,8 +29,8 @@ export default async function Danke({ searchParams }) {
       <main className="wrap center">
         <div className="card">
           <span className="eyebrow">Danke</span>
-          <h1>Deine Zahlung wird bestätigt.</h1>
-          <p>Das dauert meist nur ein paar Sekunden.</p>
+          <h1>Dein Zugang wird freigeschaltet.</h1>
+          <p>Stripe bestätigt gerade deine Anmeldung. Das dauert meist nur ein paar Sekunden.</p>
           <a className="btn primary block" href="/app">Journal öffnen</a>
         </div>
       </main>

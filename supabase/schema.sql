@@ -13,9 +13,12 @@ create table if not exists public.subscriptions (
   consent_at timestamptz,
   updated_at timestamptz not null default now(),
   -- journal = 7,99 €, backtest = Journal + Backtesting 14,99 €, freund = free friend account (everything)
-  plan text not null default 'journal'
+  plan text not null default 'journal',
+  trial_end timestamptz
 );
 alter table public.subscriptions add column if not exists plan text not null default 'journal';
+-- end of the free trial (kept after the trial is over, so a customer gets the trial only once)
+alter table public.subscriptions add column if not exists trial_end timestamptz;
 do $$ begin
   alter table public.subscriptions add constraint subscriptions_plan_check check (plan in ('journal', 'backtest', 'freund'));
 exception when duplicate_object then null; end $$;

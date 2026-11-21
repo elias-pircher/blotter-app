@@ -1114,3 +1114,14 @@ html.vt #view{pointer-events:none}
 .acct-mail b{color:var(--ink);font-weight:600}
 .acct-friend{color:var(--ink-2)}
 .acct-btns{display:flex;flex-wrap:wrap;gap:8px}
+.acct-trial{color:var(--ink-2)}
+.trial-pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:999px;font-size:12px;font-weight:600;line-height:1;white-space:nowrap;text-decoration:none;color:var(--ink);background:color-mix(in srgb,var(--gold) 13%,transparent);border:1px solid color-mix(in srgb,var(--gold) 45%,transparent);transition:background-color .2s}
+.trial-pill:hover{background:color-mix(in srgb,var(--gold) 22%,transparent)}
+.trial-pill .tp-l{color:var(--gold)}
+@media (max-width:760px){
+  .topbar-in:has(.trial-pill:not([hidden])){column-gap:10px}
+  .top-right:has(.trial-pill:not([hidden])){gap:8px}
+  .trial-pill{padding:0 9px;gap:5px}
+  .trial-pill .tp-n{display:none}
+}
+@media (max-width:380px){.trial-pill .tp-l{display:none}}

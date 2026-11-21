@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic';
 // Switching between "Journal" and "Journal + Backtesting" on a running subscription.
 // GET  /api/plan?to=backtest  what the switch costs (nothing changes)
 // POST /api/plan {to, prorationDate}  switches; an upgrade charges the difference for the rest of the month right away,
-//      a downgrade credits the unused part to the next invoice.
+//      a downgrade credits the unused part to the next invoice. During the free trial a switch costs nothing
+//      and the trial keeps its end date.
 
 const fail = (error, status = 400) => NextResponse.json({ error }, { status });
 const isProration = (l) => l.proration === true || l.parent?.subscription_item_details?.proration === true || l.parent?.invoice_item_details?.proration === true;
@@ -32,13 +33,23 @@ async function load(to) {
   if (from === to) return { err: fail('same_plan', 409) };
   const end = item.current_period_end ?? sub.current_period_end;
   const start = item.current_period_start ?? sub.current_period_start;
-  return { user, sub, item, from, to, newPrice, upgrade: PLANS[to].cents > PLANS[from].cents, start, end };
+  const trialing = sub.status === 'trialing' && !!sub.trial_end;
+  return { user, sub, item, from, to, newPrice, upgrade: PLANS[to].cents > PLANS[from].cents, start, end, trialing };
 }
 
 export async function GET(req) {
   try {
     const c = await load(new URL(req.url).searchParams.get('to'));
     if (c.err) return c.err;
+    if (c.trialing) {
+      return NextResponse.json({
+        from: c.from, to: c.to, upgrade: c.upgrade, trial: true,
+        now: 0, credit: 0, monthly: PLANS[c.to].cents,
+        next: new Date(c.sub.trial_end * 1000).toISOString(),
+        canceling: !!c.sub.cancel_at_period_end,
+        prorationDate: Math.floor(Date.now() / 1000),
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    }
     const prorationDate = Math.floor(Date.now() / 1000);
     const inv = await stripe().invoices.createPreview({
       customer: typeof c.sub.customer === 'string' ? c.sub.customer : c.sub.customer?.id,
@@ -72,6 +83,15 @@ export async function POST(req) {
     const body = await req.json().catch(() => ({}));
     const c = await load(body.to);
     if (c.err) return c.err;
+    if (c.trialing) {
+      // nothing has been charged yet, so there is nothing to prorate; the trial runs on to its end date
+      const updated = await stripe().subscriptions.update(c.sub.id, {
+        items: [{ id: c.item.id, price: c.newPrice }],
+        proration_behavior: 'none',
+      });
+      const r = await syncSubscription(updated.id, c.user.id);
+      return NextResponse.json({ status: 'ok', plan: r.plan });
+    }
     // the same moment as the preview, so the charge matches what the customer saw (within the last hour, inside this period)
     const now = Math.floor(Date.now() / 1000);
     let pd = Number(body.prorationDate);

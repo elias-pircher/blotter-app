@@ -11,6 +11,12 @@ css = s[s.index('<style>') + len('<style>'):s.index('</style>')]
 main_start = s.index('<script>\n(function(){')
 markup_start = s.index('<div id="bg-wrap"')
 markup = s[markup_start:main_start].strip()
+
+# ---- the free trial in the top bar (filled in by Journal.js while a trial runs)
+_st = '<span class="status" id="status">'
+if markup.count(_st) != 1:
+    sys.exit('status pill not found')
+markup = markup.replace(_st, '<a class="trial-pill" id="trial-pill" href="/abo" hidden><span class="tp-l">Test</span><span class="tp-v"></span></a>\n      ' + _st)
 js = s[main_start + len('<script>'):s.rindex('</script>')]
 
 def rep(text, old, new, count=1):
@@ -35,7 +41,7 @@ js = rep(js, "'Gespeichert im Journal, auf all deinen Geräten verfügbar'", "'G
 # ---- account & subscription section in the settings dialog
 js = rep(js, """      <section class="set-sec"><h3>Konten</h3>${acctEditor(draft.accounts, 'set')}</section>""",
 """      <section class="set-sec"><h3>Konten</h3>${acctEditor(draft.accounts, 'set')}</section>
-      ${window.BlotterBackend ? `<section class="set-sec"><h3>${window.BlotterBackend.friend ? 'Konto' : 'Konto &amp; Abo'}</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p>${window.BlotterBackend.friend ? '<p class="acct-mail acct-friend">Freundeszugang: Blotter ist für dich kostenlos, ohne Abo, Backtesting inklusive.</p>' : `<p class="acct-mail acct-plan">Dein Abo: <b>${window.BlotterBackend.plan === 'backtest' ? 'Journal + Backtesting' : 'Journal'}</b> (${window.BlotterBackend.plan === 'backtest' ? '14,99' : '7,99'} € im Monat)</p>`}<div class="acct-btns">${window.BlotterBackend.friend ? '' : `<a class="btn" href="/abo${window.BlotterBackend.plan === 'backtest' ? '' : '?plan=backtest'}">${window.BlotterBackend.plan === 'backtest' ? 'Abo wechseln' : 'Backtesting dazunehmen'}</a><button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button>`}<button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}""")
+      ${window.BlotterBackend ? `<section class="set-sec"><h3>${window.BlotterBackend.friend ? 'Konto' : 'Konto &amp; Abo'}</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p>${window.BlotterBackend.friend ? '<p class="acct-mail acct-friend">Freundeszugang: Blotter ist für dich kostenlos, ohne Abo, Backtesting inklusive.</p>' : `<p class="acct-mail acct-plan">Dein Abo: <b>${window.BlotterBackend.plan === 'backtest' ? 'Journal + Backtesting' : 'Journal'}</b> (${window.BlotterBackend.plan === 'backtest' ? '14,99' : '7,99'} € im Monat)</p>` + (window.BlotterBackend.trialUntil ? '<p class="acct-mail acct-trial">' + (window.BlotterBackend.trialCanceled ? 'Gekündigt. Dein kostenloser Test endet am ' + esc(window.BlotterBackend.trialUntil) + ', es wird nichts abgebucht.' : 'Kostenloser Test bis ' + esc(window.BlotterBackend.trialUntil) + '. Danach beginnt das Abo, außer du kündigst vorher.') + '</p>' : '')}<div class="acct-btns">${window.BlotterBackend.friend ? '' : `<a class="btn" href="/abo${window.BlotterBackend.plan === 'backtest' ? '' : '?plan=backtest'}">${window.BlotterBackend.plan === 'backtest' ? 'Abo wechseln' : 'Backtesting dazunehmen'}</a><button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button>`}<button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}""")
 js = rep(js, """        if (act === 'set-cancel') { if (Modal.cur) Modal.cur.dirty = false; Modal.close(); }""",
 """        if (act === 'set-cancel') { if (Modal.cur) Modal.cur.dirty = false; Modal.close(); }
         else if (act === 'acct-portal' || act === 'acct-logout') {
@@ -49,6 +55,17 @@ css = css + """
 .acct-mail b{color:var(--ink);font-weight:600}
 .acct-friend{color:var(--ink-2)}
 .acct-btns{display:flex;flex-wrap:wrap;gap:8px}
+.acct-trial{color:var(--ink-2)}
+.trial-pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:999px;font-size:12px;font-weight:600;line-height:1;white-space:nowrap;text-decoration:none;color:var(--ink);background:color-mix(in srgb,var(--gold) 13%,transparent);border:1px solid color-mix(in srgb,var(--gold) 45%,transparent);transition:background-color .2s}
+.trial-pill:hover{background:color-mix(in srgb,var(--gold) 22%,transparent)}
+.trial-pill .tp-l{color:var(--gold)}
+@media (max-width:760px){
+  .topbar-in:has(.trial-pill:not([hidden])){column-gap:10px}
+  .top-right:has(.trial-pill:not([hidden])){gap:8px}
+  .trial-pill{padding:0 9px;gap:5px}
+  .trial-pill .tp-n{display:none}
+}
+@media (max-width:380px){.trial-pill .tp-l{display:none}}
 """
 
 RESET = (":root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}\n"

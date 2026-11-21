@@ -143,6 +143,10 @@ export function makeBackend(sb, uid, email, opts = {}) {
     // 'journal' | 'backtest' | 'freund'; backtesting is part of the larger plan and of friend accounts
     plan: opts.plan || 'journal',
     canBacktest: opts.plan === 'backtest' || opts.plan === 'freund' || !!opts.friend,
+    // the free trial, while it runs: its end (ISO), the same as text, and whether it is already cancelled
+    trialEnd: opts.trial ? opts.trial.end : null,
+    trialUntil: opts.trial ? opts.trial.until : '',
+    trialCanceled: !!(opts.trial && opts.trial.canceled),
     async use(name) { return name === 'db' ? db : name === 'assets' ? assets : name === 'marketdata' ? md : null; },
     imgSrc(ref) { return '/api/shot?p=' + encodeURIComponent(ref); },
     async portal() {

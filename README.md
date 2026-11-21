@@ -1,6 +1,6 @@
 # Blotter – Verkaufsversion
 
-Das Blotter Trading Journal als eigene Web-App mit Login, getrennten Kundendaten und zwei Stripe-Abos: Journal (7,99 €/Monat) und Journal + Backtesting (14,99 €/Monat), beide monatlich kündbar und jederzeit wechselbar.
+Das Blotter Trading Journal als eigene Web-App mit Login, getrennten Kundendaten und zwei Stripe-Abos: Journal (7,99 €/Monat) und Journal + Backtesting (14,99 €/Monat), beide monatlich kündbar und jederzeit wechselbar. Neukunden testen 3 Tage kostenlos (einmal pro Konto, Zahlungsmethode wird bei Stripe hinterlegt, abgebucht wird erst nach dem Test).
 
 **Technik:** Next.js (Hosting auf Vercel) · Supabase (Login, Datenbank, Screenshot-Speicher, Server in Frankfurt) · Stripe (Abo, Bezahlung, Kundenportal)
 
@@ -37,7 +37,7 @@ Jeder Kunde sieht nur seine eigenen Daten. Das erzwingt die Datenbank selbst (Ro
 2. **Einstellungen → Billing → Kundenportal**: aktivieren, „Abos kündigen“ erlauben (zum Ende des Abrechnungszeitraums), „Zahlungsmethode aktualisieren“ erlauben.
 3. **Entwickler → Webhooks → Endpoint hinzufügen**
    - URL: `https://DEINE-ADRESSE/api/stripe/webhook`
-   - Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed`
+   - Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed`, `customer.subscription.trial_will_end` (löst die E-Mail mit dem Enddatum des Tests aus)
    - Das **Signing secret** (`whsec_…`) ist geheim.
 4. **Entwickler → API-Schlüssel**: Den **Secret key** (`sk_test_…`) geheim halten.
 

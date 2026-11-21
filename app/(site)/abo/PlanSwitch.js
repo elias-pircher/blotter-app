@@ -58,7 +58,9 @@ export default function PlanSwitch({ to, toName, toPrice, toShort, upgrade, quie
       {!blocked && !pv && !err && <p className="sw-note muted" aria-live="polite"><span className="dot pulse" />Kosten werden berechnet…</p>}
       {pv && (
         <p className="sw-note">
-          {upgrade
+          {pv.trial
+            ? <>Du testest gerade kostenlos, deshalb kostet der Wechsel nichts. Dein Test läuft{when ? ` bis ${when}` : ''} weiter, danach {euro(pv.monthly)} im Monat.{upgrade ? ' Das Backtesting ist sofort freigeschaltet.' : ' Das Backtesting ist dann nicht mehr verfügbar, deine Sessions und Kursdaten bleiben aber gespeichert.'}</>
+            : upgrade
             ? <>Heute zahlst du <b>{euro(pv.now)}</b> für die restlichen Tage{when ? ` bis ${when}` : ''}, danach {euro(pv.monthly)} im Monat. Das Backtesting ist sofort freigeschaltet.</>
             : <>Ab sofort {euro(pv.monthly)} im Monat. Das Backtesting ist dann nicht mehr verfügbar, deine Sessions und Kursdaten bleiben aber gespeichert. {pv.credit > 0 ? <>Für die restlichen Tage bekommst du <b>{euro(pv.credit)}</b> gutgeschrieben{when ? `, die wir von deiner nächsten Rechnung am ${when} abziehen` : ''}.</> : null}</>}
           {pv.canceling ? ' Dein Abo bleibt gekündigt und endet wie geplant.' : ''}
@@ -67,7 +69,7 @@ export default function PlanSwitch({ to, toName, toPrice, toShort, upgrade, quie
       {err && <div className="msg err" role="alert">{err}</div>}
       {!blocked && (
         <button type="button" className={'btn block' + (upgrade && !quiet ? ' primary' : '')} onClick={go} disabled={busy || !pv}>
-          {busy ? 'Wird gewechselt…' : upgrade ? `Jetzt wechseln · ${pv ? euro(pv.now) : '…'} heute` : `Zu ${toName} wechseln`}
+          {busy ? 'Wird gewechselt…' : pv && pv.trial ? `Zu ${toName} wechseln` : upgrade ? `Jetzt wechseln · ${pv ? euro(pv.now) : '…'} heute` : `Zu ${toName} wechseln`}
         </button>
       )}
     </section>

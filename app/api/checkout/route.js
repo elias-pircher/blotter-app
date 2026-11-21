@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { stripe, isActive } from '@/lib/stripe';
+import { stripe, isActive, trialEligible } from '@/lib/stripe';
 import { siteUrl } from '@/lib/env';
-import { isPlan, priceIdFor } from '@/lib/plans';
+import { isPlan, priceIdFor, TRIAL_DAYS } from '@/lib/plans';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,7 @@ export async function POST(req) {
 
   const base = siteUrl(req);
   const admin = createAdminClient();
-  const { data: sub } = await admin.from('subscriptions').select('stripe_customer_id,status').eq('user_id', user.id).maybeSingle();
+  const { data: sub } = await admin.from('subscriptions').select('stripe_customer_id,stripe_subscription_id,status,price_id,trial_end').eq('user_id', user.id).maybeSingle();
   // already subscribed: a different plan is a switch, which the subscription page handles
   if (isActive(sub)) return NextResponse.json({ url: base + '/abo?plan=' + plan });
 
@@ -39,6 +39,10 @@ export async function POST(req) {
   }, { onConflict: 'user_id' });
   if (error) return NextResponse.json({ error: 'db_error' }, { status: 500 });
 
+  // new customers start with a free trial; Stripe still takes the card, and charges it when the trial ends
+  let trial = false;
+  try { trial = await trialEligible(sub, customerId); } catch (e) { trial = false; }
+
   const tax = process.env.STRIPE_AUTOMATIC_TAX === 'true'
     ? { automatic_tax: { enabled: true }, customer_update: { address: 'auto' } }
     : {};
@@ -47,13 +51,17 @@ export async function POST(req) {
     customer: customerId,
     client_reference_id: user.id,
     line_items: [{ price: priceId, quantity: 1 }],
-    subscription_data: { metadata: { user_id: user.id } },
-    metadata: { plan },
+    subscription_data: {
+      metadata: { user_id: user.id },
+      ...(trial ? { trial_period_days: TRIAL_DAYS, trial_settings: { end_behavior: { missing_payment_method: 'cancel' } } } : {}),
+    },
+    payment_method_collection: 'always',
+    metadata: { plan, trial: trial ? 'yes' : 'no' },
     allow_promotion_codes: true,
     locale: 'de',
     success_url: base + '/abo/danke?session_id={CHECKOUT_SESSION_ID}',
     cancel_url: base + '/abo?abgebrochen=1&plan=' + plan,
     ...tax,
   });
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({ url: session.url, trial });
 }

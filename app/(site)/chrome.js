@@ -30,7 +30,7 @@ export function Nav({ loggedIn }) {
         <span className="sp" />
         {loggedIn
           ? <a className="btn sm primary" href="/app">Zum Journal</a>
-          : <><a className="link hide-xs" href="/login">Anmelden</a><a className="btn sm primary" href="/login?next=/abo">Starten</a></>}
+          : <><a className="link hide-xs" href="/login">Anmelden</a><a className="btn sm primary" href="/login?next=/abo">Kostenlos testen</a></>}
       </div>
     </header>
   );

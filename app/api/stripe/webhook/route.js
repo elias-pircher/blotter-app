@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { stripe, syncSubscription } from '@/lib/stripe';
 import { secret as readSecret } from '@/lib/secrets';
+import { sendTrialMail } from '@/lib/trial-mail';
+import { siteUrl } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +13,7 @@ const HANDLED = new Set([
   'customer.subscription.deleted',
   'customer.subscription.paused',
   'customer.subscription.resumed',
+  'customer.subscription.trial_will_end',
 ]);
 
 export async function POST(req) {
@@ -33,7 +36,11 @@ export async function POST(req) {
         await syncSubscription(typeof obj.subscription === 'string' ? obj.subscription : obj.subscription.id, obj.client_reference_id);
       }
     } else {
-      await syncSubscription(obj.id, obj.metadata?.user_id);
+      const r = await syncSubscription(obj.id, obj.metadata?.user_id);
+      if (event.type === 'customer.subscription.trial_will_end') {
+        // the e-mail must never make Stripe resend the event: the subscription is already in sync
+        try { await sendTrialMail(r.sub, siteUrl(req)); } catch (e) { console.error('Test-Mail', e?.status || '', e?.code || e?.message || ''); }
+      }
     }
   } catch (err) {
     console.error('Stripe webhook', event.type, err);

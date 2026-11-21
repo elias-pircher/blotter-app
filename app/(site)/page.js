@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
+import { isActive, hadSubscription } from '@/lib/stripe';
+import { TRIAL_DAYS } from '@/lib/plans';
 import { Nav, Footer } from './chrome';
 import { Scenes, Replay } from './motion';
 
@@ -43,11 +45,12 @@ const TIERS = [
 const FAQ = [
   ['Wer sieht meine Trades?', 'Nur du. Jedes Konto hat einen eigenen, getrennten Datenbereich, und Screenshots liegen in einem privaten Speicher.'],
   ['Geht es um meinen Kontostand?', 'Nein. Blotter hält fest, ob ein Trade im Take Profit, im Stop Loss oder auf Break Even endete. So misst du, wie gut du deinem System folgst, und nicht deine Tagesform.'],
+  ['Wie funktioniert der kostenlose Test?', `Du wählst ein Abo und hinterlegst bei Stripe eine Zahlungsmethode. Die ersten ${TRIAL_DAYS} Tage hast du vollen Zugang, und es wird nichts abgebucht. Danach läuft dein Abo zum Monatspreis weiter. Kündigst du vorher, zahlst du nichts. Den Test gibt es einmal pro Konto.`],
   ['Welches Abo passt zu mir?', 'Wenn du deine Live-Trades festhalten und auswerten willst, reicht das Journal. Willst du dein Setup vorher auf vergangenen Kursen testen, nimm Journal + Backtesting. Alles andere ist in beiden Abos gleich.'],
-  ['Kann ich später wechseln?', 'Ja, jederzeit unter Einstellungen im Journal. Beim Wechsel zu Journal + Backtesting zahlst du nur die Differenz für die restlichen Tage des Monats. Wechselst du zurück, wird der nicht genutzte Teil mit deiner nächsten Rechnung verrechnet, und deine Backtests bleiben gespeichert.'],
+  ['Kann ich später wechseln?', 'Ja, jederzeit unter Einstellungen im Journal. Während des kostenlosen Tests kostet ein Wechsel nichts. Danach gilt: Beim Wechsel zu Journal + Backtesting zahlst du nur die Differenz für die restlichen Tage des Monats. Wechselst du zurück, wird der nicht genutzte Teil mit deiner nächsten Rechnung verrechnet, und deine Backtests bleiben gespeichert.'],
   ['Woher kommen die Kursdaten fürs Backtesting?', 'Du lädst 1-Minuten-Daten einmal selbst herunter, zum Beispiel kostenlos bei HistData, und importierst sie in Blotter. Eine Schritt-für-Schritt-Anleitung steht direkt auf der Backtesting-Seite. Danach liegen die Daten privat in deinem Konto.'],
   ['Brauche ich eine App?', 'Nein. Blotter läuft im Browser auf Mac, Windows, iPhone und Android. Deine Einträge sind auf allen Geräten gleich.'],
-  ['Wie kündige ich?', 'Im Journal unter Einstellungen → „Abo verwalten oder kündigen“. Das Abo läuft dann bis zum Ende des bezahlten Monats.'],
+  ['Wie kündige ich?', 'Im Journal unter Einstellungen → „Abo verwalten oder kündigen“. Das Abo läuft dann bis zum Ende des bezahlten Monats. Kündigst du während des Tests, endet dein Zugang mit dem letzten Testtag und es wird nichts abgebucht.'],
 ];
 
 const RING = (
@@ -61,8 +64,18 @@ const RING = (
 
 export default async function Home() {
   let loggedIn = false;
-  try { const { data } = await createClient().auth.getUser(); loggedIn = !!data.user; } catch {}
-  const start = loggedIn ? '/app' : '/login?next=/abo';
+  let sub = null;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getUser();
+    loggedIn = !!data.user;
+    if (loggedIn) sub = (await supabase.from('subscriptions').select('status,price_id,stripe_subscription_id,trial_end').eq('user_id', data.user.id).maybeSingle()).data;
+  } catch {}
+  const active = isActive(sub);
+  // the free trial is offered to everyone who has not had a subscription yet
+  const trial = !active && !hadSubscription(sub);
+  const start = active ? '/app' : loggedIn ? '/abo' : '/login?next=/abo';
+  const startLabel = active ? 'Zum Journal' : trial ? `${TRIAL_DAYS} Tage kostenlos testen` : 'Abo wählen';
   const choose = (plan) => (loggedIn ? '/abo?plan=' + plan : '/login?next=' + encodeURIComponent('/abo?plan=' + plan));
   return (
     <>
@@ -76,10 +89,10 @@ export default async function Home() {
           <h1><span className="in" style={{ '--t': '.05s' }}>Miss deine Disziplin.</span><span className="in g" style={{ '--t': '.18s' }}>Nicht deinen Kontostand.</span></h1>
           <p className="lead in" style={{ '--t': '.32s' }}>Blotter ist das Trading Journal, das festhält, wie jeder Trade endet: Take Profit, Break Even oder Stop Loss. Mit Kalender, Screenshots, Learnings, Outlooks und Backtesting.</p>
           <div className="cta in" style={{ '--t': '.44s' }}>
-            <a className="btn primary" href={start}>{loggedIn ? 'Zum Journal' : 'Ab 7,99 € im Monat starten'}</a>
+            <a className="btn primary" href={start}>{startLabel}</a>
             <a className="btn" href="#funktionen">Ansehen</a>
           </div>
-          <p className="fine in" style={{ '--t': '.52s' }}>Monatlich kündbar. Keine Mindestlaufzeit.</p>
+          <p className="fine in" style={{ '--t': '.52s' }}>{trial ? 'Danach ab 7,99 € im Monat. Monatlich kündbar, keine Mindestlaufzeit.' : 'Ab 7,99 € im Monat. Monatlich kündbar, keine Mindestlaufzeit.'}</p>
           <div className="comp" aria-hidden="true">
             <div className="aur" />
             <div className="hphone in" style={{ '--t': '.5s' }}><img src="/landing/phone-start.webp" width="780" height="1328" alt="" fetchPriority="high" /></div>
@@ -146,8 +159,8 @@ export default async function Home() {
               {BT_POINTS.map(([h, p], i) => <li key={h} className="glass" data-reveal style={{ '--d': i * 0.08 + 's' }}><b>{h}</b><span>{p}</span></li>)}
             </ul>
             <div className="bts-cta glass" data-reveal>
-              <p>Backtesting ist im Abo <b>Journal + Backtesting</b> enthalten, für 14,99 € im Monat.</p>
-              <a className="btn primary" href={choose('backtest')}>Mit Backtesting starten</a>
+              <p>Backtesting ist im Abo <b>Journal + Backtesting</b> enthalten, für 14,99 € im Monat.{trial ? ` Die ersten ${TRIAL_DAYS} Tage sind kostenlos.` : ''}</p>
+              <a className="btn primary" href={choose('backtest')}>{trial ? 'Backtesting kostenlos testen' : 'Mit Backtesting starten'}</a>
             </div>
           </div>
         </section>
@@ -156,14 +169,14 @@ export default async function Home() {
         <section className="wrap sec mid" id="preis">
           <div className="blob" aria-hidden="true" style={{ width: 700, height: 420, left: '30%', top: 260, background: 'radial-gradient(closest-side, #6366F1, transparent)', opacity: 0.3 }} />
           <h2 data-reveal>Journal allein oder mit Backtesting.</h2>
-          <p className="sub" data-reveal style={{ '--d': '.06s' }}>Endpreise, monatlich kündbar. Du kannst jederzeit wechseln, abgerechnet wird tagesgenau.</p>
+          <p className="sub" data-reveal style={{ '--d': '.06s' }}>{trial ? `Die ersten ${TRIAL_DAYS} Tage sind kostenlos, danach gelten diese Endpreise. Monatlich kündbar, und du kannst jederzeit wechseln.` : 'Endpreise, monatlich kündbar. Du kannst jederzeit wechseln, abgerechnet wird tagesgenau.'}</p>
           <div className="tiers">
             {TIERS.map((t, k) => (
               <article key={t.id} className={'tier ' + (t.id === 'backtest' ? 'plus' : 'glass')} data-reveal style={{ '--d': k * 0.1 + 's' }} aria-labelledby={'tier-' + t.id}>
-                <h3 id={'tier-' + t.id}>{t.name}</h3>
+                <div className="th"><h3 id={'tier-' + t.id}>{t.name}</h3>{trial && <span className="free">{TRIAL_DAYS} Tage kostenlos</span>}</div>
                 <p className="amt"><b>{t.amt}</b><span>im Monat</span></p>
                 <p className="tl">{t.lead}</p>
-                <a className={'btn' + (t.id === 'backtest' ? ' primary' : '')} href={choose(t.id)}>{t.id === 'backtest' ? 'Mit Backtesting starten' : 'Mit dem Journal starten'}</a>
+                <a className={'btn' + (t.id === 'backtest' ? ' primary' : '')} href={choose(t.id)}>{trial ? `${TRIAL_DAYS} Tage kostenlos testen` : t.id === 'backtest' ? 'Mit Backtesting starten' : 'Mit dem Journal starten'}</a>
                 <ul>{t.list.map((x) => <li key={x}>{CHECK}{x}</li>)}</ul>
               </article>
             ))}
@@ -183,7 +196,8 @@ export default async function Home() {
           <div className="glow" aria-hidden="true" />
           <div className="wrap">
             <h2>Halte dich an das System.</h2>
-            <div className="cta"><a className="btn primary" href={start}>{loggedIn ? 'Zum Journal' : 'Blotter starten'}</a></div>
+            <div className="cta"><a className="btn primary" href={start}>{startLabel}</a></div>
+            {trial && <p className="fine">Danach ab 7,99 € im Monat. Kündigst du im Test, zahlst du nichts.</p>}
           </div>
         </section>
       </main>

@@ -150,6 +150,9 @@ img{max-width:100%;height:auto}
 .tier{border-radius:28px;padding:34px;display:flex;flex-direction:column}
 .tier.plus{background:linear-gradient(rgba(12,14,28,.92),rgba(12,14,28,.92)) padding-box,linear-gradient(135deg,var(--a1),var(--a2) 50%,var(--a3)) border-box;border:1.5px solid transparent;box-shadow:0 30px 90px rgba(99,102,241,.22)}
 .tier h3{margin:0;font-size:18px;font-weight:600}
+.tier .th{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px}
+.free{font-size:13px;font-weight:600;line-height:1;color:var(--gold-hi);background:var(--gold-soft);border:1px solid var(--gold-line);border-radius:999px;padding:7px 12px;white-space:nowrap}
+.lp .end .fine{margin-top:18px}
 .amt{display:flex;align-items:baseline;gap:10px;margin:20px 0 12px}
 .amt b{font-size:clamp(46px,5vw,60px);font-weight:600;letter-spacing:-.04em;line-height:1;white-space:nowrap}
 .amt span{color:var(--muted)}
@@ -333,6 +336,22 @@ img{max-width:100%;height:auto}
 .sw-note b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
 .card .sw-note.muted{color:var(--muted);font-size:14px}
 @media (prefers-reduced-motion:reduce){.switch.focus{animation:none}.plan .rd::after{transition:none}}
+
+/* the free trial: today, then the day it ends; on a running trial, how much of it is left */
+.trial-tl{list-style:none;margin:2px 0;padding:0;display:grid;gap:14px}
+.trial-tl li{position:relative;padding-left:28px;display:grid;gap:2px}
+.trial-tl li::before{content:"";position:absolute;left:0;top:5px;width:14px;height:14px;border-radius:50%;background:var(--bg);border:2px solid var(--a2)}
+.trial-tl li:first-child::before{background:var(--a1);border-color:var(--a1);box-shadow:0 0 0 4px rgba(45,212,191,.16)}
+.trial-tl li:not(:last-child)::after{content:"";position:absolute;left:6px;top:19px;bottom:-19px;width:2px;border-radius:2px;background:linear-gradient(var(--a1),var(--a2))}
+.trial-tl b{font-size:15px;font-weight:600;color:var(--ink)}
+.trial-tl span{font-size:14px;color:var(--muted);line-height:1.5}
+.trial-meter{display:grid;gap:9px;padding:14px 16px;border-radius:14px;background:var(--gold-soft);border:1px solid var(--gold-line)}
+.tm-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:14px;color:var(--muted)}
+.tm-top b{font-size:16px;font-weight:600;color:var(--ink)}
+.tm-bar{height:6px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden}
+.tm-bar i{display:block;height:100%;border-radius:6px;background:var(--grad)}
+.trial-meter.off{background:rgba(255,255,255,.03);border-color:var(--line)}
+.trial-meter.off .tm-bar i{background:var(--be)}
 
 .card{background:rgba(11,15,31,.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border-color:var(--glass-line);border-radius:26px}
 .card h1{font-weight:600;letter-spacing:-.025em}
