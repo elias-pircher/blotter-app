@@ -72,7 +72,7 @@ export default async function Home() {
     if (loggedIn) sub = (await supabase.from('subscriptions').select('status,price_id,stripe_subscription_id,trial_end').eq('user_id', data.user.id).maybeSingle()).data;
   } catch {}
   const active = isActive(sub);
-  // the free trial is offered to everyone who has not had a subscription yet
+  // the offer (3 days free) is always on the page; the buttons only say "testen" to whoever can still start a trial
   const trial = !active && !hadSubscription(sub);
   const start = active ? '/app' : loggedIn ? '/abo' : '/login?next=/abo';
   const startLabel = active ? 'Zum Journal' : trial ? `${TRIAL_DAYS} Tage kostenlos testen` : 'Abo wählen';
@@ -92,7 +92,7 @@ export default async function Home() {
             <a className="btn primary" href={start}>{startLabel}</a>
             <a className="btn" href="#funktionen">Ansehen</a>
           </div>
-          <p className="fine in" style={{ '--t': '.52s' }}>{trial ? 'Danach ab 7,99 € im Monat. Monatlich kündbar, keine Mindestlaufzeit.' : 'Ab 7,99 € im Monat. Monatlich kündbar, keine Mindestlaufzeit.'}</p>
+          <p className="fine in" style={{ '--t': '.52s' }}>{trial ? 'Danach ab 7,99 € im Monat. Monatlich kündbar, keine Mindestlaufzeit.' : `Neu bei Blotter: ${TRIAL_DAYS} Tage kostenlos, danach ab 7,99 € im Monat. Monatlich kündbar.`}</p>
           <div className="comp" aria-hidden="true">
             <div className="aur" />
             <div className="hphone in" style={{ '--t': '.5s' }}><img src="/landing/phone-start.webp" width="780" height="1328" alt="" fetchPriority="high" /></div>
@@ -159,7 +159,7 @@ export default async function Home() {
               {BT_POINTS.map(([h, p], i) => <li key={h} className="glass" data-reveal style={{ '--d': i * 0.08 + 's' }}><b>{h}</b><span>{p}</span></li>)}
             </ul>
             <div className="bts-cta glass" data-reveal>
-              <p>Backtesting ist im Abo <b>Journal + Backtesting</b> enthalten, für 14,99 € im Monat.{trial ? ` Die ersten ${TRIAL_DAYS} Tage sind kostenlos.` : ''}</p>
+              <p>Backtesting ist im Abo <b>Journal + Backtesting</b> enthalten, für 14,99 € im Monat. Die ersten {TRIAL_DAYS} Tage sind kostenlos.</p>
               <a className="btn primary" href={choose('backtest')}>{trial ? 'Backtesting kostenlos testen' : 'Mit Backtesting starten'}</a>
             </div>
           </div>
@@ -169,11 +169,11 @@ export default async function Home() {
         <section className="wrap sec mid" id="preis">
           <div className="blob" aria-hidden="true" style={{ width: 700, height: 420, left: '30%', top: 260, background: 'radial-gradient(closest-side, #6366F1, transparent)', opacity: 0.3 }} />
           <h2 data-reveal>Journal allein oder mit Backtesting.</h2>
-          <p className="sub" data-reveal style={{ '--d': '.06s' }}>{trial ? `Die ersten ${TRIAL_DAYS} Tage sind kostenlos, danach gelten diese Endpreise. Monatlich kündbar, und du kannst jederzeit wechseln.` : 'Endpreise, monatlich kündbar. Du kannst jederzeit wechseln, abgerechnet wird tagesgenau.'}</p>
+          <p className="sub" data-reveal style={{ '--d': '.06s' }}>Die ersten {TRIAL_DAYS} Tage sind kostenlos, danach gelten diese Endpreise. Monatlich kündbar, und du kannst jederzeit wechseln.</p>
           <div className="tiers">
             {TIERS.map((t, k) => (
               <article key={t.id} className={'tier ' + (t.id === 'backtest' ? 'plus' : 'glass')} data-reveal style={{ '--d': k * 0.1 + 's' }} aria-labelledby={'tier-' + t.id}>
-                <div className="th"><h3 id={'tier-' + t.id}>{t.name}</h3>{trial && <span className="free">{TRIAL_DAYS} Tage kostenlos</span>}</div>
+                <div className="th"><h3 id={'tier-' + t.id}>{t.name}</h3><span className="free">{TRIAL_DAYS} Tage kostenlos</span></div>
                 <p className="amt"><b>{t.amt}</b><span>im Monat</span></p>
                 <p className="tl">{t.lead}</p>
                 <a className={'btn' + (t.id === 'backtest' ? ' primary' : '')} href={choose(t.id)}>{trial ? `${TRIAL_DAYS} Tage kostenlos testen` : t.id === 'backtest' ? 'Mit Backtesting starten' : 'Mit dem Journal starten'}</a>
@@ -197,7 +197,7 @@ export default async function Home() {
           <div className="wrap">
             <h2>Halte dich an das System.</h2>
             <div className="cta"><a className="btn primary" href={start}>{startLabel}</a></div>
-            {trial && <p className="fine">Danach ab 7,99 € im Monat. Kündigst du im Test, zahlst du nichts.</p>}
+            <p className="fine">{trial ? 'Danach ab 7,99 € im Monat. Kündigst du im Test, zahlst du nichts.' : `Neu bei Blotter: ${TRIAL_DAYS} Tage kostenlos, danach ab 7,99 € im Monat.`}</p>
           </div>
         </section>
       </main>
