@@ -14,6 +14,7 @@ export function Nav({ loggedIn }) {
         <a className="logo" href="/"><Logo />Blotter</a>
         <span className="sp" />
         <a className="link hide-sm" href="/#funktionen">Funktionen</a>
+        <a className="link hide-sm" href="/#backtesting">Backtesting</a>
         <a className="link hide-sm" href="/#preis">Preis</a>
         <a className="link hide-sm" href="/#fragen">Fragen</a>
         {loggedIn

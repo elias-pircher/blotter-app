@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { Nav, Footer } from './chrome';
+import { Motion, Replay } from './motion';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,9 +47,16 @@ const FACTS = [
   ['12 Farbschemen', 'Dunkel oder hell, so wie du am liebsten arbeitest.'],
 ];
 
+const BT_POINTS = [
+  ['Sechs Märkte', 'Nasdaq 100, S&P 500, DAX 40, Gold, EUR/USD und GBP/USD.'],
+  ['Deine eigenen Kursdaten', 'Du lädst 1-Minuten-Daten einmal kostenlos herunter und importierst sie. Die Anleitung ist dabei.'],
+  ['Statistik pro Session', 'Win-Rate, Summe in R, Profit Factor, Drawdown und Equity-Kurve.'],
+];
+
 const FAQ = [
   ['Wer sieht meine Trades?', 'Nur du. Jedes Konto hat einen eigenen, getrennten Datenbereich, und Screenshots liegen in einem privaten Speicher.'],
   ['Geht es um meinen Kontostand?', 'Nein. Blotter hält fest, ob ein Trade im Take Profit, im Stop Loss oder auf Break Even endete. So misst du, wie gut du deinem System folgst, und nicht deine Tagesform.'],
+  ['Woher kommen die Kursdaten fürs Backtesting?', 'Du lädst 1-Minuten-Daten einmal selbst herunter, zum Beispiel kostenlos bei HistData, und importierst sie in Blotter. Eine Schritt-für-Schritt-Anleitung steht direkt auf der Backtesting-Seite. Danach liegen die Daten privat in deinem Konto.'],
   ['Brauche ich eine App?', 'Nein. Blotter läuft im Browser auf Mac, Windows, iPhone und Android. Deine Einträge sind auf allen Geräten gleich.'],
   ['Wie kündige ich?', 'Im Journal unter Einstellungen → „Abo verwalten oder kündigen“. Das Abo läuft dann bis zum Ende des bezahlten Monats.'],
 ];
@@ -63,8 +71,9 @@ export default async function Home() {
       <main className="lp">
         <section className="wrap hero">
           <div className="hero-txt">
+            <a className="news" href="#backtesting"><b>Neu</b>Backtesting mit sechs Märkten</a>
             <h1><span>Miss deine Disziplin.</span> <span>Nicht deinen Kontostand.</span></h1>
-            <p className="lead">Blotter ist das Trading Journal, das festhält, wie jeder Trade endet: Take Profit, Break Even oder Stop Loss. Mit Kalender, Screenshots, Learnings und Outlooks, auf all deinen Geräten.</p>
+            <p className="lead">Blotter ist das Trading Journal, das festhält, wie jeder Trade endet: Take Profit, Break Even oder Stop Loss. Mit Kalender, Screenshots, Learnings, Outlooks und Backtesting, auf all deinen Geräten.</p>
             <div className="cta">
               <a className="btn primary" href={start}>{loggedIn ? 'Zum Journal' : 'Für 7,99 € im Monat starten'}</a>
               <a className="btn quiet" href="#journal">Ansehen</a>
@@ -75,37 +84,51 @@ export default async function Home() {
         </section>
 
         <section className="wrap shot" id="journal">
-          <figure className="screen">
+          <figure className="screen" data-lift>
             <picture>
               <source media="(max-width: 700px)" srcSet="/landing/phone-start.webp" width="780" height="1328" />
               <img src="/landing/journal-desktop.webp" width="2400" height="1500" alt="Das Journal: Kalender mit Bilanz, Win-Rate und den Trades des Monats" fetchPriority="high" />
             </picture>
           </figure>
           <ul className="facts">
-            {FACTS.map(([h, p]) => <li key={h}><b>{h}</b><span>{p}</span></li>)}
+            {FACTS.map(([h, p], i) => <li key={h} data-reveal style={{ '--d': i * 0.08 + 's' }}><b>{h}</b><span>{p}</span></li>)}
           </ul>
         </section>
 
         <section className="wrap rows" id="funktionen">
           {ROWS.map(([img, alt, h, p]) => (
             <article className="row" key={img}>
-              <div className="row-txt"><h2>{h}</h2><p>{p}</p></div>
-              <figure className="phone"><img src={`/landing/${img}.webp`} width="780" height="1328" alt={alt} loading="lazy" decoding="async" /></figure>
+              <div className="row-txt" data-reveal><h2>{h}</h2><p>{p}</p></div>
+              <figure className="phone" data-reveal data-drift style={{ '--d': '.1s' }}><img src={`/landing/${img}.webp`} width="780" height="1328" alt={alt} loading="lazy" decoding="async" /></figure>
             </article>
           ))}
         </section>
 
+        <section className="bts" id="backtesting">
+          <div className="wrap bts-head">
+            <h2 data-reveal>Teste dein Setup, bevor es Geld kostet.</h2>
+            <p data-reveal style={{ '--d': '.08s' }}>Mit dem Backtesting spielst du den Markt Kerze für Kerze nach. Du setzt Entry, Stop und Ziel und Blotter rechnet jeden Trade in R. So siehst du schwarz auf weiß, ob dein Setup trägt, bevor echtes Geld im Spiel ist.</p>
+          </div>
+          <Replay />
+          <div className="wrap">
+            <ul className="facts three">
+              {BT_POINTS.map(([h, p], i) => <li key={h} data-reveal style={{ '--d': i * 0.08 + 's' }}><b>{h}</b><span>{p}</span></li>)}
+            </ul>
+          </div>
+        </section>
+
         <section className="wrap price-sec" id="preis">
-          <div className="price">
+          <div className="price" data-reveal>
             <div className="price-main">
               <h2>Ein Preis. Alles drin.</h2>
               <p className="amt"><b>7,99 €</b><span>im Monat</span></p>
-              <a className="btn primary" href={loggedIn ? '/abo' : '/login?next=/abo'}>Jetzt starten</a>
+              <a className="btn primary" href={loggedIn ? '/abo' : '/login?next=/abo'}>Blotter starten</a>
               <p className="fine">Endpreis. Monatlich kündbar, mit zwei Klicks.</p>
             </div>
             <ul className="incl">
               <li>Unbegrenzt Trades, Learnings und Outlooks</li>
               <li>Screenshots zu jedem Eintrag</li>
+              <li>Backtesting mit sechs Märkten</li>
               <li>Bis zu 10 Konten und 12 Farbschemen</li>
               <li>Synchron auf Laptop, Tablet und Handy</li>
               <li>Deine Daten sieht nur du</li>
@@ -115,18 +138,19 @@ export default async function Home() {
         </section>
 
         <section className="wrap faq-sec" id="fragen">
-          <h2>Gut zu wissen</h2>
-          <div className="faq">
+          <h2 data-reveal>Gut zu wissen</h2>
+          <div className="faq" data-reveal style={{ '--d': '.08s' }}>
             {FAQ.map(([q, a]) => <details key={q}><summary>{q}</summary><p>{a}</p></details>)}
           </div>
         </section>
 
         <section className="wrap close">
-          <p className="mantra">Halte dich an das System.</p>
-          <a className="btn primary" href={start}>{loggedIn ? 'Zum Journal' : 'Blotter starten'}</a>
+          <p className="mantra" data-reveal>Halte dich an das System.</p>
+          <a className="btn primary" data-reveal style={{ '--d': '.12s' }} href={start}>{loggedIn ? 'Zum Journal' : 'Blotter starten'}</a>
         </section>
       </main>
       <Footer />
+      <Motion />
     </>
   );
 }
