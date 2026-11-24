@@ -2,12 +2,14 @@
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
+import { lp, tr } from '@/lib/i18n';
 
 const safeNext = (n) => (n && n.startsWith('/') && !n.startsWith('//') ? n : '/app');
 
 // Supabase sends the login back as #access_token=…&refresh_token=… (or #error=…).
 // The fragment never reaches a server; here it becomes the normal cookie session.
-export default function Finish() {
+export default function Finish({ lang = 'de' }) {
+  const t = tr(lang);
   const [state, setState] = useState('working');
   const [next, setNext] = useState('/app');
 
@@ -36,21 +38,21 @@ export default function Finish() {
   if (state === 'working') {
     return (
       <div className="card">
-        <span className="eyebrow">Einen Moment</span>
-        <h1>Du wirst angemeldet…</h1>
+        <span className="eyebrow">{t('Einen Moment', 'One moment')}</span>
+        <h1>{t('Du wirst angemeldet…', 'Logging you in…')}</h1>
       </div>
     );
   }
   return (
     <div className="card">
-      <span className="eyebrow">Anmeldung</span>
-      <h1>Das hat nicht geklappt.</h1>
+      <span className="eyebrow">{t('Anmeldung', 'Log in')}</span>
+      <h1>{t('Das hat nicht geklappt.', 'That did not work.')}</h1>
       <div className="msg err">
         {state === 'expired'
-          ? 'Der Anmelde-Link ist abgelaufen oder wurde schon benutzt. Jeder Link funktioniert nur einmal.'
-          : 'Der Anmelde-Link konnte nicht verwendet werden.'}
+          ? t('Der Anmelde-Link ist abgelaufen oder wurde schon benutzt. Jeder Link funktioniert nur einmal.', 'The login link has expired or was already used. Each link works only once.')
+          : t('Der Anmelde-Link konnte nicht verwendet werden.', 'The login link could not be used.')}
       </div>
-      <a className="btn primary block" href={'/login?next=' + encodeURIComponent(next)}>Neuen Link anfordern</a>
+      <a className="btn primary block" href={lp(lang, '/login') + '?next=' + encodeURIComponent(next)}>{t('Neuen Link anfordern', 'Request a new link')}</a>
     </div>
   );
 }

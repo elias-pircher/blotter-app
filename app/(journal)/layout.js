@@ -1,4 +1,5 @@
 import './journal.css';
+import { getLang } from '@/lib/i18n-server';
 
 export const viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 
@@ -11,7 +12,7 @@ const SKIN = 'try{var k=localStorage.getItem("blotter.skin"),o={ocean:"slate",ro
 
 export default function JournalLayout({ children }) {
   return (
-    <html lang="de" suppressHydrationWarning>
+    <html lang={getLang()} suppressHydrationWarning>
       <head>
         <link rel="preload" href="/fonts/archivo-wdth.woff2" as="font" type="font/woff2" crossOrigin="" />
         <link rel="preload" href="/fonts/plex-sans-400.woff2" as="font" type="font/woff2" crossOrigin="" />

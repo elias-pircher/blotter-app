@@ -81,6 +81,12 @@ Jeder Kunde sieht nur seine eigenen Daten. Das erzwingt die Datenbank selbst (Ro
 Das Journal-Design kommt aus der Claude-Version (`design/blotter.html`). Nach Änderungen dort:
 `python3 scripts/extract-journal.py` erzeugt `public/journal/journal.js`, `app/(journal)/journal.css` und `app/(journal)/app/markup.js` neu.
 
+Dabei entsteht auch die englische Fassung (`journal.en.js`, `backtest.en.js`, `markup.en.js`) aus den Übersetzungen in `scripts/i18n/journal.en.txt` und `scripts/i18n/backtest.en.txt`. Bleibt irgendwo deutscher Text stehen, bricht das Skript ab; `node scripts/i18n/build.js --report` zeigt dann, welche Stellen noch eine Übersetzung brauchen. Vorher einmal `npm install` ausführen (für `acorn`).
+
+## Sprachen
+
+Die Website gibt es auf Deutsch unter `/…` und auf Englisch unter `/en/…`. Beim ersten Besuch entscheidet die Browsersprache, danach die Wahl im Umschalter (Navigation, Fußzeile, im Journal unter Einstellungen → Sprache). Die Wahl liegt im Cookie `lang` und im Konto (`user_metadata.lang`), damit auch Anmelde- und Abo-E-Mails in der richtigen Sprache kommen. Rechtstexte gibt es übersetzt, verbindlich ist die deutsche Fassung.
+
 ## Lokal starten (optional)
 ```
 cp .env.example .env.local   # Werte eintragen

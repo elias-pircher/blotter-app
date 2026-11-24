@@ -1,0 +1,1044 @@
+# English for backtesting and prop accounts (public/journal/backtest.js). Format: see apply.js.
+
+# ---- locale, numbers and money
+!= const LOC = 'de-AT';
+!> const LOC = 'en-GB';
+!= const fUsd = new Intl.NumberFormat('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+!> const fUsd = new Intl.NumberFormat('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+!= const usd = v => (v <= -0.005 ? '−' : '') + fUsd.format(Math.abs(v) < 0.005 ? 0 : Math.abs(v)) + '\u00a0$';
+!> const usd = v => (v <= -0.005 ? '−' : '') + '$' + fUsd.format(Math.abs(v) < 0.005 ? 0 : Math.abs(v));
+!= const usdS = v => (v >= 0.005 ? '+' : v <= -0.005 ? '−' : '') + fUsd.format(Math.abs(v) < 0.005 ? 0 : Math.abs(v)) + '\u00a0$';
+!> const usdS = v => (v >= 0.005 ? '+' : v <= -0.005 ? '−' : '') + '$' + fUsd.format(Math.abs(v) < 0.005 ? 0 : Math.abs(v));
+!= const fUsd0 = new Intl.NumberFormat('de-DE', {maximumFractionDigits: 0});
+!> const fUsd0 = new Intl.NumberFormat('en-US', {maximumFractionDigits: 0});
+!= .replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')
+!> .replace(/,(?=\d{3}(\D|$))/g, '').replace(',', '.')
+
+# ---- markets, timeframes, sources
+= Punkte
+> points
+= 3 Minuten
+> 3 minutes
+= 5 Minuten
+> 5 minutes
+= 15 Minuten
+> 15 minutes
+= 30 Minuten
+> 30 minutes
+= 1 Stunde
+> 1 hour
+= 4 Stunden
+> 4 hours
+= Täglich
+> Daily
+= Wöchentlich
+> Weekly
+= Monatlich
+> Monthly
+= CSV mit ISO-Zeit
+> CSV with ISO time
+= HistData: New York ohne Sommerzeit (UTC−5)
+> HistData: New York without daylight saving (UTC−5)
+= MetaTrader-Broker: UTC+2, im US-Sommer UTC+3
+> MetaTrader broker: UTC+2, UTC+3 in US summer
+= Wien/Berlin (MEZ/MESZ)
+> Vienna/Berlin (CET/CEST)
+= New York mit Sommerzeit
+> New York with daylight saving
+= Kursdaten
+> Price data
+
+# ---- backtesting page
+= ${ICON_PLUS}Neue Session
+> ${ICON_PLUS}New session
+= Deine 1-Minuten-Daten, die nur du siehst. Lade sie einmal herunter und importiere sie hier.
+> Your 1-minute data, visible only to you. Download it once and import it here.
+= Wo bekomme ich die Daten?
+> Where do I get the data?
+= Mit einem
+> With a
+= Prop-Konto
+> prop account
+= rechnest du in Lots, Kontrakten und Dollar.
+> you count in lots, contracts and dollars.
+= Spiel den Markt Kerze für Kerze nach und teste dein Setup, bevor echtes Geld im Spiel ist.
+> Replay the market candle by candle and test your setup before real money is on the line.
+= Sessions werden geladen…
+> Loading sessions…
+= Noch keine Session
+> No session yet
+= Starte eine Session: Markt wählen, Startzeitpunkt setzen und dann Kerze für Kerze traden.
+> Start a session: pick a market, set a start time and then trade candle by candle.
+= Importiere zuerst Kursdaten für einen Markt. Wo du sie bekommst und wie du sie herunterlädst, steht in der Anleitung.
+> Import price data for a market first. The guide explains where to get it and how to download it.
+= ${ICON_PLUS}Erste Session starten
+> ${ICON_PLUS}Start your first session
+= Zur Anleitung
+> Open the guide
+= Empfohlen
+> Recommended
+= Kostenlos, ohne Abo und viele Jahre zurück. Für alle sechs Märkte der einfachste Weg.
+> Free, no subscription and many years back. The easiest way for all six markets.
+= Öffne unten die Seite deines Markts bei HistData. Dort sind 1-Minuten-Kerzen im Format „Generic ASCII“ schon ausgewählt.
+> Open your market’s page at HistData below. 1-minute candles in the “Generic ASCII” format are already selected there.
+= Klicke auf das Jahr, das du testen willst. Für das laufende Jahr stehen dort einzelne Monate.
+> Click the year you want to test. For the current year, single months are listed.
+= Auf der nächsten Seite klickst du den Link mit dem Dateinamen, der mit „HISTDATA_COM_ASCII“ beginnt. Die ZIP-Datei wird heruntergeladen.
+> On the next page, click the link with the file name starting with “HISTDATA_COM_ASCII”. The ZIP file downloads.
+= Wiederhole das für jedes weitere Jahr.
+> Repeat this for every further year.
+= Zieh die ZIP-Dateien unverändert in den Import. Entpacken musst du nichts.
+> Drag the ZIP files into the import as they are. No need to unzip anything.
+= Deine Märkte bei HistData
+> Your markets at HistData
+= heißt dort ${esc(m.hist.toUpperCase())}
+> called ${esc(m.hist.toUpperCase())} there
+= Kostenlos und sehr sauber, dazu viele Märkte. Für den Download kann Dukascopy eine kostenlose Anmeldung verlangen.
+> Free and very clean, with many markets. Dukascopy may ask for a free sign-up to download.
+= Wähle dein Instrument. Indizes heißen dort anders, der Nasdaq 100 zum Beispiel „USA 100 Technical Index“.
+> Choose your instrument. Indices have different names there, the Nasdaq 100 for example is “USA 100 Technical Index”.
+= Stell den Zeitrahmen auf 1 Minute, wähl den Zeitraum und als Dateiformat CSV. Die Zeit bleibt auf GMT.
+> Set the timeframe to 1 minute, choose the period and CSV as the file format. Leave the time on GMT.
+= Lade die Datei herunter und zieh sie in den Import.
+> Download the file and drag it into the import.
+= Die Kurse deines eigenen Brokers. Wie weit sie zurückgehen, hängt vom Broker ab.
+> Your own broker’s prices. How far back they go depends on the broker.
+= Öffne in MetaTrader 5 „Ansicht → Symbole“ (unter Windows Strg+U).
+> In MetaTrader 5, open “View → Symbols” (Ctrl+U on Windows).
+= Wähle dein Symbol, zum Beispiel US100, GER40 oder XAUUSD, und öffne den Reiter „Balken“ (Bars).
+> Choose your symbol, for example US100, GER40 or XAUUSD, and open the “Bars” tab.
+= Stell M1 und den Zeitraum ein und klicke „Anfordern“ (Request).
+> Set M1 and the period and click “Request”.
+= Klicke „Balken exportieren“ (Export Bars) und speichere die Datei als CSV.
+> Click “Export Bars” and save the file as CSV.
+= Zieh die Datei in den Import. Blotter schlägt die übliche Serverzeit vor (UTC+2, im US-Sommer UTC+3). Prüf, ob das bei deinem Broker stimmt.
+> Drag the file into the import. Blotter suggests the usual server time (UTC+2, UTC+3 in US summer). Check that this is right for your broker.
+= Kommen weniger Kerzen als erwartet, erhöhe in den MetaTrader-Einstellungen unter „Charts“ die maximale Anzahl Balken und starte MetaTrader neu.
+> If you get fewer candles than expected, raise the maximum number of bars in the MetaTrader settings under “Charts” and restart MetaTrader.
+= Geht nur mit einem bezahlten TradingView-Abo. Exportiert werden nur die Kerzen, die im Chart geladen sind, bei 1-Minuten-Kerzen also eher kurze Zeiträume.
+> Only works with a paid TradingView plan. Only the candles loaded in the chart are exported, so rather short periods for 1-minute candles.
+= Öffne deinen Markt im 1-Minuten-Chart.
+> Open your market on the 1-minute chart.
+= Scroll nach links, bis der Zeitraum geladen ist, den du testen willst.
+> Scroll left until the period you want to test is loaded.
+= Öffne oben im Menü „Chartdaten herunterladen…“ (Download chart data) und lade die CSV-Datei herunter.
+> Open “Download chart data…” in the menu at the top and download the CSV file.
+= Zieh die Datei in den Import.
+> Drag the file into the import.
+= Datenquelle
+> Data source
+= Anleitung: Kursdaten herunterladen
+> Guide: downloading price data
+= Woher die Kurse kommen und wie du sie in Blotter bekommst
+> Where the prices come from and how to get them into Blotter
+= Für das Backtesting brauchst du Kurse als 1-Minuten-Kerzen (M1). Blotter liefert keine Kurse mit: Du lädst sie einmal selbst herunter und importierst sie hier. Danach liegen sie privat in deinem Konto und sind auf all deinen Geräten da. Für den Anfang reicht ein Jahr pro Markt, das sind etwa 2 MB.
+> For backtesting you need prices as 1-minute candles (M1). Blotter doesn’t ship prices: you download them once yourself and import them here. After that they sit privately in your account and are there on all your devices. To start, one year per market is enough, which is about 2 MB.
+= Zeitzone
+> Time zone
+= Blotter erkennt beim Import, aus welcher Quelle die Datei stammt, und stellt die Zeitzone passend ein. Vor dem Import kannst du sie noch ändern.
+> On import, Blotter recognises which source the file comes from and sets the time zone to match. You can still change it before importing.
+= Mehr Jahre
+> More years
+= Weitere Jahre kannst du jederzeit mit „Ergänzen“ dazuholen. Bereits importierte Monate werden zusammengeführt.
+> You can add more years at any time with “Add more”. Months already imported are merged.
+= Nur für dich
+> Only for you
+= Deine Kursdaten liegen in deinem Konto und sind für niemanden sonst sichtbar.
+> Your price data sits in your account and is visible to nobody else.
+= Kursdaten importieren
+> Import price data
+= Kerzen
+> Candles
+= Noch keine Daten
+> No data yet
+= Ergänzen
+> Add more
+= Importieren
+> Import
+= Win-Rate
+> Win rate
+= Schließen
+> Close
+= Markt
+> Market
+= Dateien hierher ziehen
+> Drag files here
+= oder klicken zum Auswählen · ZIP, CSV oder TXT, mehrere auf einmal
+> or click to choose · ZIP, CSV or TXT, several at once
+= Abbrechen
+> Cancel
+= Lade die Jahre herunter, die du testen willst. Für das laufende Jahr gibt es einzelne Monate.
+> Download the years you want to test. For the current year there are single months.
+= Zieh die ZIP-Dateien unverändert hier hinein. Exporte aus MetaTrader, TradingView oder Dukascopy gehen auch.
+> Drag the ZIP files in here as they are. Exports from MetaTrader, TradingView or Dukascopy work too.
+= Schritt für Schritt und für alle Quellen:
+> Step by step and for all sources:
+= Anleitung öffnen
+> Open the guide
+= Format nicht erkannt
+> Format not recognised
+= Zeitzone der Datei
+> Time zone of the file
+= Die Datei „${esc(other.src.name)}“ sieht nach ${esc(MK[other.guess].name)} aus. Prüfe, ob der Markt oben stimmt.
+> The file “${esc(other.src.name)}” looks like ${esc(MK[other.guess].name)}. Check that the market above is right.
+= Nicht erkannte Dateien werden übersprungen. Unterstützt: HistData (Generic ASCII oder MetaTrader), MetaTrader-Export, TradingView-Export, Dukascopy-Export.
+> Files that aren’t recognised are skipped. Supported: HistData (Generic ASCII or MetaTrader), MetaTrader export, TradingView export, Dukascopy export.
+= Dateien werden geprüft…
+> Checking files…
+= Die Datei konnte nicht gelesen werden. Ist es eine ZIP-, CSV- oder TXT-Datei?
+> The file could not be read. Is it a ZIP, CSV or TXT file?
+= Kerzen gelesen…
+> candles read…
+= Wird gespeichert…
+> Saving…
+= In den Dateien wurden keine Kerzen gefunden.
+> No candles were found in the files.
+= Der Speicher ist voll. Importiere weniger Jahre auf einmal.
+> The storage is full. Import fewer years at once.
+= Import hat nicht geklappt. Prüfe deine Verbindung und versuch es erneut.
+> The import didn’t work. Check your connection and try again.
+= Importiere zuerst Kursdaten unter Backtesting. Die Anleitung steht dort.
+> Import price data under Backtesting first. The guide is there.
+= z. B. London Sweep, Q1
+> e.g. London sweep, Q1
+= Neue Session
+> New session
+= Start (deine Zeit)
+> Start (your time)
+= Zeiteinheit
+> Timeframe
+= Name (optional)
+> Name (optional)
+= Session starten
+> Start session
+= Konto
+> Account
+= Ohne Konto, Ergebnis in R
+> No account, result in R
+= Für dieses Konto fehlen Kursdaten. Futures-Konten brauchen Daten für Nasdaq 100, S&P 500, Gold, EUR/USD oder GBP/USD.
+> Price data for this account is missing. Futures accounts need data for Nasdaq 100, S&P 500, gold, EUR/USD or GBP/USD.
+= Futures-Konten handeln die CME-Kontrakte, deshalb ohne DAX.
+> Futures accounts trade the CME contracts, so no DAX.
+= Wähle einen Startzeitpunkt.
+> Choose a start time.
+= Daten werden geladen…
+> Loading data…
+= Ab diesem Zeitpunkt gibt es keine Daten. Wähle einen früheren Start.
+> There’s no data from this time on. Choose an earlier start.
+= Die Session konnte nicht gespeichert werden. Prüfe deine Verbindung.
+> The session could not be saved. Check your connection.
+= Zurück zu den Sessions
+> Back to sessions
+= Rückgängig
+> Undo
+= Wiederholen
+> Redo
+= Chart-Einstellungen
+> Chart settings
+= Zeichenwerkzeuge
+> Drawing tools
+= Wiedergabe
+> Playback
+= Abspielen
+> Play
+= Abspielen (Leertaste)
+> Play (space)
+= Nächste Kerze
+> Next candle
+= Nächste Kerze (→)
+> Next candle (→)
+= Tempo
+> Speed
+= Kursdaten werden geladen…
+> Loading price data…
+= Springen
+> Jump
+= Strg+
+> Ctrl+
+= Strg+Umschalt+
+> Ctrl+Shift+
+= Der Chart konnte nicht geladen werden. Prüfe deine Verbindung.
+> The chart could not be loaded. Check your connection.
+= Anhalten
+> Pause
+= Ende der importierten Daten erreicht. Importiere weitere Monate, um weiterzumachen.
+> End of the imported data reached. Import more months to continue.
+= Schließe zuerst die offene Position.
+> Close the open position first.
+= Trag Entry, Stop Loss und Take Profit ein.
+> Enter entry, stop loss and take profit.
+= Beim Long liegt der Stop Loss unter dem Entry und der Take Profit darüber.
+> On a long, the stop loss is below the entry and the take profit above it.
+= Beim Short liegt der Stop Loss über dem Entry und der Take Profit darunter.
+> On a short, the stop loss is above the entry and the take profit below it.
+= ausgelöst bei
+> triggered at
+= Risiko
+> Risk
+= Chance
+> Reward
+= offen seit ${esc(fHM.format(new Date(o.entryTime)))}
+> open since ${esc(fHM.format(new Date(o.entryTime)))}
+= SL auf Einstand
+> SL to break even
+= Position schließen
+> Close position
+= Ziehe SL und TP direkt im Chart.
+> Drag SL and TP right on the chart.
+= wartet auf ${nf(o.entry, this.digits)}
+> waiting for ${nf(o.entry, this.digits)}
+= Order löschen
+> Cancel order
+= Ordertyp
+> Order type
+= Take Profit als Vielfaches des Risikos
+> Take profit as a multiple of the risk
+= Preis
+> Price
+= Verwerfen
+> Discard
+= Linien im Chart ziehen oder Werte eintragen. Enter platziert, Esc verwirft.
+> Drag the lines on the chart or enter values. Enter places, Esc discards.
+= Leertaste spielt ab oder hält an, → zeigt die nächste Kerze, L und S öffnen eine Order.
+> Space plays or pauses, → shows the next candle, L and S open an order.
+= Gesamt
+> Total
+= Profitfaktor
+> Profit factor
+= Ø pro Trade
+> Avg per trade
+= Max. Drawdown
+> Max drawdown
+= Trade löschen
+> Delete trade
+= Vorspulen
+> Fast forward
+= Spult bis zu einem späteren Zeitpunkt vor. Offene Orders und Positionen laufen dabei mit.
+> Fast-forwards to a later time. Open orders and positions keep running.
+= Bis (deine Zeit)
+> Until (your time)
+= Nächste Stunde
+> Next hour
+= Nächster Tag
+> Next day
+= Nächste Woche
+> Next week
+= Wähle einen Zeitpunkt nach dem aktuellen.
+> Choose a time after the current one.
+= Wird vorgespult…
+> Fast-forwarding…
+= Hohle Kerzen
+> Hollow candles
+= Balken
+> Bars
+= Linie
+> Line
+= Fläche
+> Area
+= Die Chart-Einstellungen konnten nicht gespeichert werden. Prüfe deine Verbindung.
+> The chart settings could not be saved. Check your connection.
+
+# ---- drawing tools
+= Fadenkreuz
+> Crosshair
+= Zeiger
+> Pointer
+= Radierer
+> Eraser
+= Trendlinie
+> Trend line
+= Strahl
+> Ray
+= Verlängerte Linie
+> Extended line
+= Info-Linie
+> Info line
+= Pfeil
+> Arrow
+= Horizontale Linie
+> Horizontal line
+= Horizontaler Strahl
+> Horizontal ray
+= Vertikale Linie
+> Vertical line
+= Kreuzlinie
+> Cross line
+= Paralleler Kanal
+> Parallel channel
+= Trendbasierte Fib-Extension
+> Trend-based Fib extension
+= Rechteck
+> Rectangle
+= Dreieck
+> Triangle
+= Pfad
+> Path
+= Pinsel
+> Brush
+= Sprechblase
+> Callout
+= Preis-Label
+> Price label
+= Pfeil nach oben
+> Arrow up
+= Pfeil nach unten
+> Arrow down
+= Datum- und Preisbereich
+> Date and price range
+= Linien
+> Lines
+= Formen
+> Shapes
+= Text und Marker
+> Text and markers
+= Positionen und Messen
+> Positions and measuring
+= \n${Math.abs(bars)} Kerzen · ${durText(t1 - t0)}
+> \n${Math.abs(bars)} candles · ${durText(t1 - t0)}
+= Zeichnungen. Lösch ein paar, um neue anzulegen.
+> drawings. Delete a few to add new ones.
+= Diese Session hat schon
+> This session already has
+= Alle Zeichnungen löschen?
+> Delete all drawings?
+= Das entfernt alle ${this.list.length} Zeichnungen dieser Session. Mit Rückgängig holst du sie zurück, solange die Session offen ist.
+> This removes all ${this.list.length} drawings of this session. Undo brings them back as long as the session is open.
+= Alle löschen
+> Delete all
+= ${esc(g.name)}: alle Werkzeuge
+> ${esc(g.name)}: all tools
+= Magnet: Punkte rasten an Open, High, Low und Close ein
+> Magnet: points snap to open, high, low and close
+= Zeichenmodus beibehalten
+> Stay in drawing mode
+= Alle Zeichnungen sperren
+> Lock all drawings
+= Alle Zeichnungen ausblenden
+> Hide all drawings
+= Alle Zeichnungen löschen
+> Delete all drawings
+= Zeichnung bearbeiten
+> Edit drawing
+= Textfarbe
+> Text colour
+= Farbe
+> Colour
+= Hintergrund
+> Background
+= Füllung
+> Fill
+= Linienstärke
+> Line width
+= Linienstil
+> Line style
+= Text bearbeiten
+> Edit text
+= Schriftgröße
+> Font size
+= Verlängern
+> Extend
+= Umkehren
+> Reverse
+= Als Order
+> As order
+= Als Order übernehmen
+> Use as order
+= Entsperren
+> Unlock
+= Sperren
+> Lock
+= Duplizieren
+> Duplicate
+= Löschen (Entf)
+> Delete (Del)
+= Eigene Farbe
+> Custom colour
+= Farbe ${c}
+> Colour ${c}
+= Deckkraft
+> Opacity
+= Hintergrund anzeigen
+> Show background
+= Füllung anzeigen
+> Show fill
+= Durchgezogen
+> Solid
+= Gestrichelt
+> Dashed
+= Gepunktet
+> Dotted
+= Nach links verlängern
+> Extend left
+= Nach rechts verlängern
+> Extend right
+= Als Entwurf übernommen.
+> Taken over as a draft.
+= Als Order-Entwurf übernommen. Prüf ihn rechts und platziere ihn.
+> Taken over as an order draft. Check it on the right and place it.
+= Text der Zeichnung
+> Drawing text
+= Beschriftung
+> Label
+= Ziel: ${amt(rew)} (${pct(rew)})
+> Target: ${amt(rew)} (${pct(rew)})
+= Bereiche
+> Ranges
+
+# ---- chart settings
+= Freiraum rechts in Kerzen
+> Right margin in candles
+= Chart-Typ
+> Chart type
+= Links steigende, rechts fallende Kerzen.
+> Rising candles on the left, falling on the right.
+= Gitterlinien
+> Grid lines
+= Anzeigen
+> Show
+= Preisskala
+> Price scale
+= Letzter Kurs
+> Last price
+= Schrift
+> Text
+= Freiraum rechts
+> Right margin
+= Fertig
+> Done
+= Darstellung
+> Appearance
+= Skalen
+> Scales
+= Körper
+> Body
+= Körper steigend
+> Body rising
+= Körper fallend
+> Body falling
+= Rahmen
+> Border
+= Rahmen steigend
+> Border rising
+= Rahmen fallend
+> Border falling
+= Docht
+> Wick
+= Docht steigend
+> Wick rising
+= Docht fallend
+> Wick falling
+= Balken steigend
+> Bars rising
+= Balken fallend
+> Bars falling
+= Linienfarbe
+> Line colour
+= Farbschema
+> Colour scheme
+= Einfarbig
+> Solid
+= Verlauf
+> Gradient
+= Hintergrundfarbe
+> Background colour
+= Zweite Hintergrundfarbe
+> Second background colour
+= Beide
+> Both
+= Keine
+> None
+= Farbe der Gitterlinien
+> Grid line colour
+= Linienstil des Fadenkreuzes
+> Crosshair line style
+= Farbe des Fadenkreuzes
+> Crosshair colour
+= Statuszeile mit OHLC
+> Status line with OHLC
+= Wasserzeichen
+> Watermark
+= Logarithmisch
+> Logarithmic
+= Prozent
+> Percent
+= Linie und Label anzeigen
+> Show line and label
+= Schriftfarbe der Skalen
+> Scale text colour
+= Schriftgröße der Skalen
+> Scale font size
+
+# ---- prop accounts on the chart
+= Geschlossen
+> Closed
+= Teil geschlossen
+> Partly closed
+= Tagesverlust-Limit
+> Daily loss limit
+= Max. Verlust
+> Max loss
+= Ohne Regeln: das Konto läuft nur mit Kontostand, ohne Ziel und ohne Limits.
+> No rules: the account only tracks its balance, with no target and no limits.
+= Gewinnziel
+> Profit target
+= Erreicht am
+> Reached on
+= von ${usd(r.target)}
+> of ${usd(r.target)}
+= Tagesverlust
+> Daily loss
+= Handelstag
+> Trading day
+= · bei Erreichen Pause bis morgen
+> · when hit, paused until tomorrow
+= · bei Erreichen ist das Konto verloren
+> · when hit, the account is lost
+= von ${usd(r.daily)}
+> of ${usd(r.daily)}
+= Statisch
+> Static
+= Trailing zum Tagesende
+> Trailing at end of day
+= , stoppt bei Start + 100 $
+> , stops at start + $100
+= Grenze ${usd(f.max)}
+> Limit ${usd(f.max)}
+= · noch ${usd(Math.max(0, room))}
+> · ${usd(Math.max(0, room))} left
+= Dieses Konto ist verloren. Setz es unter Prop-Konten zurück, um neu zu starten.
+> This account is lost. Reset it under prop accounts to start over.
+= Tagesverlust-Limit erreicht. Handeln kannst du wieder am nächsten Handelstag.
+> Daily loss limit reached. You can trade again on the next trading day.
+= Ab 16:45 New York sind Futures-Konten flat. Neue Orders gehen wieder ab der Markteröffnung um 18:00.
+> From 16:45 New York, futures accounts are flat. New orders are possible again from the market open at 18:00.
+= Futures handelst du in ganzen Kontrakten, mindestens 1.
+> You trade futures in whole contracts, at least 1.
+= Ungültiges Volumen: ab 0,01 Lots in Schritten von 0,01.
+> Invalid volume: from 0.01 lots in steps of 0.01.
+= Höchstens ${fQty(ins, ins.max)} pro Position.
+> At most ${fQty(ins, ins.max)} per position.
+= Nicht genug Margin: ${usd(need)} nötig, frei sind ${usd(st.free)}. Wähle weniger Lots.
+> Not enough margin: ${usd(need)} needed, ${usd(st.free)} free. Choose fewer lots.
+= 16:45 New York: Order gelöscht. Futures-Konten gehen vor der Tagespause flat.
+> 16:45 New York: order cancelled. Futures accounts go flat before the daily break.
+= Order gelöscht: nicht genug freie Margin.
+> Order cancelled: not enough free margin.
+= ausgeführt zu
+> filled at
+= Gewinnziel erreicht
+> Profit target reached
+= ${esc(acc.name)} steht bei ${usd(f.bal)}, das sind ${usdS(f.bal - acc.size)} seit dem Start. Bei einer Prop-Firma hättest du diese Phase bestanden. Du kannst weiter traden, die Regeln gelten weiter.
+> ${esc(acc.name)} is at ${usd(f.bal)}, that’s ${usdS(f.bal - acc.size)} since the start. At a prop firm you would have passed this phase. You can keep trading; the rules still apply.
+= Zu den Prop-Konten
+> Go to prop accounts
+= Weiter traden
+> Keep trading
+= Tagesverlust-Limit erreicht
+> Daily loss limit reached
+= Heute hast du ${usd(-r.daily)} verloren. Wie bei den Futures-Prop-Firmen ist das ein weicher Verstoß: das Konto bleibt bestehen, aber am Handelstag ${esc(fDay(day))} kannst du nicht mehr traden. Spiel weiter bis zur nächsten Session ab 18:00 New York.
+> Today you lost ${usd(-r.daily)}. As with the futures prop firms, this is a soft breach: the account stays, but you can’t trade any more on the trading day ${esc(fDay(day))}. Play on to the next session from 18:00 New York.
+= Verstanden
+> Got it
+= Konto verloren
+> Account lost
+= Bei einer Prop-Firma wäre das Konto jetzt beendet. Die offene Position wurde zur Grenze geschlossen, neue Orders gehen auf diesem Konto nicht mehr.
+> At a prop firm the account would now be closed. The open position was closed at the limit; no new orders are possible on this account.
+= Unter Prop-Konten kannst du das Konto zurücksetzen und mit ${usd(acc.size)} neu starten.
+> Under prop accounts you can reset the account and start over with ${usd(acc.size)}.
+= Chart ansehen
+> View chart
+= Dein Konto hat die Grenze für den maximalen Verlust erreicht (${usd(f.max)}).
+> Your account hit the max loss limit (${usd(f.max)}).
+= Dein Konto hat das Tagesverlust-Limit von ${usd(r.daily)} erreicht.
+> Your account hit the daily loss limit of ${usd(r.daily)}.
+= Das Konto konnte nicht gespeichert werden. Prüfe deine Verbindung.
+> The account could not be saved. Check your connection.
+= Gib eine Menge zwischen ${fQty(ins, ins.min)} und ${fQty(ins, roundQty(ins, o.qty - ins.step))} ein.
+> Enter a quantity between ${fQty(ins, ins.min)} and ${fQty(ins, roundQty(ins, o.qty - ins.step))}.
+= Verloren
+> Lost
+= Pause bis morgen
+> Paused until tomorrow
+= Ziel erreicht
+> Target reached
+= Aktiv
+> Active
+= Kontostand
+> Balance
+= Freie Margin
+> Free margin
+= Heute
+> Today
+= Offener G/V
+> Open P/L
+= Max-Loss-Grenze
+> Max loss limit
+= Kontrakte
+> Contracts
+= Regeln
+> Rules
+= seit ${esc(fHM.format(new Date(o.entryTime)))}
+> since ${esc(fHM.format(new Date(o.entryTime)))}
+= Kommission bisher ${usd(o.commIn * o.qty / o.qty0)}
+> Commission so far ${usd(o.commIn * o.qty / o.qty0)}
+= Menge zum Schließen
+> Quantity to close
+= Teilschließen
+> Partial close
+= Teil schließen
+> Close part
+= ${esc(fQty(ins, o.qty))} · wartet auf ${nf(o.entry, dg)}
+> ${esc(fQty(ins, o.qty))} · waiting for ${nf(o.entry, dg)}
+= Weniger
+> Less
+= Mehr
+> More
+= Volumen in Lots
+> Volume in lots
+= Einheit
+> Unit
+= Größe nach Risiko
+> Size by risk
+= Sofort
+> Market
+= Kontrakt
+> Contract
+= Tick ${nf(ins.tick, decimalsOf(String(ins.tick)))} = ${usd(ins.tv)} pro Kontrakt · Kommission ${usd(ins.rt)} je Round Turn
+> Tick ${nf(ins.tick, decimalsOf(String(ins.tick)))} = ${usd(ins.tv)} per contract · commission ${usd(ins.rt)} per round turn
+= L und S öffnen eine Order, die Leertaste spielt ab.
+> L and S open an order, space plays.
+= BUY eröffnet zum Ask, SELL zum Bid, wie in MetaTrader 5.
+> BUY opens at the ask, SELL at the bid, like in MetaTrader 5.
+= Futures handelst du in ganzen Kontrakten, Mini oder Micro.
+> You trade futures in whole contracts, mini or micro.
+= Ziel
+> Target
+= Kommission
+> Commission
+= vom Konto
+> of account
+= Diese Session
+> This session
+= Netto
+> Net
+= ${st.w} Gewinner
+> ${st.w} winners
+= ${st.l} Verlierer
+> ${st.l} losers
+= Teile
+> Parts
+= : Tagesverlust-Limit
+> : daily loss limit
+= : Max. Verlust
+> : max loss
+= Pause bis zum nächsten Handelstag
+> Paused until the next trading day
+= Position in einer anderen Session
+> Position in another session
+= Gerade kein Handel
+> No trading right now
+= Konto ${esc(acc.name)} löschen
+> Delete account ${esc(acc.name)}
+
+# ---- prop accounts page
+= Regeln und Kosten
+> Rules and costs
+= Zurücksetzen
+> Reset
+= Löschen
+> Delete
+= Sessions auf diesem Konto
+> Sessions on this account
+= Weiter
+> Continue
+= · Position offen
+> · position open
+= Futures-Konto
+> Futures account
+= 25K, 50K, 100K oder 150K. Ganze Kontrakte wie bei Tradesea: NQ, ES, Gold, Euro und Pfund, als Mini oder Micro.
+> 25K, 50K, 100K or 150K. Whole contracts like on Tradesea: NQ, ES, gold, euro and pound, as mini or micro.
+= CFD-Konto
+> CFD account
+= 10K, 25K, 50K oder 100K. Lots ab 0,01 wie in MetaTrader 5, mit Spread, Kommission und Margin.
+> 10K, 25K, 50K or 100K. Lots from 0.01 like in MetaTrader 5, with spread, commission and margin.
+= Prop-Konten
+> Prop accounts
+= Backteste wie auf einem echten Konto: Futures in ganzen Kontrakten, CFDs in Lots wie in MetaTrader 5, der Kontostand in Dollar und die Regeln der Prop-Firmen.
+> Backtest as if on a real account: futures in whole contracts, CFDs in lots like in MetaTrader 5, the balance in dollars and the prop firms’ rules.
+= ${ICON_PLUS}Neues Konto
+> ${ICON_PLUS}New account
+= Konten werden geladen…
+> Loading accounts…
+= Leg dein erstes Konto an
+> Create your first account
+= Wähle die Art des Kontos. Größe, Regeln und Kosten stellst du im nächsten Schritt ein.
+> Choose the type of account. You set size, rules and costs in the next step.
+= ${m.id} Kontraktgröße
+> ${m.id} contract size
+= ${m.id} Spread in ${m.unit}
+> ${m.id} spread in ${m.unit}
+= ${m.id} Kommission
+> ${m.id} commission
+= ${m.id} Hebel
+> ${m.id} leverage
+= Prop-Firm-Regeln
+> Prop firm rules
+= Alle Werte kannst du an deine Firma anpassen.
+> You can adjust every value to your firm.
+= Art des Max. Verlusts
+> Type of max loss
+= Statisch ab Startkapital
+> Static from starting balance
+= Trailing zum Tagesende (EOD)
+> Trailing at end of day (EOD)
+= Trailing stoppt bei Startkapital + 100 $
+> Trailing stops at starting balance + $100
+= Bei Erreichen
+> When hit
+= Pause bis zum nächsten Tag
+> Pause until the next day
+= Das Tageslimit zählt ab dem Kontostand zu Tagesbeginn, mit offenen Positionen.
+> The daily limit counts from the balance at the start of the day, including open positions.
+= Kosten
+> Costs
+= Neues Prop-Konto
+> New prop account
+= ${PA_TYPES[F.type]}-Konto mit ${usd(F.size)}. Art und Größe bleiben fest, Regeln und Kosten kannst du jederzeit ändern. Sie gelten ab jetzt.
+> ${PA_TYPES[F.type]} account with ${usd(F.size)}. Type and size stay fixed; you can change rules and costs at any time. They apply from now on.
+= Art des Kontos
+> Account type
+= Ganze Kontrakte, Mini und Micro
+> Whole contracts, mini and micro
+= Lots ab 0,01 wie in MT5
+> Lots from 0.01 like in MT5
+= Kontogröße
+> Account size
+= Voreingestellt wie die Evaluation bei Lucid Trading, einer der Futures-Firmen auf Tradesea.
+> Preset like the evaluation at Lucid Trading, one of the futures firms on Tradesea.
+= Voreingestellt wie die FTMO Challenge (2-Step).
+> Preset like the FTMO Challenge (2-step).
+= Positionen um 16:45 New York schließen
+> Close positions at 16:45 New York
+= Max. Kontrakte
+> Max contracts
+= Ein Handelstag läuft von 18:00 bis 17:00 New York.
+> A trading day runs from 18:00 to 17:00 New York.
+= Ein Handelstag beginnt um Mitternacht in Prag (MEZ/MESZ), wie bei FTMO.
+> A trading day starts at midnight in Prague (CET/CEST), as at FTMO.
+= und Kontraktgrößen
+> and contract sizes
+= Futures haben feste Kontraktwerte der CME, zum Beispiel NQ 20 $ pro Punkt und MNQ 2 $. Die Kurse kommen aus deinen Kursdaten.
+> Futures have fixed CME contract values, for example NQ $20 per point and MNQ $2. The prices come from your price data.
+= Kommission Mini, je Round Turn
+> Commission mini, per round turn
+= Kommission Micro, je Round Turn
+> Commission micro, per round turn
+= Kontrakt je Lot
+> Contract per lot
+= Kommission je Lot und Seite
+> Commission per lot and side
+= Hebel 1:
+> Leverage 1:
+= Spread in Pips (EUR/USD, GBP/USD) oder Punkten. Gold rechnet die Kommission in Prozent vom Volumen. Schau bei deinem Broker unter „Spezifikation“, wenn du andere Werte hast.
+> Spread in pips (EUR/USD, GBP/USD) or points. Gold charges commission as a percentage of volume. Check your broker’s “Specification” if your values differ.
+= Kurs EUR/USD für den DAX
+> EUR/USD rate for the DAX
+= Speichern
+> Save
+= Konto anlegen
+> Create account
+= Trag ein Gewinnziel ein, 0 für keins.
+> Enter a profit target, 0 for none.
+= Der maximale Verlust muss kleiner als das Startkapital sein, 0 für keinen.
+> The max loss must be smaller than the starting balance, 0 for none.
+= Trag ein Tagesverlust-Limit ein, 0 für keins.
+> Enter a daily loss limit, 0 for none.
+= Max. Kontrakte: eine ganze Zahl zwischen 1 und 100.
+> Max contracts: a whole number between 1 and 100.
+= Die Kommissionen müssen 0 oder mehr sein.
+> Commissions must be 0 or more.
+= Der EUR/USD-Kurs sieht nicht richtig aus, zum Beispiel 1,10.
+> The EUR/USD rate doesn’t look right, for example 1.10.
+= Prüf die Werte bei ${mk}: Kontraktgröße über 0, Spread und Kommission 0 oder mehr, Hebel ab 1.
+> Check the values for ${mk}: contract size above 0, spread and commission 0 or more, leverage from 1.
+= Prop-Konten gibt es im Abo Pro.
+> Prop accounts are part of the Pro plan.
+= Das hat nicht geklappt. Prüfe deine Verbindung.
+> That didn’t work. Check your connection.
+= Konto zurücksetzen?
+> Reset account?
+= ${esc(acc.name)} startet wieder mit ${usd(acc.size)}: Kontostand, Ziel, Limits und Trailing beginnen neu. Deine Sessions bleiben erhalten, ihre bisherigen Trades zählen nicht mehr für das Konto.
+> ${esc(acc.name)} starts again with ${usd(acc.size)}: balance, target, limits and trailing start over. Your sessions are kept; their earlier trades no longer count for the account.
+= Die offene Position oder Order wird gelöscht.
+> The open position or order is cancelled.
+= wurde zurückgesetzt.
+> was reset.
+= Konto löschen?
+> Delete account?
+= ${esc(acc.name)} und sein Verlauf werden gelöscht.
+> ${esc(acc.name)} and its history will be deleted.
+= wurde gelöscht.
+> was deleted.
+= × Index
+> × index
+= je Pip
+> per pip
+= je Punkt
+> per point
+= Anleitung: So tradest du auf einem Prop-Konto
+> Guide: how to trade on a prop account
+= Konto anlegen, Lots und Kontrakte, Kosten und die Regeln der Prop-Firmen
+> Creating an account, lots and contracts, costs and the prop firms’ rules
+= Ein Prop-Konto ist ein simuliertes Konto mit Startkapital in Dollar. Statt in R rechnet Blotter jeden Trade so, wie er auf dem echten Konto abgerechnet würde: mit deiner Positionsgröße, Spread, Kommission und den Regeln der Prop-Firma.
+> A prop account is a simulated account with a starting balance in dollars. Instead of R, Blotter counts every trade the way it would be settled on the real account: with your position size, spread, commission and the prop firm’s rules.
+= Konto anlegen.
+> Create an account.
+= Wähle Futures (25K bis 150K) oder CFD (10K bis 100K). Die Regeln sind wie bei Lucid Trading bzw. FTMO voreingestellt, du kannst sie an deine Firma anpassen.
+> Choose futures (25K to 150K) or CFD (10K to 100K). The rules are preset like Lucid Trading or FTMO; you can adjust them to your firm.
+= Session starten.
+> Start a session.
+= Unter „Neue Session“ wählst du Markt, Startzeit und Zeiteinheit. Die Kursdaten sind dieselben wie im Backtesting.
+> Under “New session” you choose market, start time and timeframe. The price data is the same as in backtesting.
+= Positionsgröße wählen.
+> Choose the position size.
+= Lots oder Kontrakte direkt eintragen oder mit „Größe nach Risiko“ aus deinem Stop berechnen lassen.
+> Enter lots or contracts directly or let “Size by risk” work them out from your stop.
+= Traden.
+> Trade.
+= Stop und Ziel setzt du wie gewohnt, im Chart oder im Ticket. Teile einer Position kannst du jederzeit schließen.
+> Set stop and target as usual, on the chart or in the ticket. You can close parts of a position at any time.
+= Regeln im Blick behalten.
+> Keep an eye on the rules.
+= Über dem Chart stehen Kontostand und Equity, daneben die Balken für Gewinnziel, Tagesverlust und maximalen Verlust.
+> Above the chart are balance and equity, next to them the bars for profit target, daily loss and max loss.
+= CFD-Konten: Lots wie in MetaTrader 5
+> CFD accounts: lots like in MetaTrader 5
+= Das Volumen wählst du in Lots, ab 0,01 in Schritten von 0,01. Ein Lot ist eine feste Menge, die Kontraktgröße: bei EUR/USD 100.000 Euro, bei Gold 100 Unzen, beim Index ein Kontrakt pro Punkt. Gekauft wird zum Ask, verkauft zum Bid. Der Unterschied ist der Spread, deshalb startet jeder Trade leicht im Minus. Dazu kommt bei Forex und Gold eine Kommission pro Lot. Für die Position wird Margin hinterlegt: Volumen × Kontraktgröße × Kurs ÷ Hebel.
+> You choose the volume in lots, from 0.01 in steps of 0.01. A lot is a fixed amount, the contract size: 100,000 euros for EUR/USD, 100 ounces for gold, one contract per point for an index. You buy at the ask and sell at the bid. The difference is the spread, which is why every trade starts slightly negative. On forex and gold there’s also a commission per lot. Margin is set aside for the position: volume × contract size × price ÷ leverage.
+= Beispiel:
+> Example:
+= 0,50 Lots EUR/USD, Stop 20 Pips. Ein Pip ist bei 1 Lot 10 $ wert, bei 0,50 Lots 5 $. Das Risiko ist 20 × 5 $ = 100 $, plus 2,50 $ Kommission für Eröffnen und Schließen.
+> 0.50 lots EUR/USD, stop 20 pips. One pip is worth $10 at 1 lot, $5 at 0.50 lots. The risk is 20 × $5 = $100, plus $2.50 commission for opening and closing.
+= Voreinstellungen der CFD-Konten, änderbar pro Konto
+> Presets of the CFD accounts, adjustable per account
+= Wert bei 1 Lot
+> Value at 1 lot
+= Hebel
+> Leverage
+= Futures-Konten: ganze Kontrakte wie bei Tradesea
+> Futures accounts: whole contracts like on Tradesea
+= Futures handelst du in ganzen Kontrakten: 1, 2, 3 und so weiter. Dein Risiko passt du deshalb nicht auf den Dollar genau an, sondern über die Zahl der Kontrakte und die Wahl zwischen Mini und Micro. Ein Micro ist ein Zehntel eines Minis. Der Preis bewegt sich in Ticks, und jeder Tick hat einen festen Wert in Dollar. Die Kommission zahlst du pro Kontrakt.
+> You trade futures in whole contracts: 1, 2, 3 and so on. So you don’t set your risk to the exact dollar, but through the number of contracts and the choice between mini and micro. A micro is a tenth of a mini. The price moves in ticks, and every tick has a fixed dollar value. You pay commission per contract.
+= 2 MNQ, Stop 40 Ticks (10 Punkte). Ein Tick ist bei MNQ 0,50 $ wert, das Risiko ist 40 × 0,50 $ × 2 = 40 $. Mit 2 NQ wären es 400 $.
+> 2 MNQ, stop 40 ticks (10 points). One tick is worth $0.50 on MNQ, the risk is 40 × $0.50 × 2 = $40. With 2 NQ it would be $400.
+= Kontraktwerte der CME
+> CME contract values
+= Kurse aus
+> Prices from
+= Wert je Tick
+> Value per tick
+= Größe
+> Size
+= Die Regeln der Prop-Firmen
+> The prop firms’ rules
+= Erreicht dein Kontostand Startkapital plus Ziel, hast du die Phase bestanden. Du kannst danach weiter traden.
+> If your balance reaches the starting balance plus the target, you’ve passed the phase. You can keep trading afterwards.
+= So viel darfst du an einem Handelstag verlieren, gerechnet ab dem Kontostand zu Tagesbeginn, offene Positionen eingeschlossen. Bei Futures pausiert das Konto bis zum nächsten Tag, bei CFDs ist es verloren.
+> This is how much you may lose in a trading day, counted from the balance at the start of the day, open positions included. On futures the account pauses until the next day; on CFDs it’s lost.
+= Statisch heißt: die Grenze bleibt beim Startkapital minus Verlust. Trailing heißt: sie zieht mit deinem höchsten Kontostand nach, zum Tagesende (EOD) oder laufend (intraday), bis sie bei Startkapital + 100 $ stehen bleibt.
+> Static means the limit stays at the starting balance minus the loss. Trailing means it follows your highest balance, at the end of the day (EOD) or continuously (intraday), until it stops at the starting balance + $100.
+= Was bei einem Verstoß passiert
+> What happens on a breach
+= Erreicht deine Equity eine Grenze, schließt Blotter die Position genau dort, wie es die Firma tun würde. Danach kannst du das Konto zurücksetzen.
+> If your equity hits a limit, Blotter closes the position right there, just as the firm would. After that you can reset the account.
+= Max. Kontrakte und Auto-Flat
+> Max contracts and auto-flat
+= Futures-Konten haben ein Limit für die Kontrakte, gezählt in Minis (10 Micro = 1 Mini). Um 16:45 New York werden offene Positionen geschlossen.
+> Futures accounts have a contract limit, counted in minis (10 micro = 1 mini). At 16:45 New York, open positions are closed.
+= Was nicht simuliert wird
+> What isn’t simulated
+= Swaps über Nacht, Slippage, Mindesthandelstage und Konsistenzregeln. Futures-Kurse kommen aus deinen CFD- und Spot-Daten, der Abstand zum echten Future fehlt also.
+> Overnight swaps, slippage, minimum trading days and consistency rules. Futures prices come from your CFD and spot data, so the basis to the real future is missing.
+
+# ---- sentences built from pieces, swapped as code
+!= `Öffne den ${ext(DUKA_URL, 'Export historischer Daten bei Dukascopy')}.`
+!> `Open the ${ext(DUKA_URL, 'historical data export at Dukascopy')}.`
+!= <li>Öffne <a href="${HIST_URL(x)}" target="_blank" rel="noopener noreferrer">HistData: ${esc(x.name)}</a> (kostenlos).</li>
+!> <li>Open <a href="${HIST_URL(x)}" target="_blank" rel="noopener noreferrer">HistData: ${esc(x.name)}</a> (free).</li>
+!= CTX.toast(nf(res.rows, 0) + ' Kerzen für ' + MK[mk].name + ' importiert (' +
+!> CTX.toast(nf(res.rows, 0) + ' candles imported for ' + MK[mk].name + ' (' +
+!= 'Daten vorhanden: ' + fMon.format(new Date(monthStart(i.first))) + ' bis ' + fMon.format(new Date(monthStart(i.last))) + '.'
+!> 'Data available: ' + fMon.format(new Date(monthStart(i.first))) + ' to ' + fMon.format(new Date(monthStart(i.last))) + '.'
+!= return [d ? d + ' T' : '', h ? h + ' Std' : '', mm && d < 3 ? mm + ' Min' : ''].filter(Boolean).join(' ') || '0 Min';
+!> return [d ? d + ' d' : '', h ? h + ' h' : '', mm && d < 3 ? mm + ' min' : ''].filter(Boolean).join(' ') || '0 min';
+!= 'Auf diesem Konto ist schon eine Position oder Order offen, in der Session „' + (acc.open.name || 'Session') + '“.'
+!> 'This account already has an open position or order, in the session “' + (acc.open.name || 'Session') + '”.'
+!= 'Bei diesem Stop ist schon ' + fQty(ins, ins.min) + ' mehr Risiko als ' + usd(risk) + '. Rück den Stop näher oder erhöhe das Risiko.'
+!> 'With this stop, even ' + fQty(ins, ins.min) + ' risks more than ' + usd(risk) + '. Move the stop closer or raise the risk.'
+!= `Dein Konto erlaubt höchstens ${fQty(ins, ins.max)}${this.acc.rules.on ? ' (Max. Kontrakte)' : ''}.`
+!> `Your account allows at most ${fQty(ins, ins.max)}${this.acc.rules.on ? ' (max contracts)' : ''}.`
+!= CTX.toast('Teil geschlossen: ' + fQty(ins, k) + ', ' + usdS(net) + '. Offen: ' + fQty(ins, o.qty) + '.');
+!> CTX.toast('Partly closed: ' + fQty(ins, k) + ', ' + usdS(net) + '. Open: ' + fQty(ins, o.qty) + '.');
+!= ${this.m.pip < 1 ? 'Pip' : 'Punkt'}-Wert ${usd(ins.pv * this.m.pip * q)}
+!> ${this.m.pip < 1 ? 'pip' : 'point'} value ${usd(ins.pv * this.m.pip * q)}
+!= CTX.toast(cur ? 'Gespeichert.' : 'Konto angelegt: ' + acc.name + ' mit ' + usd(acc.size) + '.');
+!> CTX.toast(cur ? 'Saved.' : 'Account created: ' + acc.name + ' with ' + usd(acc.size) + '.');
+!= ${n ? ` ${n === 1 ? 'Die Session' : 'Die ' + n + ' Sessions'} auf dem Konto ${n === 1 ? 'bleibt' : 'bleiben'} erhalten und ${n === 1 ? 'rechnet' : 'rechnen'} danach in R.` : ''}
+!> ${n ? ` ${n === 1 ? 'The session' : 'The ' + n + ' sessions'} on the account ${n === 1 ? 'is' : 'are'} kept and ${n === 1 ? 'counts' : 'count'} in R afterwards.` : ''}
+!= (c.ccy === 'EUR' ? nf(c.cs, 0) + ' € je Punkt'
+!> (c.ccy === 'EUR' ? '€' + nf(c.cs, 0) + ' per point'
+!= 'Entspricht ' + nf((r.maxQty || 0) * 10, 0) + ' Micro'
+!> 'Equals ' + nf((r.maxQty || 0) * 10, 0) + ' micro'
+!= ' = ' + nf(v / F.size * 100, 1) + ' % des Kontos'
+!> ' = ' + nf(v / F.size * 100, 1) + '% of the account'
+
+!= ' class="old" title="Aus einem früheren Durchgang, vor dem Zurücksetzen"'
+!> ' class="old" title="From an earlier run, before the reset"'
+= Begrenzt auf das Maximum von
+> Limited to the maximum of
+
+# ---- more code swaps
+!= + ' %'
+!# 8
+!> + '%'
+!= ), 2)} %)
+!# 2
+!> ), 2)}%)
+!= .replace(/,00$/, '')
+!> .replace(/\.00$/, '')
+!= MK[mk].tag) + ' ab ' + fDate.format(new Date(first));
+!> MK[mk].tag) + ' from ' + fDate.format(new Date(first));
+!= CTX.toast(ord.kind === 'market' ? side + fQty(ins, ord.qty) + ' zu ' + nf(ord.entry, ins.digits) + '.' : side + (ord.kind === 'limit' ? 'Limit ' : 'Stop ') + fQty(ins, ord.qty) + ' bei ' + nf(ord.entry, ins.digits) + ' platziert.');
+!> CTX.toast(ord.kind === 'market' ? side + fQty(ins, ord.qty) + ' at ' + nf(ord.entry, ins.digits) + '.' : side + (ord.kind === 'limit' ? 'limit ' : 'stop ') + fQty(ins, ord.qty) + ' placed at ' + nf(ord.entry, ins.digits) + '.');
+!= ${d.side === 'long' ? 'Long' : 'Short'} platzieren
+!> Place ${d.side === 'long' ? 'long' : 'short'}
+!= ${acc.type === 'fut' ? 'Kontrakte' : 'Lots'} berechnen
+!> Calculate ${acc.type === 'fut' ? 'contracts' : 'lots'}
+!= <p class="pa-fail">${st.why === 'daily' ? 'Tagesverlust-Limit' : 'Max. Verlust'} erreicht${st.at ? ' am ' + esc(fDate.format(new Date(st.at))) : ''}. Setz das Konto zurück, um neu zu starten.</p>
+!> <p class="pa-fail">${st.why === 'daily' ? 'Daily loss limit' : 'Max loss'} hit${st.at ? ' on ' + esc(fDate.format(new Date(st.at))) : ''}. Reset the account to start over.</p>
+!= ${ins.kind === 'cfd' ? ' · Margin ' + usd(marginOf(ins, o.qty, o.entry)) : ''}. Ziehe SL und TP direkt im Chart.
+!> ${ins.kind === 'cfd' ? ' · margin ' + usd(marginOf(ins, o.qty, o.entry)) : ''}. Drag SL and TP right on the chart.
+= Vertikal
+> Vertical
+= Euro FX (125.000 €)
+> Euro FX (€125,000)
+= British Pound (62.500 £)
+> British Pound (£62,500)
+= Micro EUR/USD (12.500 €)
+> Micro EUR/USD (€12,500)
+= Micro GBP/USD (6.250 £)
+> Micro GBP/USD (£6,250)
+= 1 Minute
+> 1 minute
+= Standard
+> Default
+= Auto-Flat 16:45
+> Auto-flat 16:45
+= gesamt
+> total
+!= title="Rückgängig (${
+!> title="Undo (${
+!= title="Wiederholen (${
+!> title="Redo (${
+= Margin-Level
+> Margin level

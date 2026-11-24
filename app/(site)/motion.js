@@ -83,9 +83,16 @@ C[HIT_I].h = TP - 5; C[HIT_I].c = Math.min(C[HIT_I].c, TP + 4);
 const RR = (SL - EN) ? (EN - TP) / (SL - EN) : 0;
 const price = (y) => 21600 - y * 0.5;
 // numbers formatted by hand, so the server and every browser write exactly the same text
-const de = (v, dec) => { const [i, f] = Math.abs(v).toFixed(dec).split('.'); return (v < 0 ? '−' : '') + i.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (f ? ',' + f : ''); };
-const fmtP = (y) => de(Math.round(price(y) * 4) / 4, 2);
-const fmtR = (r) => (r > 0 ? '+' : '') + de(r, 1) + ' R';
+const num = (v, dec, en) => { const [i, f] = Math.abs(v).toFixed(dec).split('.'); return (v < 0 ? '−' : '') + i.replace(/\B(?=(\d{3})+(?!\d))/g, en ? ',' : '.') + (f ? (en ? '.' : ',') + f : ''); };
+const fmtP = (y, en) => num(Math.round(price(y) * 4) / 4, 2, en);
+const fmtR = (r, en) => (r > 0 ? '+' : '') + num(r, 1, en) + ' R';
+// the replay's words in both languages
+const RT = {
+  de: { hit: 'Geschlossen im Take Profit', open: 'Long offen', wait: 'Warte auf dein Setup', day: 'Do 16. Okt, ', stop: 'Stop', target: 'Ziel', sum: 'Summe', list: 'Trades dieser Session', hint: 'Scroll weiter, der Markt läuft Kerze für Kerze.',
+    aria: 'Backtesting in Blotter: Der Nasdaq 100 läuft Kerze für Kerze, ein Long-Trade wird eröffnet und schließt im Take Profit mit plus 2,4 R. Die Statistik der Session steigt danach auf 14 Trades, 64 Prozent Win-Rate und plus 12 R.' },
+  en: { hit: 'Closed at take profit', open: 'Long open', wait: 'Waiting for your setup', day: 'Thu 16 Oct, ', stop: 'Stop', target: 'Target', sum: 'Total', list: 'Trades this session', hint: 'Keep scrolling, the market plays candle by candle.',
+    aria: 'Backtesting in Blotter: the Nasdaq 100 plays candle by candle, a long trade opens and closes at take profit with plus 2.4 R. The session stats then rise to 14 trades, a 64 percent win rate and plus 12 R.' },
+};
 const timeOf = (i) => { const m = 14 * 60 + i * 5; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 const cx = (i) => i * STEP + STEP / 2;
 const Y0 = 95, YH = 210;
@@ -98,8 +105,9 @@ const EQ0 = PREV.reduce((a, r) => a.concat(Math.round((a[a.length - 1] + r) * 10
 const EQ1 = EQ0.concat(Math.round((EQ0[EQ0.length - 1] + RR) * 10) / 10);
 const spark = (pts, n) => pts.map((v, i) => `${(i / (n - 1) * 200).toFixed(1)},${(52 - v / 12.5 * 46).toFixed(1)}`).join(' ');
 
-export function Replay() {
+export function Replay({ lang = 'de' }) {
   const ref = useRef(null);
+  const en = lang === 'en', T = RT[en ? 'en' : 'de'];
   useEffect(() => {
     const root = ref.current; if (!root) return;
     const stick = root.querySelector('.rp-stick'), win = root.querySelector('.rp-win');
@@ -136,9 +144,9 @@ export function Replay() {
       lines.forEach((l) => l.setAttribute('x2', (cx(ENTRY_I) - STEP / 2 + w).toFixed(1)));
       const cur = C[k], cNow = cur.o + (cur.c - cur.o) * (1 - (1 - (r >= N ? 1 : f)) ** 2);
       const rNow = hit ? RR : placed ? (EN - cNow) / (SL - EN) : 0;
-      live.textContent = placed ? fmtR(Math.round(rNow * 10) / 10) : '–';
+      live.textContent = placed ? fmtR(Math.round(rNow * 10) / 10, en) : '–';
       live.className = 'rp-live ' + (!placed ? '' : rNow > 0.05 ? 'pos' : rNow < -0.05 ? 'neg' : '');
-      state.textContent = hit ? 'Geschlossen im Take Profit' : placed ? 'Long offen' : 'Warte auf dein Setup';
+      state.textContent = hit ? T.hit : placed ? T.open : T.wait;
       time.textContent = timeOf(k);
       bar.style.transform = `scaleX(${(0.18 + p * 0.82).toFixed(4)})`;
       if (hint) hint.classList.toggle('gone', p > 0.04);
@@ -163,12 +171,12 @@ export function Replay() {
     <div className="rp-track" ref={ref}>
       <div className="rp-stick">
         <div className="wrap">
-          <div className="rp-win" role="img" aria-label="Backtesting in Blotter: Der Nasdaq 100 läuft Kerze für Kerze, ein Long-Trade wird eröffnet und schließt im Take Profit mit plus 2,4 R. Die Statistik der Session steigt danach auf 14 Trades, 64 Prozent Win-Rate und plus 12 R.">
+          <div className="rp-win" role="img" aria-label={T.aria}>
             <div className="rp-top" aria-hidden="true">
               <span className="rp-tag">NQ</span><b>Nasdaq 100</b>
               <span className="rp-tfs"><i>1m</i><i className="on">5m</i><i>15m</i><i>1h</i><i>4h</i></span>
               <span className="rp-sp" />
-              <span className="rp-time"><span className="rp-day">Do 16. Okt, </span><span className="rp-hm">{timeOf(START - 1)}</span></span>
+              <span className="rp-time"><span className="rp-day">{T.day}</span><span className="rp-hm">{timeOf(START - 1)}</span></span>
             </div>
             <div className="rp-main" aria-hidden="true">
               <div className="rp-chart">
@@ -190,28 +198,28 @@ export function Replay() {
                     ))}
                   </svg>
                   <div className="rp-ov">
-                    {AXIS.map((y) => <span key={y} className="rp-ax" style={{ top: pY(y) }}>{fmtP(y)}</span>)}
+                    {AXIS.map((y) => <span key={y} className="rp-ax" style={{ top: pY(y) }}>{fmtP(y, en)}</span>)}
                     <span className="rp-tg tp" style={{ top: pY(TP) }}>TP</span>
                     <span className="rp-tg en" style={{ top: pY(EN) }}>Entry</span>
                     <span className="rp-tg sl" style={{ top: pY(SL) }}>SL</span>
                     <span className="rp-mk" style={{ left: pX(cx(ENTRY_I)), top: pY(C[ENTRY_I].l + 10) }}>Long</span>
-                    <span className="rp-won" style={{ left: pX((cx(ENTRY_I) + cx(HIT_I)) / 2), top: pY(TP + 12) }}>{fmtR(Math.round(RR * 10) / 10)}</span>
+                    <span className="rp-won" style={{ left: pX((cx(ENTRY_I) + cx(HIT_I)) / 2), top: pY(TP + 12) }}>{fmtR(Math.round(RR * 10) / 10, en)}</span>
                   </div>
                 </div>
               </div>
               <div className="rp-side">
                 <div className="rp-card">
-                  <div className="rp-ch"><span className="rp-long">Long</span><span className="rp-state">Warte auf dein Setup</span></div>
+                  <div className="rp-ch"><span className="rp-long">Long</span><span className="rp-state">{T.wait}</span></div>
                   <b className="rp-live">–</b>
                   <div className="rp-lv">
-                    <span><small>Entry</small>{fmtP(EN)}</span><span><small>Stop</small>{fmtP(SL)}</span><span><small>Ziel</small>{fmtP(TP)}</span>
+                    <span><small>Entry</small>{fmtP(EN, en)}</span><span><small>{T.stop}</small>{fmtP(SL, en)}</span><span><small>{T.target}</small>{fmtP(TP, en)}</span>
                   </div>
                 </div>
                 <div className="rp-card rp-stats">
                   <div className="rp-sg">
                     <span><small>Trades</small><b><i className="a">13</i><i className="b">14</i></b></span>
                     <span><small>Win-Rate</small><b><i className="a">62 %</i><i className="b">64 %</i></b></span>
-                    <span className="pos"><small>Summe</small><b><i className="a">+9,6 R</i><i className="b">+12,0 R</i></b></span>
+                    <span className="pos"><small>{T.sum}</small><b><i className="a">{en ? '+9.6 R' : '+9,6 R'}</i><i className="b">{en ? '+12.0 R' : '+12,0 R'}</i></b></span>
                   </div>
                   <svg className="rp-eq" viewBox="0 0 200 56" preserveAspectRatio="none">
                     <polyline className="b" points={spark(EQ1, EQ1.length)} />
@@ -219,11 +227,11 @@ export function Replay() {
                   </svg>
                 </div>
                 <div className="rp-card rp-list">
-                  <small className="rp-lh">Trades dieser Session</small>
+                  <small className="rp-lh">{T.list}</small>
                   <ul>
-                    <li className="new"><span className="rp-res tp">TP</span><span className="rp-tn">#14 Long</span><b className="pos">{fmtR(Math.round(RR * 10) / 10)}</b></li>
+                    <li className="new"><span className="rp-res tp">TP</span><span className="rp-tn">#14 Long</span><b className="pos">{fmtR(Math.round(RR * 10) / 10, en)}</b></li>
                     {PREV.slice(-3).reverse().map((r, i) => (
-                      <li key={i}><span className={'rp-res ' + (r > 0 ? 'tp' : 'sl')}>{r > 0 ? 'TP' : 'SL'}</span><span className="rp-tn">#{13 - i} {i === 1 ? 'Short' : 'Long'}</span><b className={r > 0 ? 'pos' : 'neg'}>{fmtR(r)}</b></li>
+                      <li key={i}><span className={'rp-res ' + (r > 0 ? 'tp' : 'sl')}>{r > 0 ? 'TP' : 'SL'}</span><span className="rp-tn">#{13 - i} {i === 1 ? 'Short' : 'Long'}</span><b className={r > 0 ? 'pos' : 'neg'}>{fmtR(r, en)}</b></li>
                     ))}
                   </ul>
                 </div>
@@ -235,7 +243,7 @@ export function Replay() {
               <span className="rp-bar"><i /></span>
             </div>
           </div>
-          <p className="rp-hint">Scroll weiter, der Markt läuft Kerze für Kerze.</p>
+          <p className="rp-hint">{T.hint}</p>
         </div>
       </div>
     </div>

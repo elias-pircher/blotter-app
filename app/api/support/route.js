@@ -48,7 +48,8 @@ export async function POST(req) {
     .select('id,created_at').single();
   if (error || !row) { console.error('Support: Speichern fehlgeschlagen', error?.code || ''); return fail('unavailable', 500); }
 
-  const ticket = { id: row.id, topic, subject, message, email: user.email, account, meta, at: row.created_at };
+  const lang = req.headers.get('x-lang') === 'en' ? 'en' : 'de';
+  const ticket = { id: row.id, topic, subject, message, email: user.email, account, meta, at: row.created_at, lang };
   // the request is saved; the e-mails are best effort and never turn a saved request into an error
   let mailed = false, confirm = false;
   try { mailed = await mailTeam(ticket); } catch (e) { console.error('Support: Mail ans Team', e?.status || '', e?.code || ''); }

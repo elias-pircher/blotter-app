@@ -37,11 +37,15 @@ export async function POST(req) {
   const site = (process.env.NEXT_PUBLIC_SITE_URL || d.site_url || 'https://blotterjournal.com').replace(/\/$/, '');
   let rid = null;
   let next = '/app';
+  // the language: the login page that asked for the e-mail, otherwise the account's choice
+  let lang = user?.user_metadata?.lang === 'en' ? 'en' : 'de';
   try {
     const r = new URL(d.redirect_to);
     const n = r.searchParams.get('next');
     if (n && n.startsWith('/') && !n.startsWith('//')) next = n;
     if (validRid(r.searchParams.get('rid'))) rid = r.searchParams.get('rid');
+    const l = r.searchParams.get('lang');
+    if (l === 'en' || l === 'de') lang = l;
   } catch {}
 
   // who gets which code (e-mail change may need two e-mails; Supabase names the hashes the other way round)
@@ -62,9 +66,9 @@ export async function POST(req) {
     const job = jobs[i];
     if (!job.to) continue;
     const link = job.hash && kind !== 'reauthentication' && kind !== 'notice'
-      ? `${site}/auth/callback?token_hash=${encodeURIComponent(job.hash)}&type=${verifyTypeOf(action)}&next=${encodeURIComponent(next)}`
+      ? `${site}/auth/callback?token_hash=${encodeURIComponent(job.hash)}&type=${verifyTypeOf(action)}&next=${encodeURIComponent(next)}&lang=${lang}`
       : null;
-    const mail = buildLoginEmail({ kind, code: job.code, link });
+    const mail = buildLoginEmail({ kind, code: job.code, link, lang });
     try {
       const { id } = await sendMail({ to: job.to, ...mail, idempotencyKey: `${hookId}-${i}`, tag: kind });
       await logMail({ rid, email: job.to, kind, resend_id: id, status: 'sent' });

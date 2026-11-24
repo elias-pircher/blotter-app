@@ -1,0 +1,906 @@
+# English for the journal (public/journal/journal.js and the markup). Format: see apply.js.
+# "= German run" then "> English run". Code swaps: "!= old" "!> new" (exact, count with "!# n").
+
+# ---- locale, numbers, the English backtesting bundle
+!= const LOC = 'de-AT';
+!> const LOC = 'en-GB';
+!= if (s.includes(',') && s.includes('.')) s = s.replace(/\./g, '').replace(',', '.');
+!> if (s.includes(',') && s.includes('.')) s = s.replace(/,/g, '');
+!= else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+!> else if (/^-?\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, '');
+!= '/journal/backtest.js?v=' + BT_V
+!# 4
+!> '/journal/backtest.en.js?v=' + BT_V
+
+# ---- storage and connection messages
+= Main-Konto
+> Main account
+= Neben-Konto
+> Second account
+= Speichern nicht möglich: Dir fehlen für dieses Journal die Schreibrechte.
+> Can’t save: you don’t have write access to this journal.
+= Der Speicher dieses Journals ist voll. Lösche alte Screenshots oder Einträge.
+> This journal’s storage is full. Delete old screenshots or entries.
+= Der Screenshot ist größer als 20 MB.
+> The screenshot is larger than 20 MB.
+= Dieses Bildformat wird nicht unterstützt. Verwende PNG, JPG, GIF oder WebP.
+> This image format isn’t supported. Use PNG, JPG, GIF or WebP.
+= Zu viele Anfragen in kurzer Zeit. Warte einen Moment und versuch es erneut.
+> Too many requests in a short time. Wait a moment and try again.
+= Der Browser-Speicher ist voll. Lösche alte Screenshots, um Platz zu schaffen.
+> The browser storage is full. Delete old screenshots to make room.
+= Screenshots können in dieser Ansicht nicht hochgeladen werden.
+> Screenshots can’t be uploaded in this view.
+= Der Zugriff auf dieses Journal wurde entzogen.
+> Access to this journal was revoked.
+= Dein Abo ist nicht aktiv. Öffne die Einstellungen, um es zu verwalten.
+> Your plan isn’t active. Open the settings to manage it.
+= Du bist nicht mehr angemeldet. Lade die Seite neu und melde dich an.
+> You’re no longer logged in. Reload the page and log in.
+= Speichern hat nicht geklappt. Prüfe deine Verbindung und versuch es erneut.
+> Saving didn’t work. Check your connection and try again.
+= Deine gespeicherten Einträge sind gerade nicht erreichbar. Die Seite lädt sie automatisch nach, sobald die Verbindung steht.
+> Your saved entries can’t be reached right now. The page loads them automatically as soon as the connection is back.
+= Die Einträge konnten nicht geladen werden. Lade die Seite neu, um es nochmal zu versuchen.
+> The entries could not be loaded. Reload the page to try again.
+= Die Verbindung zu deinem Konto ist gerade nicht möglich. Einträge werden vorerst nur in diesem Browser gespeichert.
+> Your account can’t be reached right now. For now, entries are saved in this browser only.
+= In diesem Browser kann gerade nichts gespeichert werden. Lade die Seite neu.
+> Nothing can be saved in this browser right now. Reload the page.
+
+# ---- mantras (two lines each)
+= Kontoschutz vor
+> Protect the account
+= Kontowachstum.
+> before you grow it.
+= Prozess
+> Process
+= vor Gewinn.
+> over profit.
+= Konstanz
+> Consistency
+= schlägt zurück.
+> compounds.
+= Geduld wird
+> Patience
+= bezahlt.
+> pays.
+= Halte dich an
+> Stick to
+= das System.
+> the system.
+= Disziplin ist
+> Discipline is
+= dein Vorteil.
+> your edge.
+
+# ---- tabs, status, calendar
+= Kalender
+> Calendar
+= Hilfe
+> Help
+= Seiten
+> Pages
+= Synchronisiert
+> Synced
+= Nur dieser Browser
+> This browser only
+= Kein Zugriff
+> No access
+= Verbinde…
+> Connecting…
+= Gespeichert in deinem Konto, auf all deinen Geräten verfügbar
+> Saved in your account, available on all your devices
+= Screenshot ${i + 1} vergrößern
+> Enlarge screenshot ${i + 1}
+= ohne Ergebnis
+> no result
+= Mo
+> Mo
+= Di
+> Tu
+= Mi
+> We
+= Do
+> Th
+= Fr
+> Fr
+= Sa
+> Sa
+= So
+> Su
+= Übersicht
+> Overview
+= Vorheriger Monat
+> Previous month
+= Nächster Monat
+> Next month
+= Konto-Filter
+> Account filter
+= Jeder eingetragene Trade macht dich besser. Wähle einen Tag im Kalender und halte fest, was passiert ist.
+> Every trade you log makes you better. Pick a day in the calendar and record what happened.
+= Bilanz
+> Summary
+= Win-Rate
+> Win rate
+= Trade-Tape
+> Trade tape
+= älteste zuerst
+> oldest first
+= Heute
+> Today
+= Alle
+> All
+= ${ICON.plus}Trade eintragen
+> ${ICON.plus}Log trade
+= Noch keine Trades.
+> No trades yet.
+= Klick auf einen Tag im Kalender oder auf „Trade eintragen“, um deinen ersten Trade mit Konto, Ergebnis (TP, BE oder SL) und Screenshot festzuhalten.
+> Click a day in the calendar or “Log trade” to record your first trade with account, result (TP, BE or SL) and screenshot.
+= Beste TP-Serie
+> Best TP streak
+= Serie
+> Streak
+= Gute Nacht
+> Good night
+= Guten Morgen
+> Good morning
+= Guten Tag
+> Good afternoon
+= Guten Abend
+> Good evening
+= , KW ${isoWeek(n)}
+> , week ${isoWeek(n)}
+= Noch keine Trades in diesem Monat
+> No trades this month yet
+= Jeder Trade erscheint hier als farbiger Block.
+> Every trade shows up here as a coloured block.
+= Aktuelle Serie
+> Current streak
+= Handelstag
+> trading day
+= Handelstage
+> trading days
+= der Trades
+> of trades
+= noch keine Trades
+> no trades yet
+= TP in Folge
+> TPs in a row
+= Woche
+> Week
+= : keine Trades
+> : no trades
+= KW ${kw}
+> Wk ${kw}
+= KW ${kw} · ${fDM.format(wStart)}–${fDM.format(wEnd)}
+> Week ${kw} · ${fDM.format(wStart)}–${fDM.format(wEnd)}
+
+# ---- learnings
+= Learnings durchsuchen
+> Search learnings
+= Jeder Fehler, den du aufschreibst, kostet dich nur einmal Geld.
+> Every mistake you write down only costs you money once.
+= ${ICON.plus}Learning eintragen
+> ${ICON.plus}Add learning
+= gespeichert. Jeder Fehler, den du aufschreibst, kostet dich nur einmal Geld.
+> saved. Every mistake you write down only costs you money once.
+= Learnings werden geladen…
+> Loading learnings…
+= Noch keine Learnings
+> No learnings yet
+= Halte fest, was du aus einem Trade gelernt hast, mit Text und Screenshot vom Chart. So siehst du später, welche Fehler sich wiederholen.
+> Record what you learned from a trade, with text and a screenshot of the chart. Later you’ll see which mistakes repeat.
+= ${ICON.plus}Erstes Learning eintragen
+> ${ICON.plus}Add your first learning
+= Keine Learnings passen zu deiner Suche.
+> No learnings match your search.
+= Bearbeiten
+> Edit
+= Instrument oder Text suchen
+> Search instrument or text
+
+# ---- outlooks
+= Outlooks durchsuchen
+> Search outlooks
+= Wer vorbereitet ist, reagiert nicht, er handelt nach Plan.
+> If you’re prepared, you don’t react, you trade the plan.
+= ${ICON.plus}Outlook eintragen
+> ${ICON.plus}Add outlook
+= Outlooks werden geladen…
+> Loading outlooks…
+= Noch keine Outlooks
+> No outlooks yet
+= Schreib vor der Session auf, was du vom Markt erwartest, und häng deinen markierten Chart an. Nach dem Tag markierst du, ob es eingetreten ist.
+> Before the session, write down what you expect from the market and attach your marked-up chart. After the day, mark whether it played out.
+= ${ICON.plus}Ersten Outlook eintragen
+> ${ICON.plus}Add your first outlook
+= Keine Outlooks passen zu deinem Filter.
+> No outlooks match your filter.
+= Eingetreten
+> Played out
+= Nicht eingetreten
+> Didn’t play out
+= Offen
+> Open
+
+# ---- forms
+= Du hast ungespeicherte Änderungen. Speichere sie oder klicke auf „Abbrechen“, um sie zu verwerfen.
+> You have unsaved changes. Save them or click “Cancel” to discard them.
+= ${esc(t.time)} Uhr
+> ${esc(t.time)}
+= Kein Ergebnis
+> No result
+= Keine Trades
+> No trades
+= Schließen
+> Close
+= ${eyebrow} · KW ${isoWeek(d)}
+> ${eyebrow} · week ${isoWeek(d)}
+= An diesem Tag ist noch kein Trade eingetragen.
+> No trade logged on this day yet.
+= zu diesem Tag
+> for this day
+= Ohne Titel
+> Untitled
+= Trade eintragen
+> Log trade
+= Trade bearbeiten
+> Edit trade
+= Trade gespeichert
+> Trade saved
+= Trade gelöscht
+> Trade deleted
+= diesen Trade
+> this trade
+= Konto
+> Account
+= Datum
+> Date
+= Uhrzeit
+> Time
+= z. B. NQ, DAX, EURUSD
+> e.g. NQ, DAX, EURUSD
+= Richtung
+> Direction
+= Ergebnis
+> Result
+= z. B. Entry Model 1, 2 oder 3
+> e.g. Entry Model 1, 2 or 3
+= Notizen
+> Notes
+= Warum bist du rein? Was lief gut, was nicht?
+> Why did you get in? What went well, what didn’t?
+= Wähle aus, auf welchem Konto der Trade lief.
+> Choose the account the trade ran on.
+= Gib ein Datum an.
+> Enter a date.
+= Wähle aus, ob der Trade in TP, BE oder SL gegangen ist.
+> Choose whether the trade went to TP, BE or SL.
+= Learning eintragen
+> Add learning
+= Learning bearbeiten
+> Edit learning
+= Learning gespeichert
+> Learning saved
+= Learning gelöscht
+> Learning deleted
+= dieses Learning
+> this learning
+= Kategorie
+> Category
+= z. B. Psychologie
+> e.g. Psychology
+= Titel
+> Title
+= Was hast du gelernt?
+> What did you learn?
+= Beschreibe die Situation und was du künftig anders machst.
+> Describe the situation and what you’ll do differently next time.
+= Gib einen Titel oder Text ein.
+> Enter a title or text.
+= Outlook eintragen
+> Add outlook
+= Outlook bearbeiten
+> Edit outlook
+= Outlook gespeichert
+> Outlook saved
+= Outlook gelöscht
+> Outlook deleted
+= diesen Outlook
+> this outlook
+= Gilt für
+> Applies to
+= z. B. Wochenausblick NQ
+> e.g. NQ weekly outlook
+= Analyse
+> Analysis
+= Key Levels, Szenarien, Plan für die Session…
+> Key levels, scenarios, plan for the session…
+= Gib zumindest ein Instrument, einen Titel oder einen Text ein.
+> Enter at least an instrument, a title or a text.
+= Psychologie
+> Psychology
+= Risikomanagement
+> Risk management
+= Disziplin
+> Discipline
+= Marktstruktur
+> Market structure
+= Konto ${i + 1}
+> Account ${i + 1}
+= Vorzeichen umkehren
+> Flip sign
+= Screenshot hinzufügen
+> Add screenshot
+= Screenshots können in dieser Ansicht nicht hinzugefügt werden.
+> Screenshots can’t be added in this view.
+= Abbrechen
+> Cancel
+= Löschen
+> Delete
+= Speichern
+> Save
+= Änderungen speichern
+> Save changes
+= Screenshot ${i + 1} ansehen
+> View screenshot ${i + 1}
+= Screenshot ${i + 1} entfernen
+> Remove screenshot ${i + 1}
+= Nur Bilddateien können als Screenshot angehängt werden.
+> Only image files can be attached as screenshots.
+= Ein Bild ist größer als 40 MB und wurde übersprungen.
+> An image is larger than 40 MB and was skipped.
+= Screenshot eingefügt
+> Screenshot added
+= Screenshots eingefügt
+> Screenshots added
+= Screenshot ${i}/${pending.length} wird hochgeladen…
+> Uploading screenshot ${i}/${pending.length}…
+= Screenshot wird hochgeladen…
+> Uploading screenshot…
+= Wird gespeichert…
+> Saving…
+= Gespeichert
+> Saved
+= ${esc(def.what.charAt(0).toUpperCase() + def.what.slice(1))} löschen?
+> Delete ${esc(def.what)}?
+= Ja, löschen
+> Yes, delete
+= Nein
+> No
+
+# ---- colour themes
+= Das Original
+> The original
+= Graphit
+> Graphite
+= Schwarz und Weiß, ganz schlicht
+> Black and white, simple
+= Schiefer
+> Slate
+= Blaugrau und ruhig
+> Blue-grey and calm
+= Mokka
+> Mocha
+= Dunkel und warm
+> Dark and warm
+= Wald
+> Forest
+= Tiefgrün und Champagner
+> Deep green and champagne
+= Mitternacht
+> Midnight
+= Indigo und Lavendel
+> Indigo and lavender
+= Petrol und Kupfer
+> Petrol and copper
+= Weinrot und Roségold
+> Wine red and rose gold
+= Hell
+> Light
+= Weiß und Anthrazit
+> White and anthracite
+= Hell und warm
+> Light and warm
+= Nebel
+> Mist
+= Hellgrau und Stahlblau
+> Light grey and steel blue
+= Salbei
+> Sage
+= Hell und naturgrün
+> Light and leaf green
+= z. B. FTMO 100k
+> e.g. FTMO 100k
+= z. B. Privatkonto
+> e.g. Personal account
+= z. B. Apex 50k
+> e.g. Apex 50k
+= z. B. Topstep
+> e.g. Topstep
+= z. B. Demokonto
+> e.g. Demo account
+
+# ---- backtesting and prop locks
+= Beispiel: Long-Trade mit Stop und Ziel auf einem Kerzenchart, das Ziel wird erreicht
+> Example: a long trade with stop and target on a candlestick chart, the target is hit
+= Spiel den Markt Kerze für Kerze nach und teste dein Setup, bevor echtes Geld im Spiel ist.
+> Replay the market candle by candle and test your setup before real money is on the line.
+= Im Abo Journal + Backtesting
+> In the Journal + Backtesting plan
+= Dein Abo ist das Journal. Mit Journal + Backtesting bekommst du zusätzlich:
+> Your plan is the journal. With Journal + Backtesting you also get:
+= Kerze für Kerze abspielen, von 1 Minute bis Monthly
+> Candle-by-candle replay, from 1 minute to monthly
+= Entry, Stop und Ziel setzen, jeder Trade in R
+> Set entry, stop and target, every trade in R
+= Zeichnen wie bei TradingView: Trendlinien, Fibonacci, Rechtecke, Long und Short
+> Drawing like on TradingView: trend lines, Fibonacci, rectangles, long and short
+= Win-Rate, Profit Factor und Equity-Kurve pro Session
+> Win rate, profit factor and equity curve per session
+= Sechs Märkte mit deinen eigenen Kursdaten, privat in deinem Konto
+> Six markets with your own price data, private in your account
+= Auf Journal + Backtesting wechseln
+> Switch to Journal + Backtesting
+= 14,99 € im Monat. Heute zahlst du nur die Differenz für die restlichen Tage. Mit Prop-Konten:
+> €14.99 a month. Today you only pay the difference for the remaining days. With prop accounts:
+= Pro für 22,99 €
+> Pro for €22.99
+= Beispiel: ein Futures-Konto mit 50.000 $, Gewinnziel und Limits
+> Example: a futures account with $50,000, profit target and limits
+= Prop-Konten
+> Prop accounts
+= Backteste wie auf einem echten Konto, mit Lots, Kontrakten, Dollar und den Regeln der Prop-Firmen.
+> Backtest as if on a real account, with lots, contracts, dollars and the prop firms’ rules.
+= Im Abo Pro
+> In the Pro plan
+= Futures-Konten mit 25K, 50K, 100K oder 150K, in ganzen Kontrakten wie bei Tradesea
+> Futures accounts with 25K, 50K, 100K or 150K, in whole contracts like on Tradesea
+= CFD-Konten mit 10K, 25K, 50K oder 100K, in Lots ab 0,01 wie in MetaTrader 5
+> CFD accounts with 10K, 25K, 50K or 100K, in lots from 0.01 like in MetaTrader 5
+= Bid und Ask, Spread, Kommission und Margin, jeder Trade in Dollar
+> Bid and ask, spread, commission and margin, every trade in dollars
+= Gewinnziel, Tagesverlust und Max. Verlust wie bei Lucid und FTMO, statisch oder trailing
+> Profit target, daily loss and max loss like at Lucid and FTMO, static or trailing
+= Teilschließen, Größe nach Risiko und eine Anleitung direkt auf der Seite
+> Partial closes, size by risk and a guide right on the page
+= Auf Pro wechseln
+> Switch to Pro
+= 22,99 € im Monat. Heute zahlst du nur die Differenz für die restlichen Tage.
+> €22.99 a month. Today you only pay the difference for the remaining days.
+= Aktiv
+> Active
+= Du hast Journal + Backtesting. Mit Pro tradest du deine Backtests zusätzlich auf simulierten Konten:
+> You have Journal + Backtesting. With Pro you also trade your backtests on simulated accounts:
+= Dein Abo ist das Journal. Mit Pro bekommst du das Backtesting und dazu simulierte Konten:
+> Your plan is the journal. With Pro you get backtesting plus simulated accounts:
+= Gewinnziel
+> Profit target
+= +1.240 $ von 3.000 $
+> +$1,240 of $3,000
+= Tagesverlust
+> Daily loss
+= −150 $ von 1.200 $
+> −$150 of $1,200
+= Max. Verlust
+> Max loss
+= Grenze 49.240 $
+> Limit $49,240
+= Wird geladen…
+> Loading…
+= Die Seite konnte nicht geladen werden. Prüfe deine Verbindung und lade die Seite neu.
+> The page could not be loaded. Check your connection and reload the page.
+
+# ---- help page
+= Erste Schritte
+> Getting started
+= Einstellungen
+> Settings
+= Abo & Zahlung
+> Plan & payment
+= Daten & Sicherheit
+> Data & security
+= Wie trage ich einen Trade ein?
+> How do I log a trade?
+= Tippe im Kalender auf „Trade eintragen“ oder wähle einen Tag und trag ihn dort ein. Nötig sind nur Konto, Datum und Ergebnis. Instrument, Uhrzeit, Setup, Notizen und Screenshots ergänzt du, wenn du willst. Am Computer öffnet die Taste N das Formular.
+> Tap “Log trade” in the calendar or pick a day and log it there. Only account, date and result are required. Add instrument, time, setup, notes and screenshots if you like. On a computer the N key opens the form.
+= Was bedeuten TP, BE und SL?
+> What do TP, BE and SL mean?
+= Take Profit: Der Trade hat sein Ziel erreicht. Break Even: Du hast den Stop auf den Einstieg gezogen und ohne Verlust geschlossen. Stop Loss: Der Stop wurde getroffen. Die Win-Rate rechnet TP ÷ (TP + SL), Break Evens zählen also nicht gegen dich.
+> Take profit: the trade hit its target. Break even: you moved the stop to entry and closed without a loss. Stop loss: the stop was hit. The win rate is TP ÷ (TP + SL), so break evens don’t count against you.
+= Wie füge ich Screenshots hinzu?
+> How do I add screenshots?
+= Gibt es Tastenkürzel?
+> Are there keyboard shortcuts?
+= Ja, am Computer: N trägt etwas Neues ein, ← und → wechseln den Monat, T springt zu heute, die Zahlen öffnen deine Seiten in ihrer Reihenfolge und ? öffnet diese Hilfe.
+> Yes, on a computer: N adds something new, ← and → change the month, T jumps to today, the numbers open your pages in their order and ? opens this help.
+= Kann ich die Einführung noch einmal sehen?
+> Can I see the introduction again?
+= Ja. In den Einstellungen startest du unter „Hilfe“ die Tour neu. Sie zeigt dir in einer Minute alle Bereiche.
+> Yes. In the settings, restart the tour under “Help”. It shows you every area in one minute.
+= Wie lege ich weitere Konten an?
+> How do I add more accounts?
+= In den Einstellungen unter „Konten“ mit „Konto hinzufügen“, bis zu 10 Stück, jedes mit eigenem Namen und eigener Farbe. Im Kalender filterst du dann nach einem Konto.
+> In the settings under “Accounts” with “Add account”, up to 10, each with its own name and colour. In the calendar you can then filter by account.
+= Kann ich Seiten ausblenden?
+> Can I hide pages?
+= Ja. Unter Einstellungen → „Seiten“ schaltest du Learnings, Outlooks, Backtesting und Prop-Konten ein oder aus. Was du dort schon eingetragen hast, bleibt gespeichert.
+> Yes. Under Settings → “Pages” you turn learnings, outlooks, backtesting and prop accounts on or off. Whatever you already entered there stays saved.
+= Wie ändere ich Farben und meinen Namen?
+> How do I change colours and my name?
+= In den Einstellungen wählst du eines von 12 Farbschemen, dunkel oder hell, und änderst den Namen, mit dem Blotter dich begrüßt.
+> In the settings you pick one of 12 colour themes, dark or light, and change the name Blotter greets you with.
+= Wofür sind Outlooks?
+> What are outlooks for?
+= Du planst vor der Session: HTF und LTF jeweils bullish oder bearish, dazu dein Szenario. Danach markierst du, ob es eingetreten ist, und siehst deine Trefferquote.
+> You plan before the session: HTF and LTF each bullish or bearish, plus your scenario. Afterwards you mark whether it played out and see your hit rate.
+= Wie finde ich alte Learnings wieder?
+> How do I find old learnings?
+= Über die Suche oben auf der Seite Learnings oder über die Kategorien darunter. Die Kategorie vergibst du beim Eintragen.
+> With the search at the top of the learnings page or the categories below it. You set the category when you add one.
+= Warum ist das Backtesting bei mir gesperrt?
+> Why is backtesting locked for me?
+= Das Backtesting gehört zu den Abos „Journal + Backtesting“ für 14,99 € und „Pro“ für 22,99 € im Monat. In den Einstellungen wechselst du mit „Backtesting dazunehmen“, danach ist es sofort frei. Im kostenlosen Test kostet der Wechsel nichts.
+> Backtesting is part of the “Journal + Backtesting” plan for €14.99 and the “Pro” plan for €22.99 a month. In the settings, switch with “Add backtesting”; it unlocks right away. During the free trial the switch costs nothing.
+= Woher bekomme ich Kursdaten?
+> Where do I get price data?
+= Du lädst 1-Minuten-Daten einmal selbst herunter, zum Beispiel kostenlos bei HistData, und importierst sie auf der Backtesting-Seite. Dort steht eine Schritt-für-Schritt-Anleitung. Exporte aus MetaTrader und von Dukascopy gehen auch. Es gibt Nasdaq 100, S&P 500, DAX 40, Gold, EUR/USD und GBP/USD.
+> You download 1-minute data once yourself, for example for free from HistData, and import it on the backtesting page. There’s a step-by-step guide there. Exports from MetaTrader and Dukascopy work too. Nasdaq 100, S&P 500, DAX 40, gold, EUR/USD and GBP/USD are available.
+= Kann ich im Backtesting-Chart zeichnen?
+> Can I draw on the backtesting chart?
+= Wie ändere ich Kerzenfarben und Hintergrund?
+> How do I change candle colours and the background?
+= Über das Zahnrad oben rechts im Backtesting öffnest du die Chart-Einstellungen: Chart-Typ (auch Heikin Ashi, Balken, Linie), Farben für Körper, Rahmen und Docht, Hintergrund, Gitter, Fadenkreuz und Preisskala. Die Einstellungen gelten für alle deine Sessions.
+> The gear at the top right of backtesting opens the chart settings: chart type (including Heikin Ashi, bars, line), colours for body, border and wick, background, grid, crosshair and price scale. The settings apply to all your sessions.
+= Was sind Prop-Konten?
+> What are prop accounts?
+= Simulierte Konten fürs Backtesting, im Abo Pro für 22,99 € im Monat. Du wählst ein Futures-Konto (25K bis 150K) oder ein CFD-Konto (10K bis 100K) und tradest deine Session darauf: mit Lots oder Kontrakten, Spread und Kommission, Kontostand in Dollar und den Regeln einer Prop-Firma. Eine Anleitung steht direkt auf der Seite Prop-Konten.
+> Simulated accounts for backtesting, in the Pro plan for €22.99 a month. You pick a futures account (25K to 150K) or a CFD account (10K to 100K) and trade your session on it: with lots or contracts, spread and commission, the balance in dollars and a prop firm’s rules. A guide is right on the prop accounts page.
+= Wie wähle ich die Positionsgröße?
+> How do I choose the position size?
+= Bei CFD-Konten in Lots ab 0,01, wie in MetaTrader 5. Bei Futures in ganzen Kontrakten, als Mini oder Micro (ein Micro ist ein Zehntel). Mit „Größe nach Risiko“ trägst du ein, wie viel du riskieren willst, in Prozent oder Dollar, und Blotter rechnet aus deinem Stop die passende Größe aus, Kommission eingerechnet.
+> On CFD accounts in lots from 0.01, like in MetaTrader 5. On futures in whole contracts, as mini or micro (a micro is a tenth). With “Size by risk” you enter how much you want to risk, in percent or dollars, and Blotter works out the right size from your stop, commission included.
+= Was passiert, wenn ich ein Limit erreiche?
+> What happens when I hit a limit?
+= Erreicht deine Equity das Tagesverlust-Limit oder den maximalen Verlust, schließt Blotter die Position genau dort, wie es die Firma tun würde. Bei CFD-Konten ist das Konto dann verloren, bei Futures-Konten pausiert es bis zum nächsten Handelstag. Unter Prop-Konten setzt du ein Konto jederzeit zurück und startest neu.
+> If your equity hits the daily loss limit or the max loss, Blotter closes the position right there, just as the firm would. On CFD accounts the account is then lost; on futures accounts it pauses until the next trading day. Under prop accounts you can reset an account at any time and start over.
+= Wie funktioniert der kostenlose Test?
+> How does the free trial work?
+= Neue Kunden testen 3 Tage kostenlos. Die Zahlungsmethode hinterlegst du bei Stripe, abgebucht wird erst, wenn der Test endet. Kündigst du vorher, zahlst du nichts. Den Test gibt es einmal pro Konto.
+> New customers try Blotter free for 3 days. You add your payment method with Stripe; nothing is charged until the trial ends. Cancel before then and you pay nothing. The trial is available once per account.
+= Wie wechsle ich mein Abo?
+> How do I switch my plan?
+= In den Einstellungen unter „Konto & Abo“. Es gibt Journal (7,99 €), Journal + Backtesting (14,99 €) und Pro mit Prop-Konten (22,99 €). Beim Wechsel zu einem größeren Abo zahlst du nur die Differenz für die restlichen Tage des Monats. Wechselst du zurück, wird der nicht genutzte Teil mit der nächsten Rechnung verrechnet. Deine Backtests und Konten bleiben gespeichert.
+> In the settings under “Account & plan”. There’s Journal (€7.99), Journal + Backtesting (€14.99) and Pro with prop accounts (€22.99). When you move to a bigger plan you only pay the difference for the rest of the month. If you move back, the unused part is credited on your next invoice. Your backtests and accounts stay saved.
+= Wie kündige ich, und wo finde ich meine Rechnungen?
+> How do I cancel, and where are my invoices?
+= In den Einstellungen öffnet „Abo verwalten oder kündigen“ das Kundenportal von Stripe. Dort kündigst du, änderst deine Zahlungsmethode und lädst deine Rechnungen herunter. Nach der Kündigung läuft das Abo bis zum Ende des bezahlten Monats.
+> In the settings, “Manage or cancel plan” opens Stripe’s customer portal. There you cancel, change your payment method and download your invoices. After cancelling, the plan runs until the end of the paid month.
+= Wer sieht meine Einträge?
+> Who can see my entries?
+= Nur du. Jedes Konto hat einen eigenen, getrennten Datenbereich, und Screenshots liegen in einem privaten Speicher.
+> Only you. Every account has its own separate data area, and screenshots are kept in private storage.
+= Was bedeutet der Punkt oben rechts?
+> What does the dot at the top right mean?
+= Grün heißt: Alles ist in deinem Konto gespeichert und auf all deinen Geräten gleich. Steht dort „Nur dieser Browser“, ist die Verbindung gerade unterbrochen, und neue Einträge liegen vorerst nur in diesem Browser. Lade die Seite neu, sobald du wieder online bist. Bleibt die Meldung, schreib uns.
+> Green means everything is saved in your account and the same on all your devices. If it says “This browser only”, the connection is interrupted and new entries are kept in this browser for now. Reload the page once you’re back online. If the message stays, write to us.
+= Wie melde ich mich an?
+> How do I log in?
+= Mit deiner E-Mail-Adresse. Du bekommst einen Code per E-Mail, ein Passwort gibt es nicht. Es gilt immer nur der Code aus der neuesten E-Mail.
+> With your e-mail address. You get a code by e-mail; there’s no password. Only the code from the newest e-mail counts.
+= Kann ich mein Konto löschen?
+> Can I delete my account?
+= Ja. Schreib uns unten mit dem Thema „Konto & Daten“. Wir löschen dein Konto mit allen Einträgen und Screenshots und bestätigen es dir per E-Mail. Ein laufendes Abo kündigst du vorher im Kundenportal.
+> Yes. Write to us below with the topic “Account & data”. We delete your account with all entries and screenshots and confirm it by e-mail. Cancel a running plan in the customer portal first.
+= Frage zur Nutzung
+> Question about using Blotter
+= Wobei können wir dir helfen?
+> What can we help you with?
+= Fehler melden
+> Report a bug
+= Was hast du gemacht, was ist passiert, und was hättest du erwartet?
+> What did you do, what happened, and what did you expect?
+= Worum geht es bei deinem Abo oder deiner Zahlung?
+> What about your plan or payment?
+= Konto & Daten
+> Account & data
+= Was sollen wir an deinem Konto oder deinen Daten tun?
+> What should we do with your account or data?
+= Idee oder Wunsch
+> Idea or wish
+= Was fehlt dir in Blotter?
+> What’s missing in Blotter for you?
+= Sonstiges
+> Other
+= Was möchtest du uns sagen?
+> What would you like to tell us?
+= Danke, deine Anfrage ist angekommen.
+> Thanks, your request has arrived.
+= Deine Ticketnummer ist
+> Your ticket number is
+= Wir antworten dir per E-Mail.
+> We’ll reply by e-mail.
+= Weitere Anfrage schreiben
+> Write another request
+= Worum geht es in einem Satz?
+> What is it about, in one sentence?
+= Support-Anfrage
+> Support request
+= Thema
+> Topic
+= Betreff
+> Subject
+= Nachricht
+> Message
+= Technische Angaben mitsenden (Browser, Bildschirmgröße, Seite). Das hilft uns bei Fehlern.
+> Send technical details (browser, screen size, page). This helps us with bugs.
+= ${HELP_ICON.mail}Anfrage senden
+> ${HELP_ICON.mail}Send request
+= Dazu haben wir noch keine Antwort. Schreib uns, wir helfen dir direkt weiter.
+> We don’t have an answer for that yet. Write to us and we’ll help you directly.
+= Anfrage schreiben
+> Write a request
+= Gib einen Betreff mit mindestens 3 Zeichen ein.
+> Enter a subject with at least 3 characters.
+= Beschreib dein Anliegen in mindestens 10 Zeichen.
+> Describe your request in at least 10 characters.
+= Anfragen gehen nur, wenn du angemeldet bist. Lade die Seite neu.
+> Requests only work while you’re logged in. Reload the page.
+= Du hast in der letzten Stunde schon mehrere Anfragen geschickt. Wir melden uns, bitte warte auf unsere Antwort.
+> You’ve already sent several requests in the last hour. We’ll get back to you, please wait for our reply.
+= Die Anfrage konnte gerade nicht gesendet werden. Versuch es in einem Moment noch einmal.
+> The request couldn’t be sent right now. Try again in a moment.
+= Hilfe und Support
+> Help and support
+= Fragen durchsuchen
+> Search questions
+= Antworten auf die häufigsten Fragen. Ist deine nicht dabei, schreib uns.
+> Answers to the most common questions. If yours isn’t here, write to us.
+= ${HELP_ICON.mail}Anfrage schreiben
+> ${HELP_ICON.mail}Write a request
+= Das Backtesting konnte nicht geladen werden. Prüfe deine Verbindung und lade die Seite neu.
+> Backtesting could not be loaded. Check your connection and reload the page.
+
+# ---- pages in the settings and the setup
+= Alle Trades im Monatsüberblick mit TP, BE und SL.
+> All trades in a monthly overview with TP, BE and SL.
+= Halte fest, was du aus Trades lernst, mit Text und Screenshots.
+> Record what you learn from trades, with text and screenshots.
+= Plane deine Markterwartung vorab und bewerte sie danach.
+> Plan your market view ahead and review it afterwards.
+= Spiel den Markt Kerze für Kerze nach und teste dein Setup mit eigenen Kursdaten.
+> Replay the market candle by candle and test your setup with your own price data.
+= Spiel den Markt Kerze für Kerze nach. Enthalten im Abo Journal + Backtesting.
+> Replay the market candle by candle. Included in the Journal + Backtesting plan.
+= Backteste auf Futures- und CFD-Konten mit Lots, Kontrakten und Prop-Regeln.
+> Backtest on futures and CFD accounts with lots, contracts and prop rules.
+= Backteste auf Futures- und CFD-Konten. Enthalten im Abo Pro.
+> Backtest on futures and CFD accounts. Included in the Pro plan.
+= Farbschema
+> Colour theme
+= Immer dabei
+> Always on
+= Anzeigen
+> Show
+= ${list.length} von ${MAX_ACCTS} Konten
+> ${list.length} of ${MAX_ACCTS} accounts
+= Farbe wechseln
+> Change colour
+= Farbe von Konto ${i + 1} wechseln
+> Change the colour of account ${i + 1}
+= Name von Konto ${i + 1}
+> Name of account ${i + 1}
+= Konto entfernen
+> Remove account
+= Konto ${i + 1} entfernen
+> Remove account ${i + 1}
+= ${ICON.plus}Konto hinzufügen
+> ${ICON.plus}Add account
+= Journal starten
+> Start journal
+= Weiter
+> Next
+= Dein Vorname
+> Your first name
+= Willkommen bei Blotter
+> Welcome to Blotter
+= Richte dein Trading Journal in vier kurzen Schritten ein.
+> Set up your trading journal in four short steps.
+= Name, Farbschema, Seiten und Konten. Alles lässt sich später in den Einstellungen ändern.
+> Name, colour theme, pages and accounts. You can change everything later in the settings.
+= Wie dürfen wir dich nennen?
+> What should we call you?
+= Wähle deinen Look.
+> Choose your look.
+= Deine Auswahl gilt sofort für das ganze Journal im Hintergrund.
+> Your choice applies right away to the whole journal in the background.
+= Was soll dein Journal können?
+> What should your journal do?
+= Der Kalender ist immer dabei. Learnings, Outlooks und Backtesting nimmst du dazu oder lässt sie weg.
+> The calendar is always on. Add learnings, outlooks and backtesting or leave them out.
+= Konten
+> Accounts
+= Welche Konten tradest du?
+> Which accounts do you trade?
+= Leg so viele an, wie du brauchst, zum Beispiel deinen Broker und deine Prop-Firm-Challenges. Mit einem Klick auf das Farbfeld wählst du die Farbe, an der du das Konto im Kalender erkennst.
+> Add as many as you need, for example your broker and your prop firm challenges. Click the colour swatch to pick the colour you’ll recognise the account by in the calendar.
+= Klicke nochmal, um ohne Speichern weiterzumachen.
+> Click again to continue without saving.
+= Du kannst alles jederzeit in den Einstellungen anpassen.
+> You can adjust everything in the settings at any time.
+= Willkommen,
+> Welcome,
+= Dein Journal ist bereit.
+> Your journal is ready.
+= Screenshots wählst du direkt aus deinen Fotos.
+> Pick screenshots straight from your photos.
+= N trägt etwas Neues ein
+> N adds something new
+= ← und → wechseln den Monat
+> ← and → change the month
+= T springt zu heute
+> T jumps to today
+= öffnen die Seiten
+> open the pages
+
+# ---- tour
+= Kurze Tour · 1 Minute
+> Quick tour · 1 minute
+= Willkommen bei Blotter.
+> Welcome to Blotter.
+= In einer Minute siehst du, wo alles ist und wie du das Meiste aus deinem Journal holst.
+> In one minute you’ll see where everything is and how to get the most out of your journal.
+= Tour starten
+> Start tour
+= Deine Bereiche
+> Your areas
+= Oben wechselst du zwischen
+> At the top you switch between
+= Deine Bilanz
+> Your summary
+= Win-Rate, die Verteilung von TP, BE und SL und dein Trade-Tape für den gewählten Monat. Alles rechnet sich von selbst.
+> Win rate, the split of TP, BE and SL and your trade tape for the selected month. Everything calculates itself.
+= Monat und Konten
+> Month and accounts
+= Mit den Pfeilen blätterst du durch die Monate, „Heute“ bringt dich zurück. Mit dem Konto-Filter siehst du nur die Trades eines Kontos.
+> The arrows page through the months, “Today” brings you back. The account filter shows only one account’s trades.
+= Konto, Instrument, Long oder Short, Ergebnis (TP, BE oder SL), Setup und Notizen.
+> Account, instrument, long or short, result (TP, BE or SL), setup and notes.
+= Der Monat in Zahlen
+> The month in numbers
+= Anzahl der Trades, Take Profits, Stop Losses und Break Evens mit ihrem Anteil, dazu deine beste TP-Serie.
+> Number of trades, take profits, stop losses and break evens with their share, plus your best TP streak.
+= Dein Kalender
+> Your calendar
+= Jeder Tag zeigt seine Trades nach Ergebnis: grün für TP, grau für BE, rot für SL. Wähl einen Tag, um seine Einträge zu sehen oder für ihn etwas einzutragen.
+> Each day shows its trades by result: green for TP, grey for BE, red for SL. Pick a day to see its entries or add something to it.
+= Darunter siehst du jede Woche zusammengefasst.
+> Below it you see each week summed up.
+= Schreib auf, was du aus deinen Trades gelernt hast, mit Kategorie und Screenshots. Über Suche und Kategorien findest du alles schnell wieder.
+> Write down what you learned from your trades, with category and screenshots. Search and categories help you find everything quickly.
+= Plane vor der Session: HTF und LTF jeweils bullish oder bearish, dazu dein Szenario. Danach markierst du, ob es eingetreten ist, und siehst deine Trefferquote.
+> Plan before the session: HTF and LTF each bullish or bearish, plus your scenario. Afterwards you mark whether it played out and see your hit rate.
+= Name, Farbschema, Seiten und Konten
+> Name, colour theme, pages and accounts
+= sowie dein Abo
+> as well as your plan
+= verwaltest du hier. Dort kannst du diese Tour auch jederzeit neu starten.
+> are managed here. You can also restart this tour there at any time.
+= Tastenkürzel
+> Keyboard shortcuts
+= Los geht’s
+> Let’s go
+= Alles klar. Viel Erfolg beim Traden.
+> All set. Good luck trading.
+= Bereit für deinen ersten Trade?
+> Ready for your first trade?
+= Alles speichert sich automatisch und ist auf all deinen Geräten da.
+> Everything saves automatically and is there on all your devices.
+= Trag deinen nächsten Trade ein, solange alles frisch ist.
+> Log your next trade while it’s all still fresh.
+= Trag ihn gleich ein, solange alles frisch ist.
+> Log it right away while it’s all still fresh.
+= Ersten Trade eintragen
+> Log your first trade
+= Fertig
+> Done
+= Überspringen
+> Skip
+= Dein Name
+> Your name
+= Die kurze Tour zeigt dir noch einmal alle Bereiche deines Journals.
+> The quick tour shows you every area of your journal again.
+= Hilfe &amp; Support
+> Help &amp; support
+= Einrichtung neu starten
+> Restart setup
+
+# ---- account and plan in the settings
+= Angemeldet als
+> Logged in as
+= Abmelden
+> Log out
+= Konto &amp; Abo
+> Account &amp; plan
+= Freundeszugang: Blotter ist für dich kostenlos, ohne Abo, Backtesting und Prop-Konten inklusive.
+> Friend access: Blotter is free for you, without a plan, backtesting and prop accounts included.
+= Dein Abo:
+> Your plan:
+= Gekündigt. Dein kostenloser Test endet am
+> Cancelled. Your free trial ends on
+= , es wird nichts abgebucht.
+> , nothing will be charged.
+= Kostenloser Test bis
+> Free trial until
+= Abo verwalten oder kündigen
+> Manage or cancel plan
+= Abo wechseln
+> Switch plan
+= Prop-Konten dazunehmen
+> Add prop accounts
+= Backtesting dazunehmen
+> Add backtesting
+= Einstellungen gespeichert
+> Settings saved
+
+# ---- markup (top bar, footer, lightbox, tour)
+= Blotter Trading Journal, zum Kalender
+> Blotter Trading Journal, to the calendar
+= Bereiche
+> Areas
+= Screenshot in voller Größe
+> Full-size screenshot
+= Vorheriger Screenshot
+> Previous screenshot
+= Nächster Screenshot
+> Next screenshot
+= Tour beenden
+> End tour
+= Neuer Eintrag
+> New entry
+= Monat
+> Month
+= Zurück
+> Back
+
+# ---- sentences built from pieces, swapped as code
+!= <span>Klicken, Bild hierher ziehen oder mit <kbd>${isMac ? '⌘' : 'Strg'}+V</kbd> einfügen</span>
+!> <span>Click, drag an image here or paste with <kbd>${isMac ? '⌘' : 'Ctrl'}+V</kbd></span>
+!= 'Eine Bestätigung ist an <b>' + esc(mail) + '</b> unterwegs. '
+!> 'A confirmation is on its way to <b>' + esc(mail) + '</b>. '
+!= <p>Deine Frage ist nicht dabei? Schreib uns. Wir antworten per E-Mail${mail ? ' an <b>' + esc(mail) + '</b>' : ''}.</p>
+!> <p>Your question isn’t here? Write to us. We reply by e-mail${mail ? ' to <b>' + esc(mail) + '</b>' : ''}.</p>
+!= 'Am Computer ziehst du Bilder ins Formular oder fügst sie mit ' + (HELP_MAC ? '⌘V' : 'Strg+V') + ' ein. Am Handy wählst du sie aus deinen Fotos. Möglich sind PNG, JPG, GIF und WebP bis 20 MB pro Bild.'
+!> 'On a computer, drag images into the form or paste them with ' + (HELP_MAC ? '⌘V' : 'Ctrl+V') + '. On a phone, pick them from your photos. PNG, JPG, GIF and WebP up to 20 MB per image work.'
+!= 'Screenshots ziehst du einfach ins Formular oder fügst sie mit ' + (mac ? '⌘V' : 'Strg+V') + ' ein.'
+!> 'Just drag screenshots into the form or paste them with ' + (mac ? '⌘V' : 'Ctrl+V') + '.'
+!= 'Ja. Links neben dem Chart findest du die Werkzeuge: Trendlinien, horizontale und vertikale Linien, Kanäle, Fibonacci, Rechtecke, Text, Pfeile, Long- und Short-Position und mehr. Ein Klick auf eine Zeichnung zeigt oben Farbe, Stärke und Stil. Die Zeichnungen gehören zur Session und bleiben auf jedem Zeitrahmen an ihrer Stelle. Mit ' + (HELP_MAC ? '⌘Z' : 'Strg+Z') + ' machst du einen Schritt rückgängig.'
+!> 'Yes. The tools are to the left of the chart: trend lines, horizontal and vertical lines, channels, Fibonacci, rectangles, text, arrows, long and short position and more. Clicking a drawing shows its colour, width and style at the top. Drawings belong to the session and stay in place on every timeframe. ' + (HELP_MAC ? '⌘Z' : 'Ctrl+Z') + ' undoes a step.'
+!= (hit + miss ? ' · Trefferquote ' + Math.round(hit / (hit + miss) * 100) + ' % (' + hit + ' von ' + (hit + miss) + ' bewertet)' : ' · noch keiner bewertet') + '. Wer vorbereitet ist, handelt nach Plan.'
+!> (hit + miss ? ' · hit rate ' + Math.round(hit / (hit + miss) * 100) + '% (' + hit + ' of ' + (hit + miss) + ' rated)' : ' · none rated yet') + '. If you’re prepared, you trade the plan.'
+!= 'Schritt ' + (i + 1) + ' von ' + this.N
+!> 'Step ' + (i + 1) + ' of ' + this.N
+!= 'Schritt ' + i + ' von ' + (n - 2)
+!> 'Step ' + i + ' of ' + (n - 2)
+!= pages.slice(0, -1).join(', ') + ' und ' + pages[pages.length - 1] : pages.join(' und ');
+!> pages.slice(0, -1).join(', ') + ' and ' + pages[pages.length - 1] : pages.join(' and ');
+!= m.textContent = '„' + (list[i].name || 'Dieses Konto') + '“ hat ' + n + (n === 1 ? ' Trade' : ' Trades') + '. Ordne ' + (n === 1 ? 'ihn' : 'sie') + ' zuerst einem anderen Konto zu oder lösche ' + (n === 1 ? 'ihn' : 'sie') + ', dann kannst du das Konto entfernen.';
+!> m.textContent = '“' + (list[i].name || 'This account') + '” has ' + n + (n === 1 ? ' trade' : ' trades') + '. Move ' + (n === 1 ? 'it' : 'them') + ' to another account or delete ' + (n === 1 ? 'it' : 'them') + ' first, then you can remove the account.';
+!= (${window.BlotterBackend.plan === 'pro' ? '22,99' : window.BlotterBackend.plan === 'backtest' ? '14,99' : '7,99'} € im Monat)
+!> (€${window.BlotterBackend.plan === 'pro' ? '22.99' : window.BlotterBackend.plan === 'backtest' ? '14.99' : '7.99'} a month)
+!= '. Danach beginnt das Abo, außer du kündigst vorher.'
+!> '. Then the plan starts, unless you cancel before.'
+
+= . Dein Journal ist bereit.
+> . Your journal is ready.
+
+# ---- more code swaps
+!= const pct = (a, n) => n ? Math.round(a / n * 100) + ' %' : '–';
+!> const pct = (a, n) => n ? Math.round(a / n * 100) + '%' : '–';
+!= Math.round(s.wr * 100) + ' %'
+!> Math.round(s.wr * 100) + '%'
+
+# ---- language switch in the settings
+= Sprache
+> Language

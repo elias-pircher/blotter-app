@@ -17,7 +17,7 @@ export async function POST(req) {
   const ok = given && sameToken(await previewToken(given), await previewToken(lock));
   if (!ok) {
     await new Promise((r) => setTimeout(r, 800)); // slows down guessing
-    const back = new URL('/zugang', url.origin);
+    const back = new URL(req.headers.get('x-lang') === 'en' ? '/en/zugang' : '/zugang', url.origin);
     back.searchParams.set('next', next);
     back.searchParams.set('fehler', '1');
     return NextResponse.redirect(back, 303);
