@@ -67,11 +67,19 @@ async function checkStripe() {
         plus = p2.unit_amount === 1499 && p2.recurring?.interval === 'month' && p2.livemode === price.livemode ? 'ok (14,99 € / Monat)' : 'unerwartet';
       } catch { plus = 'nicht gefunden'; }
     }
+    let pro = 'fehlt';
+    if (process.env.STRIPE_PRICE_ID_PRO) {
+      try {
+        const p3 = await stripe().prices.retrieve(process.env.STRIPE_PRICE_ID_PRO);
+        pro = p3.unit_amount === 2299 && p3.recurring?.interval === 'month' && p3.livemode === price.livemode ? 'ok (22,99 € / Monat)' : 'unerwartet';
+      } catch { pro = 'nicht gefunden'; }
+    }
     return {
       status: 'ok',
       modus: price.livemode ? 'live' : 'test',
       preis: price.unit_amount === 799 && price.recurring?.interval === 'month' ? 'ok (7,99 € / Monat)' : 'unerwartet',
       preis_backtesting: plus,
+      preis_pro: pro,
     };
   } catch (e) {
     if (e?.type === 'StripeAuthenticationError') return { status: 'ungültig', hinweis: 'Stripe lehnt den Schlüssel ab: unvollständig kopiert oder inzwischen ersetzt.' };

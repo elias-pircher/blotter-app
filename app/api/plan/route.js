@@ -5,8 +5,8 @@ import { PLANS, isPlan, planOf, planOfPrice, priceIdFor, FRIEND } from '@/lib/pl
 
 export const dynamic = 'force-dynamic';
 
-// Switching between "Journal" and "Journal + Backtesting" on a running subscription.
-// GET  /api/plan?to=backtest  what the switch costs (nothing changes)
+// Switching between "Journal", "Journal + Backtesting" and "Pro" on a running subscription.
+// GET  /api/plan?to=pro  what the switch costs (nothing changes)
 // POST /api/plan {to, prorationDate}  switches; an upgrade charges the difference for the rest of the month right away,
 //      a downgrade credits the unused part to the next invoice. During the free trial a switch costs nothing
 //      and the trial keeps its end date.

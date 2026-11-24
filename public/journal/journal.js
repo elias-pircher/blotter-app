@@ -66,13 +66,14 @@ const S = {
   month: new Date(now0.getFullYear(), now0.getMonth(), 1),
   acct: lsGet('blotter.acct') || 'all',
   lastAccount: lsGet('blotter.lastAccount') || 'main',
-  trades: [], learnings: [], outlooks: [], backtests: [],
-  settings: {theme: 'navy', name: '', modules: {learnings: true, outlooks: true, backtest: true}, accounts: [{id: 'main', name: 'Main-Konto', color: 'gold'}, {id: 'neben', name: 'Neben-Konto', color: 'silver'}], setupDone: false},
+  trades: [], learnings: [], outlooks: [], backtests: [], accounts: [],
+  settings: {theme: 'navy', name: '', modules: {learnings: true, outlooks: true, backtest: true, prop: true}, accounts: [{id: 'main', name: 'Main-Konto', color: 'gold'}, {id: 'neben', name: 'Neben-Konto', color: 'silver'}], setupDone: false},
   settingsLoaded: false, mountSig: '',
-  mode: 'connecting', loaded: {trades: false, learnings: false, outlooks: false, backtests: false},
+  mode: 'connecting', loaded: {trades: false, learnings: false, outlooks: false, backtests: false, accounts: false},
   lq: '', lcat: '', oq: '', obias: 'all'
 };
-const KINDS = ['trades', 'learnings', 'outlooks', 'backtests'];
+// 'accounts' are the simulated prop accounts of the backtesting (Pro)
+const KINDS = ['trades', 'learnings', 'outlooks', 'backtests', 'accounts'];
 
 /* ---------- storage ---------- */
 const LS_DATA = 'blotter.v1.data', LS_IMG = 'blotter.v1.img.';
@@ -163,7 +164,7 @@ const Store = {
     schedule();
   },
   persistLocal(){
-    const ok = lsSet(LS_DATA, JSON.stringify({trades: S.trades, learnings: S.learnings, outlooks: S.outlooks, backtests: S.backtests, settings: S.settings}));
+    const ok = lsSet(LS_DATA, JSON.stringify({trades: S.trades, learnings: S.learnings, outlooks: S.outlooks, backtests: S.backtests, accounts: S.accounts, settings: S.settings}));
     if (!ok) throw {code: 'local_full'};
   },
   async save(kind, obj){
@@ -1095,7 +1096,7 @@ let rq = 0;
 function schedule(){ if (rq) return; rq = requestAnimationFrame(() => { rq = 0; render(); }); }
 function render(){
   const el = $('#view');
-  if (S.mounted !== S.view) { if (window.BlotterBT && S.mounted === 'backtest') window.BlotterBT.unmount(); S.mountN++; Views[S.view].mount(el); S.mounted = S.view; S.mountSig = settingsSig(); splitTitle(el); onScroll(); }
+  if (S.mounted !== S.view) { if (window.BlotterBT && S.mounted === 'backtest') window.BlotterBT.unmount(); if (window.BlotterBT && S.mounted === 'prop' && window.BlotterBT.unmountProp) window.BlotterBT.unmountProp(); S.mountN++; Views[S.view].mount(el); S.mounted = S.view; S.mountSig = settingsSig(); splitTitle(el); onScroll(); }
   Views[S.view].update();
   Reveal.scan(el);
   updateChrome();
@@ -1958,10 +1959,10 @@ const SKIN_OLD = {ocean: 'slate', royal: 'navy', copper: 'mocha', arctic: 'paper
 const skinId = id => SKIN_OLD[id] || id;
 function normSettings(d){
   d = d || {};
-  const o = {theme: 'navy', name: '', modules: {learnings: true, outlooks: true, backtest: true}, accounts: [], setupDone: !!d.setupDone, tourDone: !!d.tourDone};
+  const o = {theme: 'navy', name: '', modules: {learnings: true, outlooks: true, backtest: true, prop: true}, accounts: [], setupDone: !!d.setupDone, tourDone: !!d.tourDone};
   if (SKIN_IDS.includes(skinId(d.theme))) o.theme = skinId(d.theme);
   if (typeof d.name === 'string') o.name = d.name.trim().slice(0, 30);
-  if (d.modules && typeof d.modules === 'object') { o.modules.learnings = d.modules.learnings !== false; o.modules.outlooks = d.modules.outlooks !== false; o.modules.backtest = d.modules.backtest !== false; }
+  if (d.modules && typeof d.modules === 'object') { o.modules.learnings = d.modules.learnings !== false; o.modules.outlooks = d.modules.outlooks !== false; o.modules.backtest = d.modules.backtest !== false; o.modules.prop = d.modules.prop !== false; }
   o.accounts = normAccounts(d);
   // the backtesting chart's look (candle colours, background, grid …), kept as the chart module wrote it
   if (d.btChart && typeof d.btChart === 'object' && !Array.isArray(d.btChart) && JSON.stringify(d.btChart).length < 4000) o.btChart = d.btChart;
@@ -2002,7 +2003,7 @@ function acVar(id){ return 'var(--ac-' + (acctById(id) || accts()[0]).color + ')
 const adot = id => `<i class="ad" style="--ac:${acVar(id)}"></i>`;
 const settingsSig = () => JSON.stringify([S.settings.name, S.settings.modules, S.settings.accounts]);
 function modOn(k){ return k === 'kalender' || !(S.settings.modules && S.settings.modules[k] === false); }
-function pagesOn(){ return ['kalender', 'learnings', 'outlooks', 'backtest'].filter(modOn); }
+function pagesOn(){ return ['kalender', 'learnings', 'outlooks', 'backtest', 'prop'].filter(modOn); }
 function an(id){ return (acctById(id) || accts()[0]).name; }
 function applySkin(id, persist){
   id = skinId(id);
@@ -2019,7 +2020,7 @@ function applySettings(){
 }
 
 /* ---------- backtesting (its code and the chart load on the first visit) ---------- */
-const BT_V = '4';
+const BT_V = '5';
 const assetP = {};
 function loadAsset(src){
   if (assetP[src]) return assetP[src];
@@ -2037,12 +2038,15 @@ const btCtx = () => ({
   Store: {save: (k, o) => Store.save(k, o), remove: (k, id) => Store.remove(k, id)},
   chartLib: () => window.LightweightCharts ? Promise.resolve() : loadAsset('/journal/vendor/lightweight-charts.js?v=5.3.0'),
   setWide: on => document.documentElement.classList.toggle('bt-wide', !!on),
+  // prop accounts (simulated futures and CFD accounts) belong to Pro
+  canProp: () => !propLocked(),
   chartStyle: () => S.settings.btChart || null,
   saveChartStyle: st => { S.settings = normSettings(Object.assign({}, S.settings, {btChart: st})); return Store.saveSettings(); }
 });
 // Backtesting belongs to the larger plan. In the smaller one the page says what it does and how to switch;
 // the module and the chart library are not loaded at all.
 const btLocked = () => !!(window.BlotterBackend && window.BlotterBackend.canBacktest === false);
+const propLocked = () => !!(window.BlotterBackend && window.BlotterBackend.canProp === false);
 function btLockFig(){
   const C = [50, 47, 49, 44, 41, 43, 39, 36, 38, 35, 33, 36, 34, 31, 33, 35, 38, 37, 41, 44, 42, 47, 51, 49, 54, 52, 56, 58];
   const W = [1.6, 2.4, 1.1, 2.8, 1.9, 1.3, 2.2];
@@ -2079,12 +2083,54 @@ function btLockHtml(){
           <li>Win-Rate, Profit Factor und Equity-Kurve pro Session</li>
           <li>Sechs Märkte mit deinen eigenen Kursdaten, privat in deinem Konto</li>
         </ul>
-        <div class="lock-act"><a class="btn primary" href="/abo?plan=backtest">Auf Journal + Backtesting wechseln</a><small>14,99 € im Monat. Heute zahlst du nur die Differenz für die restlichen Tage.</small></div>
+        <div class="lock-act"><a class="btn primary" href="/abo?plan=backtest">Auf Journal + Backtesting wechseln</a><small>14,99 € im Monat. Heute zahlst du nur die Differenz für die restlichen Tage. Mit Prop-Konten: <a href="/abo?plan=pro">Pro für 22,99 €</a>.</small></div>
       </div>
       <figure class="lock-fig">${btLockFig()}</figure>
     </section>
   </div>`;
 }
+// prop accounts belong to Pro; the smaller plans see what they are and how to switch
+function propLockHtml(){
+  const back = !btLocked();
+  const m = (l, v, w, c) => `<div class="pl-m"><span>${l}<b>${v}</b></span><i style="--w:${w}%;--c:${c}"></i></div>`;
+  return `<div class="bt-lock">
+    <div class="page-head"><div class="grow"><h1>Prop-Konten</h1><p>Backteste wie auf einem echten Konto, mit Lots, Kontrakten, Dollar und den Regeln der Prop-Firmen.</p></div></div>
+    <section class="lock-card" aria-labelledby="plock-h">
+      <div class="lock-txt">
+        <h2 id="plock-h">Im Abo Pro</h2>
+        <p>${back ? 'Du hast Journal + Backtesting. Mit Pro tradest du deine Backtests zusätzlich auf simulierten Konten:' : 'Dein Abo ist das Journal. Mit Pro bekommst du das Backtesting und dazu simulierte Konten:'}</p>
+        <ul class="lock-pts">
+          <li>Futures-Konten mit 25K, 50K, 100K oder 150K, in ganzen Kontrakten wie bei Tradesea</li>
+          <li>CFD-Konten mit 10K, 25K, 50K oder 100K, in Lots ab 0,01 wie in MetaTrader 5</li>
+          <li>Bid und Ask, Spread, Kommission und Margin, jeder Trade in Dollar</li>
+          <li>Gewinnziel, Tagesverlust und Max. Verlust wie bei Lucid und FTMO, statisch oder trailing</li>
+          <li>Teilschließen, Größe nach Risiko und eine Anleitung direkt auf der Seite</li>
+        </ul>
+        <div class="lock-act"><a class="btn primary" href="/abo?plan=pro">Auf Pro wechseln</a><small>22,99 € im Monat. Heute zahlst du nur die Differenz für die restlichen Tage.</small></div>
+      </div>
+      <figure class="lock-fig pl-fig" aria-label="Beispiel: ein Futures-Konto mit 50.000 $, Gewinnziel und Limits">
+        <div class="pl-top"><span class="pl-tag">Futures</span><b>50K</b><span class="pl-st">Aktiv</span></div>
+        <div class="pl-bal"><b>51.240,00 $</b><span>+1.240,00 $</span></div>
+        ${m('Gewinnziel', '+1.240 $ von 3.000 $', 41, 'var(--up)')}
+        ${m('Tagesverlust', '−150 $ von 1.200 $', 12.5, 'var(--down)')}
+        ${m('Max. Verlust', 'Grenze 49.240 $', 0, 'var(--down)')}
+        <div class="pl-oc" aria-hidden="true"><span class="s"><small>SELL</small>21.034,25</span><em>2 MNQ</em><span class="b"><small>BUY</small>21.034,50</span></div>
+      </figure>
+    </section>
+  </div>`;
+}
+Views.prop = {
+  prep(){ return window.BlotterBT || propLocked() ? Promise.resolve() : Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)]); },
+  mount(el){
+    if (propLocked()) { el.innerHTML = propLockHtml(); return; }
+    el.innerHTML = '<div id="pa-root" class="bt-root"><div class="page-head"><div class="grow"><h1>Prop-Konten</h1><p>Wird geladen…</p></div></div></div>';
+    const root = $('#pa-root', el);
+    Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)])
+      .then(() => { if (S.view === 'prop' && root.isConnected) window.BlotterBT.mountProp(root, btCtx()); })
+      .catch(() => { if (root.isConnected) root.innerHTML = '<div class="page-head"><div class="grow"><h1>Prop-Konten</h1><p>Die Seite konnte nicht geladen werden. Prüfe deine Verbindung und lade die Seite neu.</p></div></div>'; });
+  },
+  update(){ if (!propLocked() && window.BlotterBT && window.BlotterBT.updateProp && $('#pa-root')) window.BlotterBT.updateProp(); }
+};
 /* ---------- help & support (added for the web app by scripts/extract-journal.py) ---------- */
 // Answers to the common questions, searchable and by topic, and a support request that goes out by e-mail.
 const HELP_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
@@ -2093,6 +2139,7 @@ const HELP_CATS = [
   ['set', 'Einstellungen'],
   ['pages', 'Learnings & Outlooks'],
   ['bt', 'Backtesting'],
+  ['prop', 'Prop-Konten'],
   ['abo', 'Abo & Zahlung'],
   ['data', 'Daten & Sicherheit'],
 ];
@@ -2103,16 +2150,19 @@ const HELP_FAQ = [
   ['start', 'Gibt es Tastenkürzel?', 'Ja, am Computer: N trägt etwas Neues ein, ← und → wechseln den Monat, T springt zu heute, die Zahlen öffnen deine Seiten in ihrer Reihenfolge und ? öffnet diese Hilfe.'],
   ['start', 'Kann ich die Einführung noch einmal sehen?', 'Ja. In den Einstellungen startest du unter „Hilfe“ die Tour neu. Sie zeigt dir in einer Minute alle Bereiche.'],
   ['set', 'Wie lege ich weitere Konten an?', 'In den Einstellungen unter „Konten“ mit „Konto hinzufügen“, bis zu 10 Stück, jedes mit eigenem Namen und eigener Farbe. Im Kalender filterst du dann nach einem Konto.'],
-  ['set', 'Kann ich Seiten ausblenden?', 'Ja. Unter Einstellungen → „Seiten“ schaltest du Learnings, Outlooks und Backtesting ein oder aus. Was du dort schon eingetragen hast, bleibt gespeichert.'],
+  ['set', 'Kann ich Seiten ausblenden?', 'Ja. Unter Einstellungen → „Seiten“ schaltest du Learnings, Outlooks, Backtesting und Prop-Konten ein oder aus. Was du dort schon eingetragen hast, bleibt gespeichert.'],
   ['set', 'Wie ändere ich Farben und meinen Namen?', 'In den Einstellungen wählst du eines von 12 Farbschemen, dunkel oder hell, und änderst den Namen, mit dem Blotter dich begrüßt.'],
   ['pages', 'Wofür sind Outlooks?', 'Du planst vor der Session: HTF und LTF jeweils bullish oder bearish, dazu dein Szenario. Danach markierst du, ob es eingetreten ist, und siehst deine Trefferquote.'],
   ['pages', 'Wie finde ich alte Learnings wieder?', 'Über die Suche oben auf der Seite Learnings oder über die Kategorien darunter. Die Kategorie vergibst du beim Eintragen.'],
-  ['bt', 'Warum ist das Backtesting bei mir gesperrt?', 'Das Backtesting gehört zum Abo „Journal + Backtesting“ für 14,99 € im Monat. In den Einstellungen wechselst du mit „Backtesting dazunehmen“, danach ist es sofort frei. Im kostenlosen Test kostet der Wechsel nichts.'],
+  ['bt', 'Warum ist das Backtesting bei mir gesperrt?', 'Das Backtesting gehört zu den Abos „Journal + Backtesting“ für 14,99 € und „Pro“ für 22,99 € im Monat. In den Einstellungen wechselst du mit „Backtesting dazunehmen“, danach ist es sofort frei. Im kostenlosen Test kostet der Wechsel nichts.'],
   ['bt', 'Woher bekomme ich Kursdaten?', 'Du lädst 1-Minuten-Daten einmal selbst herunter, zum Beispiel kostenlos bei HistData, und importierst sie auf der Backtesting-Seite. Dort steht eine Schritt-für-Schritt-Anleitung. Exporte aus MetaTrader und von Dukascopy gehen auch. Es gibt Nasdaq 100, S&P 500, DAX 40, Gold, EUR/USD und GBP/USD.'],
   ['bt', 'Kann ich im Backtesting-Chart zeichnen?', 'Ja. Links neben dem Chart findest du die Werkzeuge: Trendlinien, horizontale und vertikale Linien, Kanäle, Fibonacci, Rechtecke, Text, Pfeile, Long- und Short-Position und mehr. Ein Klick auf eine Zeichnung zeigt oben Farbe, Stärke und Stil. Die Zeichnungen gehören zur Session und bleiben auf jedem Zeitrahmen an ihrer Stelle. Mit ' + (HELP_MAC ? '⌘Z' : 'Strg+Z') + ' machst du einen Schritt rückgängig.'],
   ['bt', 'Wie ändere ich Kerzenfarben und Hintergrund?', 'Über das Zahnrad oben rechts im Backtesting öffnest du die Chart-Einstellungen: Chart-Typ (auch Heikin Ashi, Balken, Linie), Farben für Körper, Rahmen und Docht, Hintergrund, Gitter, Fadenkreuz und Preisskala. Die Einstellungen gelten für alle deine Sessions.'],
+  ['prop', 'Was sind Prop-Konten?', 'Simulierte Konten fürs Backtesting, im Abo Pro für 22,99 € im Monat. Du wählst ein Futures-Konto (25K bis 150K) oder ein CFD-Konto (10K bis 100K) und tradest deine Session darauf: mit Lots oder Kontrakten, Spread und Kommission, Kontostand in Dollar und den Regeln einer Prop-Firma. Eine Anleitung steht direkt auf der Seite Prop-Konten.'],
+  ['prop', 'Wie wähle ich die Positionsgröße?', 'Bei CFD-Konten in Lots ab 0,01, wie in MetaTrader 5. Bei Futures in ganzen Kontrakten, als Mini oder Micro (ein Micro ist ein Zehntel). Mit „Größe nach Risiko“ trägst du ein, wie viel du riskieren willst, in Prozent oder Dollar, und Blotter rechnet aus deinem Stop die passende Größe aus, Kommission eingerechnet.'],
+  ['prop', 'Was passiert, wenn ich ein Limit erreiche?', 'Erreicht deine Equity das Tagesverlust-Limit oder den maximalen Verlust, schließt Blotter die Position genau dort, wie es die Firma tun würde. Bei CFD-Konten ist das Konto dann verloren, bei Futures-Konten pausiert es bis zum nächsten Handelstag. Unter Prop-Konten setzt du ein Konto jederzeit zurück und startest neu.'],
   ['abo', 'Wie funktioniert der kostenlose Test?', 'Neue Kunden testen 3 Tage kostenlos. Die Zahlungsmethode hinterlegst du bei Stripe, abgebucht wird erst, wenn der Test endet. Kündigst du vorher, zahlst du nichts. Den Test gibt es einmal pro Konto.'],
-  ['abo', 'Wie wechsle ich mein Abo?', 'In den Einstellungen unter „Konto & Abo“. Beim Wechsel zu Journal + Backtesting zahlst du nur die Differenz für die restlichen Tage des Monats. Wechselst du zurück, wird der nicht genutzte Teil mit der nächsten Rechnung verrechnet. Deine Backtests bleiben gespeichert.'],
+  ['abo', 'Wie wechsle ich mein Abo?', 'In den Einstellungen unter „Konto & Abo“. Es gibt Journal (7,99 €), Journal + Backtesting (14,99 €) und Pro mit Prop-Konten (22,99 €). Beim Wechsel zu einem größeren Abo zahlst du nur die Differenz für die restlichen Tage des Monats. Wechselst du zurück, wird der nicht genutzte Teil mit der nächsten Rechnung verrechnet. Deine Backtests und Konten bleiben gespeichert.'],
   ['abo', 'Wie kündige ich, und wo finde ich meine Rechnungen?', 'In den Einstellungen öffnet „Abo verwalten oder kündigen“ das Kundenportal von Stripe. Dort kündigst du, änderst deine Zahlungsmethode und lädst deine Rechnungen herunter. Nach der Kündigung läuft das Abo bis zum Ende des bezahlten Monats.'],
   ['data', 'Wer sieht meine Einträge?', 'Nur du. Jedes Konto hat einen eigenen, getrennten Datenbereich, und Screenshots liegen in einem privaten Speicher.'],
   ['data', 'Was bedeutet der Punkt oben rechts?', 'Grün heißt: Alles ist in deinem Konto gespeichert und auf all deinen Geräten gleich. Steht dort „Nur dieser Browser“, ist die Verbindung gerade unterbrochen, und neue Einträge liegen vorerst nur in diesem Browser. Lade die Seite neu, sobald du wieder online bist. Bleibt die Meldung, schreib uns.'],
@@ -2282,13 +2332,15 @@ const MI = {
   kalender: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   learnings: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>',
   outlooks: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>',
-  backtest: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4v16M12 8v10M18 3v12"/><rect x="4" y="8" width="4" height="7" rx="1"/><rect x="10" y="10" width="4" height="5" rx="1"/><rect x="16" y="5" width="4" height="6" rx="1"/></svg>'
+  backtest: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4v16M12 8v10M18 3v12"/><rect x="4" y="8" width="4" height="7" rx="1"/><rect x="10" y="10" width="4" height="5" rx="1"/><rect x="16" y="5" width="4" height="6" rx="1"/></svg>',
+  prop: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18M7 15h3M14 15h3"/></svg>'
 };
 const MODS = [
   {k: 'kalender', name: 'Kalender', desc: 'Alle Trades im Monatsüberblick mit TP, BE und SL.', locked: true},
   {k: 'learnings', name: 'Learnings', desc: 'Halte fest, was du aus Trades lernst, mit Text und Screenshots.'},
   {k: 'outlooks', name: 'Outlooks', desc: 'Plane deine Markterwartung vorab und bewerte sie danach.'},
-  {k: 'backtest', name: 'Backtesting', desc: 'Spiel den Markt Kerze für Kerze nach und teste dein Setup mit eigenen Kursdaten.', lockDesc: 'Spiel den Markt Kerze für Kerze nach. Enthalten im Abo Journal + Backtesting.'}
+  {k: 'backtest', name: 'Backtesting', desc: 'Spiel den Markt Kerze für Kerze nach und teste dein Setup mit eigenen Kursdaten.', lockDesc: 'Spiel den Markt Kerze für Kerze nach. Enthalten im Abo Journal + Backtesting.'},
+  {k: 'prop', name: 'Prop-Konten', desc: 'Backteste auf Futures- und CFD-Konten mit Lots, Kontrakten und Prop-Regeln.', lockDesc: 'Backteste auf Futures- und CFD-Konten. Enthalten im Abo Pro.', pro: true}
 ];
 function skinPreview(id){
   const C = [[26, 2], [32, 6], [22, 12, 1], [38, 10], [28, 18, 1], [44, 16], [34, 24, 1], [50, 22]];
@@ -2300,7 +2352,7 @@ function skinGrid(sel){
 function modGrid(mods){
   return `<div class="mod-grid">${MODS.map(m => m.locked
     ? `<div class="mod-card locked" aria-checked="true"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.desc}</small><span class="tg">Immer dabei<span class="tgl"></span></span></div>`
-    : `<button type="button" class="mod-card" role="switch" aria-checked="${mods[m.k] !== false}" data-mod="${m.k}"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.lockDesc && btLocked() ? m.lockDesc : m.desc}</small><span class="tg">Anzeigen<span class="tgl"></span></span></button>`).join('')}</div>`;
+    : `<button type="button" class="mod-card" role="switch" aria-checked="${mods[m.k] !== false}" data-mod="${m.k}"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.lockDesc && (m.pro ? propLocked() : btLocked()) ? m.lockDesc : m.desc}</small><span class="tg">Anzeigen<span class="tgl"></span></span></button>`).join('')}</div>`;
 }
 function acctEditor(list, p, fresh){
   return `<div class="acct-ed" data-acct-ed="${p}">
@@ -2483,13 +2535,13 @@ const Tour = {
     }, delay == null ? 1400 : delay);
   },
   build(){
-    const L = modOn('learnings'), O = modOn('outlooks'), B = modOn('backtest');
+    const L = modOn('learnings'), O = modOn('outlooks'), B = modOn('backtest'), PR = modOn('prop');
     const touch = matchMedia('(hover: none)').matches;
     const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
     const wide = matchMedia('(min-width: 761px) and (hover: hover)').matches;
     const phone = matchMedia('(max-width: 760px)').matches;
     const nm = S.settings.name;
-    const pages = ['Kalender'].concat(L ? ['Learnings'] : [], O ? ['Outlooks'] : [], B ? ['Backtesting'] : []);
+    const pages = ['Kalender'].concat(L ? ['Learnings'] : [], O ? ['Outlooks'] : [], B ? ['Backtesting'] : [], PR ? ['Prop-Konten'] : []);
     const list = pages.length > 2 ? pages.slice(0, -1).join(', ') + ' und ' + pages[pages.length - 1] : pages.join(' und ');
     const shots = touch ? 'Screenshots wählst du direkt aus deinen Fotos.' : 'Screenshots ziehst du einfach ins Formular oder fügst sie mit ' + (mac ? '⌘V' : 'Strg+V') + ' ein.';
     const keys = ['N trägt etwas Neues ein', '← und → wechseln den Monat', 'T springt zu heute'].concat(pages.length > 1 ? [pages.map((p, k) => k + 1).join(', ') + ' öffnen die Seiten'] : []);
@@ -2661,7 +2713,7 @@ function openSettings(){
       <section class="set-sec"><h3>Farbschema</h3>${skinGrid(draft.theme)}</section>
       <section class="set-sec"><h3>Seiten</h3>${modGrid(draft.modules)}</section>
       <section class="set-sec"><h3>Konten</h3>${acctEditor(draft.accounts, 'set')}</section>
-      ${window.BlotterBackend ? `<section class="set-sec"><h3>${window.BlotterBackend.friend ? 'Konto' : 'Konto &amp; Abo'}</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p>${window.BlotterBackend.friend ? '<p class="acct-mail acct-friend">Freundeszugang: Blotter ist für dich kostenlos, ohne Abo, Backtesting inklusive.</p>' : `<p class="acct-mail acct-plan">Dein Abo: <b>${window.BlotterBackend.plan === 'backtest' ? 'Journal + Backtesting' : 'Journal'}</b> (${window.BlotterBackend.plan === 'backtest' ? '14,99' : '7,99'} € im Monat)</p>` + (window.BlotterBackend.trialUntil ? '<p class="acct-mail acct-trial">' + (window.BlotterBackend.trialCanceled ? 'Gekündigt. Dein kostenloser Test endet am ' + esc(window.BlotterBackend.trialUntil) + ', es wird nichts abgebucht.' : 'Kostenloser Test bis ' + esc(window.BlotterBackend.trialUntil) + '. Danach beginnt das Abo, außer du kündigst vorher.') + '</p>' : '')}<div class="acct-btns">${window.BlotterBackend.friend ? '' : `<a class="btn" href="/abo${window.BlotterBackend.plan === 'backtest' ? '' : '?plan=backtest'}">${window.BlotterBackend.plan === 'backtest' ? 'Abo wechseln' : 'Backtesting dazunehmen'}</a><button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button>`}<button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}
+      ${window.BlotterBackend ? `<section class="set-sec"><h3>${window.BlotterBackend.friend ? 'Konto' : 'Konto &amp; Abo'}</h3><p class="acct-mail">Angemeldet als <b>${esc(window.BlotterBackend.email || '')}</b></p>${window.BlotterBackend.friend ? '<p class="acct-mail acct-friend">Freundeszugang: Blotter ist für dich kostenlos, ohne Abo, Backtesting und Prop-Konten inklusive.</p>' : `<p class="acct-mail acct-plan">Dein Abo: <b>${window.BlotterBackend.plan === 'pro' ? 'Pro' : window.BlotterBackend.plan === 'backtest' ? 'Journal + Backtesting' : 'Journal'}</b> (${window.BlotterBackend.plan === 'pro' ? '22,99' : window.BlotterBackend.plan === 'backtest' ? '14,99' : '7,99'} € im Monat)</p>` + (window.BlotterBackend.trialUntil ? '<p class="acct-mail acct-trial">' + (window.BlotterBackend.trialCanceled ? 'Gekündigt. Dein kostenloser Test endet am ' + esc(window.BlotterBackend.trialUntil) + ', es wird nichts abgebucht.' : 'Kostenloser Test bis ' + esc(window.BlotterBackend.trialUntil) + '. Danach beginnt das Abo, außer du kündigst vorher.') + '</p>' : '')}<div class="acct-btns">${window.BlotterBackend.friend ? '' : `<a class="btn" href="/abo${window.BlotterBackend.plan === 'pro' ? '' : window.BlotterBackend.plan === 'backtest' ? '?plan=pro' : '?plan=backtest'}">${window.BlotterBackend.plan === 'pro' ? 'Abo wechseln' : window.BlotterBackend.plan === 'backtest' ? 'Prop-Konten dazunehmen' : 'Backtesting dazunehmen'}</a><button type="button" class="btn" data-action="acct-portal">Abo verwalten oder kündigen</button>`}<button type="button" class="btn ghost" data-action="acct-logout">Abmelden</button></div></section>` : ''}
       <section class="set-sec"><h3>Hilfe</h3><p class="set-help">Die kurze Tour zeigt dir noch einmal alle Bereiche deines Journals.</p><div class="acct-btns"><button type="button" class="btn sm" data-action="set-help">Hilfe &amp; Support</button><button type="button" class="btn sm" data-action="set-tour">Tour starten</button></div></section>
       <p class="form-err" id="form-err" role="alert" hidden></p>
     </div>
@@ -2719,10 +2771,10 @@ document.addEventListener('keydown', e => {
   const tg = e.target;
   if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) return;
   const k = (e.key || '').toLowerCase();
-  const pi = ['1', '2', '3', '4'].indexOf(k), pg = pagesOn();
+  const pi = ['1', '2', '3', '4', '5'].indexOf(k), pg = pagesOn();
   if (pi >= 0) { if (!pg[pi]) return; location.hash = pg[pi]; }
   else if (e.key === '?') location.hash = 'hilfe';
-  else if (k === 'n' && S.view !== 'backtest' && S.view !== 'hilfe') openForm(S.view === 'kalender' ? 'trades' : S.view, null, {});
+  else if (k === 'n' && S.view !== 'backtest' && S.view !== 'prop' && S.view !== 'hilfe') openForm(S.view === 'kalender' ? 'trades' : S.view, null, {});
   else if (S.view === 'kalender' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { S.month = new Date(S.month.getFullYear(), S.month.getMonth() + (e.key === 'ArrowLeft' ? -1 : 1), 1); schedule(); }
   else if (S.view === 'kalender' && k === 't') { const n = new Date(); S.month = new Date(n.getFullYear(), n.getMonth(), 1); schedule(); }
   else return;

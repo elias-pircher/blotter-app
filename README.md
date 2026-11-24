@@ -56,6 +56,7 @@ Jeder Kunde sieht nur seine eigenen Daten. Das erzwingt die Datenbank selbst (Ro
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` | **ja** |
 | `STRIPE_PRICE_ID` | `price_…` (Journal, 7,99 €) | nein |
 | `STRIPE_PRICE_ID_BACKTEST` | `price_…` (Journal + Backtesting, 14,99 €) | nein |
+| `STRIPE_PRICE_ID_PRO` | `price_…` (Pro mit Prop-Konten, 22,99 €) | nein |
 | `STRIPE_AUTOMATIC_TAX` | `false` (später `true` mit Stripe Tax) | nein |
 | `SUPPORT_EMAIL` | Postfach, an das Support-Anfragen gehen (Antworten gehen direkt an den Kunden). Ohne den Eintrag werden Anfragen nur in `support_tickets` gespeichert | nein |
 

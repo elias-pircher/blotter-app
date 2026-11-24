@@ -24,6 +24,7 @@ export function Nav({ loggedIn }) {
         <nav className="links glass" aria-label="Seiten">
           <a href="/#funktionen">Funktionen</a>
           <a href="/#backtesting">Backtesting</a>
+          <a href="/#prop">Prop-Konten</a>
           <a href="/#preis">Preis</a>
           <a href="/#fragen">Fragen</a>
         </nav>

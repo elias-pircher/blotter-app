@@ -460,6 +460,24 @@ button{cursor:pointer}
 .lock-fig .en{stroke:var(--gold);stroke-width:1.2;stroke-dasharray:3 3}
 .lock-fig .lb{font:600 10px var(--f-mono);fill:var(--muted)}
 .lock-fig .lb.tp{fill:var(--up)}.lock-fig .lb.sl{fill:var(--down)}.lock-fig .rr{font-weight:500;fill:var(--up)}
+/* prop accounts in the smaller plans: a small account card as the picture */
+.pl-fig{display:flex;flex-direction:column;gap:12px;padding:18px}
+.pl-top{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.pl-tag{padding:1px 8px;border-radius:6px;font-weight:600;color:#5eead4;background:rgba(45,212,191,.14);box-shadow:inset 0 0 0 1px rgba(45,212,191,.35)}
+.pl-st{margin-left:auto;padding:2px 9px;border-radius:999px;font-weight:600;color:var(--up);background:rgba(var(--up-rgb),.12)}
+.pl-bal{display:flex;align-items:baseline;gap:10px;font-variant-numeric:tabular-nums}
+.pl-bal b{font-family:var(--f-display);font-stretch:108%;font-weight:800;font-size:26px}
+.pl-bal span{font:500 13px var(--f-mono);color:var(--up)}
+.pl-m{display:flex;flex-direction:column;gap:5px}
+.pl-m>span{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.pl-m>span b{font:500 12px var(--f-mono);color:var(--ink-2)}
+.pl-m i{display:block;height:6px;border-radius:3px;background:rgba(var(--fg-rgb),.08);overflow:hidden}
+.pl-m i::after{content:"";display:block;height:100%;width:var(--w);border-radius:3px;background:var(--c)}
+.pl-oc{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center;margin-top:4px}
+.pl-oc span{display:flex;flex-direction:column;align-items:center;padding:8px 4px;border-radius:10px;color:#fff;font:500 13px/1.1 var(--f-mono)}
+.pl-oc span small{font:700 10px var(--f-body);letter-spacing:.08em;opacity:.9}
+.pl-oc .s{background:linear-gradient(180deg,#f2545b,#c93b43)} .pl-oc .b{background:linear-gradient(180deg,#3b7bf6,#2457c9)}
+.pl-oc em{font-style:normal;font:600 13px var(--f-mono);padding:0 6px;color:var(--ink)}
 @media (max-width:760px){
   .lock-card{grid-template-columns:minmax(0,1fr);gap:20px;padding:18px}
   .lock-fig{order:-1}
@@ -774,6 +792,11 @@ html.touring .rv-pop{animation:none!important}
   .stat:nth-child(n+4){grid-column:span 3}
   .d-pnl{font-size:13px}
   .hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+}
+/* five pages: below 1000px the tabs get a row of their own */
+@media (max-width:1000px){
+  .tabs{order:3;width:100%}
+  .tabs a{flex:1 1 auto;text-align:center}
 }
 @media (max-width:760px){
   .brand .sub{display:none}
@@ -1109,9 +1132,9 @@ html.vt #view{pointer-events:none}
 
 /* fourth tab: short label on narrow screens */
 .tabs .t-s{display:none}
-@media (max-width:520px){ .tabs .t-l{display:none} .tabs .t-s{display:inline} }
+@media (max-width:520px){ .tabs .t-l{display:none} .tabs .t-s{display:inline} .tabs a{flex:1 1 auto;padding:8px 5px;font-size:13.5px} }
 /* four tabs on the narrowest phones (320 px) */
-@media (max-width:380px){ .tabs a{padding:8px 4px;font-size:13px} }
+@media (max-width:380px){ .tabs a{padding:8px 3px;font-size:12.5px} }
 </style>
 <script>try{var k=localStorage.getItem("blotter.skin"),o={ocean:"slate",royal:"navy",copper:"mocha",arctic:"paper"};if(k&&/^[a-z]+$/.test(k))document.documentElement.setAttribute("data-skin",o[k]||k)}catch(e){}</script>
 
@@ -1146,6 +1169,7 @@ html.vt #view{pointer-events:none}
       <a href="#learnings" data-tab="learnings">Learnings</a>
       <a href="#outlooks" data-tab="outlooks">Outlooks</a>
       <a href="#backtest" data-tab="backtest"><span class="t-l">Backtesting</span><span class="t-s">Backtest</span></a>
+      <a href="#prop" data-tab="prop"><span class="t-l">Prop-Konten</span><span class="t-s">Prop</span></a>
     </nav>
     <div class="top-right">
       <span class="status" id="status"><i></i><span id="status-t">Verbinde…</span></span>
@@ -1280,13 +1304,14 @@ const S = {
   month: new Date(now0.getFullYear(), now0.getMonth(), 1),
   acct: lsGet('blotter.acct') || 'all',
   lastAccount: lsGet('blotter.lastAccount') || 'main',
-  trades: [], learnings: [], outlooks: [], backtests: [],
-  settings: {theme: 'navy', name: '', modules: {learnings: true, outlooks: true, backtest: true}, accounts: [{id: 'main', name: 'Main-Konto', color: 'gold'}, {id: 'neben', name: 'Neben-Konto', color: 'silver'}], setupDone: false},
+  trades: [], learnings: [], outlooks: [], backtests: [], accounts: [],
+  settings: {theme: 'navy', name: '', modules: {learnings: true, outlooks: true, backtest: true, prop: true}, accounts: [{id: 'main', name: 'Main-Konto', color: 'gold'}, {id: 'neben', name: 'Neben-Konto', color: 'silver'}], setupDone: false},
   settingsLoaded: false, mountSig: '',
-  mode: 'connecting', loaded: {trades: false, learnings: false, outlooks: false, backtests: false},
+  mode: 'connecting', loaded: {trades: false, learnings: false, outlooks: false, backtests: false, accounts: false},
   lq: '', lcat: '', oq: '', obias: 'all'
 };
-const KINDS = ['trades', 'learnings', 'outlooks', 'backtests'];
+// 'accounts' are the simulated prop accounts of the backtesting (Pro)
+const KINDS = ['trades', 'learnings', 'outlooks', 'backtests', 'accounts'];
 
 /* ---------- storage ---------- */
 const LS_DATA = 'blotter.v1.data', LS_IMG = 'blotter.v1.img.';
@@ -1375,7 +1400,7 @@ const Store = {
     schedule();
   },
   persistLocal(){
-    const ok = lsSet(LS_DATA, JSON.stringify({trades: S.trades, learnings: S.learnings, outlooks: S.outlooks, backtests: S.backtests, settings: S.settings}));
+    const ok = lsSet(LS_DATA, JSON.stringify({trades: S.trades, learnings: S.learnings, outlooks: S.outlooks, backtests: S.backtests, accounts: S.accounts, settings: S.settings}));
     if (!ok) throw {code: 'local_full'};
   },
   async save(kind, obj){
@@ -2306,7 +2331,7 @@ let rq = 0;
 function schedule(){ if (rq) return; rq = requestAnimationFrame(() => { rq = 0; render(); }); }
 function render(){
   const el = $('#view');
-  if (S.mounted !== S.view) { if (window.BlotterBT && S.mounted === 'backtest') window.BlotterBT.unmount(); S.mountN++; Views[S.view].mount(el); S.mounted = S.view; S.mountSig = settingsSig(); splitTitle(el); onScroll(); }
+  if (S.mounted !== S.view) { if (window.BlotterBT && S.mounted === 'backtest') window.BlotterBT.unmount(); if (window.BlotterBT && S.mounted === 'prop' && window.BlotterBT.unmountProp) window.BlotterBT.unmountProp(); S.mountN++; Views[S.view].mount(el); S.mounted = S.view; S.mountSig = settingsSig(); splitTitle(el); onScroll(); }
   Views[S.view].update();
   Reveal.scan(el);
   updateChrome();
@@ -3169,10 +3194,10 @@ const SKIN_OLD = {ocean: 'slate', royal: 'navy', copper: 'mocha', arctic: 'paper
 const skinId = id => SKIN_OLD[id] || id;
 function normSettings(d){
   d = d || {};
-  const o = {theme: 'navy', name: '', modules: {learnings: true, outlooks: true, backtest: true}, accounts: [], setupDone: !!d.setupDone, tourDone: !!d.tourDone};
+  const o = {theme: 'navy', name: '', modules: {learnings: true, outlooks: true, backtest: true, prop: true}, accounts: [], setupDone: !!d.setupDone, tourDone: !!d.tourDone};
   if (SKIN_IDS.includes(skinId(d.theme))) o.theme = skinId(d.theme);
   if (typeof d.name === 'string') o.name = d.name.trim().slice(0, 30);
-  if (d.modules && typeof d.modules === 'object') { o.modules.learnings = d.modules.learnings !== false; o.modules.outlooks = d.modules.outlooks !== false; o.modules.backtest = d.modules.backtest !== false; }
+  if (d.modules && typeof d.modules === 'object') { o.modules.learnings = d.modules.learnings !== false; o.modules.outlooks = d.modules.outlooks !== false; o.modules.backtest = d.modules.backtest !== false; o.modules.prop = d.modules.prop !== false; }
   o.accounts = normAccounts(d);
   // the backtesting chart's look (candle colours, background, grid …), kept as the chart module wrote it
   if (d.btChart && typeof d.btChart === 'object' && !Array.isArray(d.btChart) && JSON.stringify(d.btChart).length < 4000) o.btChart = d.btChart;
@@ -3213,7 +3238,7 @@ function acVar(id){ return 'var(--ac-' + (acctById(id) || accts()[0]).color + ')
 const adot = id => `<i class="ad" style="--ac:${acVar(id)}"></i>`;
 const settingsSig = () => JSON.stringify([S.settings.name, S.settings.modules, S.settings.accounts]);
 function modOn(k){ return k === 'kalender' || !(S.settings.modules && S.settings.modules[k] === false); }
-function pagesOn(){ return ['kalender', 'learnings', 'outlooks', 'backtest'].filter(modOn); }
+function pagesOn(){ return ['kalender', 'learnings', 'outlooks', 'backtest', 'prop'].filter(modOn); }
 function an(id){ return (acctById(id) || accts()[0]).name; }
 function applySkin(id, persist){
   id = skinId(id);
@@ -3230,7 +3255,7 @@ function applySettings(){
 }
 
 /* ---------- backtesting (its code and the chart load on the first visit) ---------- */
-const BT_V = '4';
+const BT_V = '5';
 const assetP = {};
 function loadAsset(src){
   if (assetP[src]) return assetP[src];
@@ -3248,12 +3273,15 @@ const btCtx = () => ({
   Store: {save: (k, o) => Store.save(k, o), remove: (k, id) => Store.remove(k, id)},
   chartLib: () => window.LightweightCharts ? Promise.resolve() : loadAsset('/journal/vendor/lightweight-charts.js?v=5.3.0'),
   setWide: on => document.documentElement.classList.toggle('bt-wide', !!on),
+  // prop accounts (simulated futures and CFD accounts) belong to Pro
+  canProp: () => !propLocked(),
   chartStyle: () => S.settings.btChart || null,
   saveChartStyle: st => { S.settings = normSettings(Object.assign({}, S.settings, {btChart: st})); return Store.saveSettings(); }
 });
 // Backtesting belongs to the larger plan. In the smaller one the page says what it does and how to switch;
 // the module and the chart library are not loaded at all.
 const btLocked = () => !!(window.BlotterBackend && window.BlotterBackend.canBacktest === false);
+const propLocked = () => !!(window.BlotterBackend && window.BlotterBackend.canProp === false);
 function btLockFig(){
   const C = [50, 47, 49, 44, 41, 43, 39, 36, 38, 35, 33, 36, 34, 31, 33, 35, 38, 37, 41, 44, 42, 47, 51, 49, 54, 52, 56, 58];
   const W = [1.6, 2.4, 1.1, 2.8, 1.9, 1.3, 2.2];
@@ -3290,12 +3318,54 @@ function btLockHtml(){
           <li>Win-Rate, Profit Factor und Equity-Kurve pro Session</li>
           <li>Sechs Märkte mit deinen eigenen Kursdaten, privat in deinem Konto</li>
         </ul>
-        <div class="lock-act"><a class="btn primary" href="/abo?plan=backtest">Auf Journal + Backtesting wechseln</a><small>14,99 € im Monat. Heute zahlst du nur die Differenz für die restlichen Tage.</small></div>
+        <div class="lock-act"><a class="btn primary" href="/abo?plan=backtest">Auf Journal + Backtesting wechseln</a><small>14,99 € im Monat. Heute zahlst du nur die Differenz für die restlichen Tage. Mit Prop-Konten: <a href="/abo?plan=pro">Pro für 22,99 €</a>.</small></div>
       </div>
       <figure class="lock-fig">${btLockFig()}</figure>
     </section>
   </div>`;
 }
+// prop accounts belong to Pro; the smaller plans see what they are and how to switch
+function propLockHtml(){
+  const back = !btLocked();
+  const m = (l, v, w, c) => `<div class="pl-m"><span>${l}<b>${v}</b></span><i style="--w:${w}%;--c:${c}"></i></div>`;
+  return `<div class="bt-lock">
+    <div class="page-head"><div class="grow"><h1>Prop-Konten</h1><p>Backteste wie auf einem echten Konto, mit Lots, Kontrakten, Dollar und den Regeln der Prop-Firmen.</p></div></div>
+    <section class="lock-card" aria-labelledby="plock-h">
+      <div class="lock-txt">
+        <h2 id="plock-h">Im Abo Pro</h2>
+        <p>${back ? 'Du hast Journal + Backtesting. Mit Pro tradest du deine Backtests zusätzlich auf simulierten Konten:' : 'Dein Abo ist das Journal. Mit Pro bekommst du das Backtesting und dazu simulierte Konten:'}</p>
+        <ul class="lock-pts">
+          <li>Futures-Konten mit 25K, 50K, 100K oder 150K, in ganzen Kontrakten wie bei Tradesea</li>
+          <li>CFD-Konten mit 10K, 25K, 50K oder 100K, in Lots ab 0,01 wie in MetaTrader 5</li>
+          <li>Bid und Ask, Spread, Kommission und Margin, jeder Trade in Dollar</li>
+          <li>Gewinnziel, Tagesverlust und Max. Verlust wie bei Lucid und FTMO, statisch oder trailing</li>
+          <li>Teilschließen, Größe nach Risiko und eine Anleitung direkt auf der Seite</li>
+        </ul>
+        <div class="lock-act"><a class="btn primary" href="/abo?plan=pro">Auf Pro wechseln</a><small>22,99 € im Monat. Heute zahlst du nur die Differenz für die restlichen Tage.</small></div>
+      </div>
+      <figure class="lock-fig pl-fig" aria-label="Beispiel: ein Futures-Konto mit 50.000 $, Gewinnziel und Limits">
+        <div class="pl-top"><span class="pl-tag">Futures</span><b>50K</b><span class="pl-st">Aktiv</span></div>
+        <div class="pl-bal"><b>51.240,00 $</b><span>+1.240,00 $</span></div>
+        ${m('Gewinnziel', '+1.240 $ von 3.000 $', 41, 'var(--up)')}
+        ${m('Tagesverlust', '−150 $ von 1.200 $', 12.5, 'var(--down)')}
+        ${m('Max. Verlust', 'Grenze 49.240 $', 0, 'var(--down)')}
+        <div class="pl-oc" aria-hidden="true"><span class="s"><small>SELL</small>21.034,25</span><em>2 MNQ</em><span class="b"><small>BUY</small>21.034,50</span></div>
+      </figure>
+    </section>
+  </div>`;
+}
+Views.prop = {
+  prep(){ return window.BlotterBT || propLocked() ? Promise.resolve() : Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)]); },
+  mount(el){
+    if (propLocked()) { el.innerHTML = propLockHtml(); return; }
+    el.innerHTML = '<div id="pa-root" class="bt-root"><div class="page-head"><div class="grow"><h1>Prop-Konten</h1><p>Wird geladen…</p></div></div></div>';
+    const root = $('#pa-root', el);
+    Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)])
+      .then(() => { if (S.view === 'prop' && root.isConnected) window.BlotterBT.mountProp(root, btCtx()); })
+      .catch(() => { if (root.isConnected) root.innerHTML = '<div class="page-head"><div class="grow"><h1>Prop-Konten</h1><p>Die Seite konnte nicht geladen werden. Prüfe deine Verbindung und lade die Seite neu.</p></div></div>'; });
+  },
+  update(){ if (!propLocked() && window.BlotterBT && window.BlotterBT.updateProp && $('#pa-root')) window.BlotterBT.updateProp(); }
+};
 Views.backtest = {
   prep(){ return window.BlotterBT || btLocked() ? Promise.resolve() : Promise.all([loadAsset('/journal/backtest.css?v=' + BT_V), loadAsset('/journal/backtest.js?v=' + BT_V)]); },
   mount(el){
@@ -3313,13 +3383,15 @@ const MI = {
   kalender: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   learnings: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>',
   outlooks: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>',
-  backtest: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4v16M12 8v10M18 3v12"/><rect x="4" y="8" width="4" height="7" rx="1"/><rect x="10" y="10" width="4" height="5" rx="1"/><rect x="16" y="5" width="4" height="6" rx="1"/></svg>'
+  backtest: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4v16M12 8v10M18 3v12"/><rect x="4" y="8" width="4" height="7" rx="1"/><rect x="10" y="10" width="4" height="5" rx="1"/><rect x="16" y="5" width="4" height="6" rx="1"/></svg>',
+  prop: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18M7 15h3M14 15h3"/></svg>'
 };
 const MODS = [
   {k: 'kalender', name: 'Kalender', desc: 'Alle Trades im Monatsüberblick mit TP, BE und SL.', locked: true},
   {k: 'learnings', name: 'Learnings', desc: 'Halte fest, was du aus Trades lernst, mit Text und Screenshots.'},
   {k: 'outlooks', name: 'Outlooks', desc: 'Plane deine Markterwartung vorab und bewerte sie danach.'},
-  {k: 'backtest', name: 'Backtesting', desc: 'Spiel den Markt Kerze für Kerze nach und teste dein Setup mit eigenen Kursdaten.', lockDesc: 'Spiel den Markt Kerze für Kerze nach. Enthalten im Abo Journal + Backtesting.'}
+  {k: 'backtest', name: 'Backtesting', desc: 'Spiel den Markt Kerze für Kerze nach und teste dein Setup mit eigenen Kursdaten.', lockDesc: 'Spiel den Markt Kerze für Kerze nach. Enthalten im Abo Journal + Backtesting.'},
+  {k: 'prop', name: 'Prop-Konten', desc: 'Backteste auf Futures- und CFD-Konten mit Lots, Kontrakten und Prop-Regeln.', lockDesc: 'Backteste auf Futures- und CFD-Konten. Enthalten im Abo Pro.', pro: true}
 ];
 function skinPreview(id){
   const C = [[26, 2], [32, 6], [22, 12, 1], [38, 10], [28, 18, 1], [44, 16], [34, 24, 1], [50, 22]];
@@ -3331,7 +3403,7 @@ function skinGrid(sel){
 function modGrid(mods){
   return `<div class="mod-grid">${MODS.map(m => m.locked
     ? `<div class="mod-card locked" aria-checked="true"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.desc}</small><span class="tg">Immer dabei<span class="tgl"></span></span></div>`
-    : `<button type="button" class="mod-card" role="switch" aria-checked="${mods[m.k] !== false}" data-mod="${m.k}"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.lockDesc && btLocked() ? m.lockDesc : m.desc}</small><span class="tg">Anzeigen<span class="tgl"></span></span></button>`).join('')}</div>`;
+    : `<button type="button" class="mod-card" role="switch" aria-checked="${mods[m.k] !== false}" data-mod="${m.k}"><span class="mi">${MI[m.k]}</span><b>${m.name}</b><small>${m.lockDesc && (m.pro ? propLocked() : btLocked()) ? m.lockDesc : m.desc}</small><span class="tg">Anzeigen<span class="tgl"></span></span></button>`).join('')}</div>`;
 }
 function acctEditor(list, p, fresh){
   return `<div class="acct-ed" data-acct-ed="${p}">
@@ -3514,13 +3586,13 @@ const Tour = {
     }, delay == null ? 1400 : delay);
   },
   build(){
-    const L = modOn('learnings'), O = modOn('outlooks'), B = modOn('backtest');
+    const L = modOn('learnings'), O = modOn('outlooks'), B = modOn('backtest'), PR = modOn('prop');
     const touch = matchMedia('(hover: none)').matches;
     const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
     const wide = matchMedia('(min-width: 761px) and (hover: hover)').matches;
     const phone = matchMedia('(max-width: 760px)').matches;
     const nm = S.settings.name;
-    const pages = ['Kalender'].concat(L ? ['Learnings'] : [], O ? ['Outlooks'] : [], B ? ['Backtesting'] : []);
+    const pages = ['Kalender'].concat(L ? ['Learnings'] : [], O ? ['Outlooks'] : [], B ? ['Backtesting'] : [], PR ? ['Prop-Konten'] : []);
     const list = pages.length > 2 ? pages.slice(0, -1).join(', ') + ' und ' + pages[pages.length - 1] : pages.join(' und ');
     const shots = touch ? 'Screenshots wählst du direkt aus deinen Fotos.' : 'Screenshots ziehst du einfach ins Formular oder fügst sie mit ' + (mac ? '⌘V' : 'Strg+V') + ' ein.';
     const keys = ['N trägt etwas Neues ein', '← und → wechseln den Monat', 'T springt zu heute'].concat(pages.length > 1 ? [pages.map((p, k) => k + 1).join(', ') + ' öffnen die Seiten'] : []);
@@ -3743,9 +3815,9 @@ document.addEventListener('keydown', e => {
   const tg = e.target;
   if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) return;
   const k = (e.key || '').toLowerCase();
-  const pi = ['1', '2', '3', '4'].indexOf(k), pg = pagesOn();
+  const pi = ['1', '2', '3', '4', '5'].indexOf(k), pg = pagesOn();
   if (pi >= 0) { if (!pg[pi]) return; location.hash = pg[pi]; }
-  else if (k === 'n' && S.view !== 'backtest') openForm(S.view === 'kalender' ? 'trades' : S.view, null, {});
+  else if (k === 'n' && S.view !== 'backtest' && S.view !== 'prop') openForm(S.view === 'kalender' ? 'trades' : S.view, null, {});
   else if (S.view === 'kalender' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { S.month = new Date(S.month.getFullYear(), S.month.getMonth() + (e.key === 'ArrowLeft' ? -1 : 1), 1); schedule(); }
   else if (S.view === 'kalender' && k === 't') { const n = new Date(); S.month = new Date(n.getFullYear(), n.getMonth(), 1); schedule(); }
   else return;

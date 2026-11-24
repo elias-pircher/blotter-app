@@ -28,7 +28,16 @@ const BT_POINTS = [
   ['Deine eigenen Kursdaten', 'Einmal kostenlos herunterladen und importieren. Die Anleitung ist dabei.'],
 ];
 
-// the two plans: the journal, and the journal with backtesting on top
+// what Pro adds: prop accounts for the backtests
+const PROP_POINTS = [
+  ['Futures wie bei Tradesea', '25K, 50K, 100K oder 150K. NQ, ES, Gold, Euro und Pfund in ganzen Kontrakten, als Mini oder Micro.', ICON(<><path d="M4 19V5M4 19h16" /><path d="M7 15l4-5 3 3 5-7" /></>, '#5EEAD4')],
+  ['CFDs wie in MetaTrader 5', '10K, 25K, 50K oder 100K. Lots ab 0,01, Bid und Ask, Spread, Kommission und Margin.', ICON(<><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M7 15V9M12 17V7M17 13v-3" /></>, '#A5B4FC')],
+  ['Die Regeln deiner Prop-Firma', 'Gewinnziel, Tagesverlust und maximaler Verlust, statisch oder trailing. Vorlagen wie bei Lucid und FTMO, frei anpassbar.', ICON(<><path d="M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7z" /><path d="M8.5 12l2.5 2.5 4.5-5" /></>, '#C4B5FD')],
+  ['Größe nach Risiko', 'Sag, wie viel du riskieren willst. Blotter rechnet Lots oder Kontrakte aus deinem Stop, Kommission eingerechnet.', ICON(<><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /><path d="M12 3v3M21 12h-3" /></>, '#F5F7FF')],
+];
+const METERS = [['Gewinnziel', '+1.240 $ von 3.000 $', 41, 'var(--up)'], ['Tagesverlust', '−150 $ von 1.200 $', 12.5, 'var(--down)'], ['Max. Verlust', 'Grenze 49.240 $', 0, 'var(--down)']];
+
+// the three plans: the journal, with backtesting, and Pro with prop accounts
 const TIERS = [
   {
     id: 'journal', name: 'Journal', amt: '7,99 €',
@@ -38,16 +47,22 @@ const TIERS = [
   {
     id: 'backtest', name: 'Journal + Backtesting', amt: '14,99 €',
     lead: 'Alles aus dem Journal, dazu der Markt zum Nachspielen.',
-    list: ['Das komplette Journal', 'Backtesting Kerze für Kerze, von 1 Minute bis Monthly', 'Sechs Märkte mit deinen eigenen Kursdaten', 'Entry, Stop und Ziel, jeder Trade in R', 'Statistik und Equity-Kurve pro Session'],
+    list: ['Das komplette Journal', 'Backtesting Kerze für Kerze, von 1 Minute bis Monthly', 'Sechs Märkte mit deinen eigenen Kursdaten', 'Zeichnen wie bei TradingView, jeder Trade in R', 'Statistik und Equity-Kurve pro Session'],
+  },
+  {
+    id: 'pro', name: 'Pro', amt: '22,99 €',
+    lead: 'Journal und Backtesting, dazu Prop-Konten für Futures und CFDs.',
+    list: ['Alles aus Journal + Backtesting', 'Futures-Konten von 25K bis 150K, in Kontrakten', 'CFD-Konten von 10K bis 100K, in Lots wie in MT5', 'Gewinnziel, Tagesverlust und Max. Verlust', 'Kontostand und Statistik in Dollar'],
   },
 ];
 
 const FAQ = [
   ['Wer sieht meine Trades?', 'Nur du. Jedes Konto hat einen eigenen, getrennten Datenbereich, und Screenshots liegen in einem privaten Speicher.'],
-  ['Geht es um meinen Kontostand?', 'Nein. Blotter hält fest, ob ein Trade im Take Profit, im Stop Loss oder auf Break Even endete. So misst du, wie gut du deinem System folgst, und nicht deine Tagesform.'],
+  ['Geht es um meinen Kontostand?', 'Im Journal nicht. Blotter hält fest, ob ein Trade im Take Profit, im Stop Loss oder auf Break Even endete. So misst du, wie gut du deinem System folgst, und nicht deine Tagesform. Nur auf den Prop-Konten im Backtesting rechnest du in Dollar, weil dort die Regeln der Prop-Firma zählen.'],
   ['Wie funktioniert der kostenlose Test?', `Du wählst ein Abo und hinterlegst bei Stripe eine Zahlungsmethode. Die ersten ${TRIAL_DAYS} Tage hast du vollen Zugang, und es wird nichts abgebucht. Danach läuft dein Abo zum Monatspreis weiter. Kündigst du vorher, zahlst du nichts. Den Test gibt es einmal pro Konto.`],
-  ['Welches Abo passt zu mir?', 'Wenn du deine Live-Trades festhalten und auswerten willst, reicht das Journal. Willst du dein Setup vorher auf vergangenen Kursen testen, nimm Journal + Backtesting. Alles andere ist in beiden Abos gleich.'],
-  ['Kann ich später wechseln?', 'Ja, jederzeit unter Einstellungen im Journal. Während des kostenlosen Tests kostet ein Wechsel nichts. Danach gilt: Beim Wechsel zu Journal + Backtesting zahlst du nur die Differenz für die restlichen Tage des Monats. Wechselst du zurück, wird der nicht genutzte Teil mit deiner nächsten Rechnung verrechnet, und deine Backtests bleiben gespeichert.'],
+  ['Welches Abo passt zu mir?', 'Wenn du deine Live-Trades festhalten und auswerten willst, reicht das Journal. Willst du dein Setup vorher auf vergangenen Kursen testen, nimm Journal + Backtesting. Tradest du bei einer Prop-Firma, nimm Pro: Dann backtestest du auf einem Konto mit deiner Kontogröße, deinen Lots oder Kontrakten und den Regeln der Firma. Das Journal ist in allen drei Abos gleich.'],
+  ['Was sind Prop-Konten?', 'Simulierte Konten fürs Backtesting, enthalten in Pro. Futures-Konten mit 25K, 50K, 100K oder 150K handeln ganze Kontrakte wie bei Tradesea, CFD-Konten mit 10K, 25K, 50K oder 100K handeln Lots ab 0,01 wie in MetaTrader 5. Blotter rechnet Spread, Kommission und Margin, prüft Gewinnziel, Tagesverlust und maximalen Verlust und schließt die Position am Limit, wie es die Firma tun würde. Es ist eine Simulation: Es werden keine echten Orders ausgeführt.'],
+  ['Kann ich später wechseln?', 'Ja, jederzeit unter Einstellungen im Journal. Während des kostenlosen Tests kostet ein Wechsel nichts. Danach gilt: Beim Wechsel zu einem größeren Abo zahlst du nur die Differenz für die restlichen Tage des Monats. Wechselst du zurück, wird der nicht genutzte Teil mit deiner nächsten Rechnung verrechnet, und deine Backtests und Konten bleiben gespeichert.'],
   ['Woher kommen die Kursdaten fürs Backtesting?', 'Du lädst 1-Minuten-Daten einmal selbst herunter, zum Beispiel kostenlos bei HistData, und importierst sie in Blotter. Eine Schritt-für-Schritt-Anleitung steht direkt auf der Backtesting-Seite. Danach liegen die Daten privat in deinem Konto.'],
   ['Brauche ich eine App?', 'Nein. Blotter läuft im Browser auf Mac, Windows, iPhone und Android. Deine Einträge sind auf allen Geräten gleich.'],
   ['Wie kündige ich?', 'Im Journal unter Einstellungen → „Abo verwalten oder kündigen“. Das Abo läuft dann bis zum Ende des bezahlten Monats. Kündigst du während des Tests, endet dein Zugang mit dem letzten Testtag und es wird nichts abgebucht.'],
@@ -87,7 +102,7 @@ export default async function Home() {
         {/* 1 · the claim, a phone with its numbers floating around it */}
         <section className="wrap hero" data-scene="hero">
           <h1><span className="in" style={{ '--t': '.05s' }}>Miss deine Disziplin.</span><span className="in g" style={{ '--t': '.18s' }}>Nicht deinen Kontostand.</span></h1>
-          <p className="lead in" style={{ '--t': '.32s' }}>Blotter ist das Trading Journal, das festhält, wie jeder Trade endet: Take Profit, Break Even oder Stop Loss. Mit Kalender, Screenshots, Learnings, Outlooks und Backtesting.</p>
+          <p className="lead in" style={{ '--t': '.32s' }}>Blotter ist das Trading Journal, das festhält, wie jeder Trade endet: Take Profit, Break Even oder Stop Loss. Mit Kalender, Screenshots, Learnings, Outlooks, Backtesting und Prop-Konten.</p>
           <div className="cta in" style={{ '--t': '.44s' }}>
             <a className="btn primary" href={start}>{startLabel}</a>
             <a className="btn" href="#funktionen">Ansehen</a>
@@ -165,25 +180,58 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 6 · price */}
+        {/* 6 · Pro: prop accounts, a MetaTrader ticket and a futures account as the picture */}
+        <section className="wrap sec row" id="prop">
+          <div>
+            <span className="pro-tag" data-reveal>Neu in Pro</span>
+            <h2 data-reveal>Backteste wie auf deinem Prop-Konto.</h2>
+            <p className="sub" data-reveal style={{ '--d': '.06s' }}>Wähl ein Futures- oder CFD-Konto mit deiner Kontogröße. Blotter rechnet jeden Trade in Dollar, mit deinen Lots oder Kontrakten, und prüft die Regeln deiner Prop-Firma, Minute für Minute.</p>
+            <div className="list">
+              {PROP_POINTS.map(([h, p, ic], i) => (
+                <div key={h} data-reveal style={{ '--d': i * 0.08 + 's' }}><span className="ic glass">{ic}</span><span><b>{h}</b>{p}</span></div>
+              ))}
+            </div>
+          </div>
+          <div className="pa-vis" aria-hidden="true">
+            <div className="pa-mt glass" data-reveal>
+              <div className="pa-h"><span className="pa-tg cfd">CFD 50K</span><b>EURUSD</b><small>Euro vs US Dollar</small></div>
+              <div className="pa-oc"><span className="s"><small>SELL</small><span>1,08<big>42</big><sup>3</sup></span></span><em>0,50<small>Lots</small></em><span className="b"><small>BUY</small><span>1,08<big>43</big><sup>1</sup></span></span></div>
+              <div className="pa-kv"><span><small>Risiko</small><b className="dn">−102,50 $</b></span><span><small>vom Konto</small><b>0,21 %</b></span><span><small>Margin</small><b>542,16 $</b></span></div>
+            </div>
+            <div className="pa-fu glass" data-reveal style={{ '--d': '.12s' }}>
+              <div className="pa-h"><span className="pa-tg fut">Futures 50K</span><span className="pa-ok">Aktiv</span></div>
+              <b className="pa-bal">51.240,00 $</b>
+              {METERS.map(([l, v, w, c]) => <div key={l} className="pa-m"><span>{l}<b>{v}</b></span><i style={{ '--w': w + '%', '--c': c }} /></div>)}
+              <div className="pa-ct"><span>MNQ</span>{[1, 2, 3, 5, 10].map((n) => <i key={n} className={n === 2 ? 'on' : ''}>{n}</i>)}</div>
+            </div>
+          </div>
+        </section>
+        <div className="wrap">
+          <div className="bts-cta glass" data-reveal>
+            <p>Prop-Konten sind im Abo <b>Pro</b> enthalten, für 22,99 € im Monat. Die ersten {TRIAL_DAYS} Tage sind kostenlos.</p>
+            <a className="btn primary" href={choose('pro')}>{trial ? 'Pro kostenlos testen' : 'Mit Pro starten'}</a>
+          </div>
+        </div>
+
+        {/* 7 · price */}
         <section className="wrap sec mid" id="preis">
           <div className="blob" aria-hidden="true" style={{ width: 700, height: 420, left: '30%', top: 260, background: 'radial-gradient(closest-side, #6366F1, transparent)', opacity: 0.3 }} />
-          <h2 data-reveal>Journal allein oder mit Backtesting.</h2>
+          <h2 data-reveal>Drei Abos, jederzeit wechselbar.</h2>
           <p className="sub" data-reveal style={{ '--d': '.06s' }}>Die ersten {TRIAL_DAYS} Tage sind kostenlos, danach gelten diese Endpreise. Monatlich kündbar, und du kannst jederzeit wechseln.</p>
           <div className="tiers">
             {TIERS.map((t, k) => (
-              <article key={t.id} className={'tier ' + (t.id === 'backtest' ? 'plus' : 'glass')} data-reveal style={{ '--d': k * 0.1 + 's' }} aria-labelledby={'tier-' + t.id}>
+              <article key={t.id} className={'tier ' + (t.id === 'pro' ? 'plus' : 'glass')} data-reveal style={{ '--d': k * 0.1 + 's' }} aria-labelledby={'tier-' + t.id}>
                 <div className="th"><h3 id={'tier-' + t.id}>{t.name}</h3><span className="free">{TRIAL_DAYS} Tage kostenlos</span></div>
                 <p className="amt"><b>{t.amt}</b><span>im Monat</span></p>
                 <p className="tl">{t.lead}</p>
-                <a className={'btn' + (t.id === 'backtest' ? ' primary' : '')} href={choose(t.id)}>{trial ? `${TRIAL_DAYS} Tage kostenlos testen` : t.id === 'backtest' ? 'Mit Backtesting starten' : 'Mit dem Journal starten'}</a>
+                <a className={'btn' + (t.id === 'pro' ? ' primary' : '')} href={choose(t.id)}>{trial ? `${TRIAL_DAYS} Tage kostenlos testen` : t.id === 'pro' ? 'Mit Pro starten' : t.id === 'backtest' ? 'Mit Backtesting starten' : 'Mit dem Journal starten'}</a>
                 <ul>{t.list.map((x) => <li key={x}>{CHECK}{x}</li>)}</ul>
               </article>
             ))}
           </div>
         </section>
 
-        {/* 7 · questions */}
+        {/* 8 · questions */}
         <section className="wrap sec mid" id="fragen">
           <h2 data-reveal>Gut zu wissen</h2>
           <div className="faq" data-reveal style={{ '--d': '.08s' }}>
@@ -191,7 +239,7 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 8 · the closing line, the aurora comes up behind it */}
+        {/* 9 · the closing line, the aurora comes up behind it */}
         <section className="end" data-scene="end">
           <div className="glow" aria-hidden="true" />
           <div className="wrap">

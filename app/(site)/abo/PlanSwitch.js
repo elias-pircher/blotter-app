@@ -11,8 +11,9 @@ const ERR = {
 };
 const errText = (code) => ERR[code] || 'Der Wechsel ist gerade nicht möglich. Versuch es in einem Moment erneut.';
 
-// The other plan, what switching to it costs, and the button that does it.
-export default function PlanSwitch({ to, toName, toPrice, toShort, upgrade, quiet, focus, blocked }) {
+// One of the other plans, what switching to it costs, and the button that does it.
+// gain / lose: what the switch adds or takes away, e.g. "das Backtesting und die Prop-Konten"
+export default function PlanSwitch({ to, toName, toPrice, toShort, upgrade, gain = '', lose = '', quiet, focus, blocked }) {
   const [pv, setPv] = useState(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,10 +49,15 @@ export default function PlanSwitch({ to, toName, toPrice, toShort, upgrade, quie
   }
 
   const when = pv && pv.next ? date(pv.next) : '';
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  // "die Prop-Konten" and two features take the plural
+  const verb = (t) => (/ und |Prop-Konten/.test(t) ? 'sind' : 'ist');
+  const gainTxt = gain ? ` ${cap(gain)} ${verb(gain)} sofort freigeschaltet.` : '';
+  const loseTxt = lose ? ` ${cap(lose)} ${verb(lose)} dann nicht mehr verfügbar, deine Daten bleiben aber gespeichert.` : '';
   return (
-    <section ref={box} className={'switch' + (focus ? ' focus' : '')} aria-labelledby="sw-h">
+    <section ref={box} className={'switch' + (focus ? ' focus' : '')} aria-labelledby={'sw-h-' + to}>
       <div className="sw-top">
-        <h2 id="sw-h">Wechseln zu {toName}</h2>
+        <h2 id={'sw-h-' + to}>Wechseln zu {toName}</h2>
         <span className="pr">{toPrice}<small> / Monat</small></span>
       </div>
       <p className="sw-d">{toShort}</p>
@@ -59,10 +65,10 @@ export default function PlanSwitch({ to, toName, toPrice, toShort, upgrade, quie
       {pv && (
         <p className="sw-note">
           {pv.trial
-            ? <>Du testest gerade kostenlos, deshalb kostet der Wechsel nichts. Dein Test läuft{when ? ` bis ${when}` : ''} weiter, danach {euro(pv.monthly)} im Monat.{upgrade ? ' Das Backtesting ist sofort freigeschaltet.' : ' Das Backtesting ist dann nicht mehr verfügbar, deine Sessions und Kursdaten bleiben aber gespeichert.'}</>
+            ? <>Du testest gerade kostenlos, deshalb kostet der Wechsel nichts. Dein Test läuft{when ? ` bis ${when}` : ''} weiter, danach {euro(pv.monthly)} im Monat.{upgrade ? gainTxt : loseTxt}</>
             : upgrade
-            ? <>Heute zahlst du <b>{euro(pv.now)}</b> für die restlichen Tage{when ? ` bis ${when}` : ''}, danach {euro(pv.monthly)} im Monat. Das Backtesting ist sofort freigeschaltet.</>
-            : <>Ab sofort {euro(pv.monthly)} im Monat. Das Backtesting ist dann nicht mehr verfügbar, deine Sessions und Kursdaten bleiben aber gespeichert. {pv.credit > 0 ? <>Für die restlichen Tage bekommst du <b>{euro(pv.credit)}</b> gutgeschrieben{when ? `, die wir von deiner nächsten Rechnung am ${when} abziehen` : ''}.</> : null}</>}
+            ? <>Heute zahlst du <b>{euro(pv.now)}</b> für die restlichen Tage{when ? ` bis ${when}` : ''}, danach {euro(pv.monthly)} im Monat.{gainTxt}</>
+            : <>Ab sofort {euro(pv.monthly)} im Monat.{loseTxt} {pv.credit > 0 ? <>Für die restlichen Tage bekommst du <b>{euro(pv.credit)}</b> gutgeschrieben{when ? `, die wir von deiner nächsten Rechnung am ${when} abziehen` : ''}.</> : null}</>}
           {pv.canceling ? ' Dein Abo bleibt gekündigt und endet wie geplant.' : ''}
         </p>
       )}

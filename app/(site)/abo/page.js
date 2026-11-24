@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { isActive, hadSubscription } from '@/lib/stripe';
-import { PLANS, isPlan, planOf, FRIEND, day, when, dayShort, trialLeft, TRIAL_DAYS } from '@/lib/plans';
+import { PLANS, PLAN_IDS, isPlan, planOf, FRIEND, day, when, dayShort, trialLeft, TRIAL_DAYS, switchGain, andList } from '@/lib/plans';
 import { Nav, Footer } from '../chrome';
 import CheckoutButton from './CheckoutButton';
 import PlanSwitch from './PlanSwitch';
@@ -38,13 +38,16 @@ export default async function AboPage({ searchParams }) {
       <div className="card">
         <span className="eyebrow">Freundeszugang</span>
         <h1>Blotter ist für dich kostenlos.</h1>
-        <p>Du nutzt Blotter mit einem Freundeszugang, Backtesting inklusive. Es läuft kein Abo und es wird nichts abgebucht.</p>
+        <p>Du nutzt Blotter mit einem Freundeszugang, Backtesting und Prop-Konten inklusive. Es läuft kein Abo und es wird nichts abgebucht.</p>
         <a className="btn primary block" href="/app">Zum Journal</a>
       </div>
     );
   } else if (active) {
     const cur = PLANS[plan];
-    const other = PLANS[plan === 'backtest' ? 'journal' : 'backtest'];
+    // the other plans, the one asked for (?plan=…) first, otherwise the bigger ones first
+    const others = PLAN_IDS.filter((id) => id !== plan).sort((a, b) => (a === want ? -1 : b === want ? 1 : PLANS[b].cents - PLANS[a].cents));
+    const gained = switched ? andList([cur.backtest ? 'Das Backtesting' : '', cur.prop ? 'die Prop-Konten' : ''].filter(Boolean)) : '';
+    const home = cur.prop ? '/app#prop' : cur.backtest ? '/app#backtest' : '/app';
     const end = sub?.current_period_end ? day(sub.current_period_end) : null;
     const trial = sub?.status === 'trialing' && sub?.trial_end ? sub.trial_end : null;
     body = (
@@ -57,11 +60,14 @@ export default async function AboPage({ searchParams }) {
               ? <><b className="ink">Gekündigt.</b> Dein Test endet am {when(trial)}. Es wird nichts abgebucht.</>
               : <>Kostenlos bis {when(trial)}. <b className="ink">Danach {cur.price} im Monat</b>, jederzeit kündbar. Kündigst du vorher, wird nichts abgebucht.</>}</p>
           : <p><b className="ink">{cur.price} im Monat.</b> {sub?.cancel_at_period_end && end ? `Gekündigt, läuft bis ${end}.` : end ? `Verlängert sich am ${end}, jederzeit kündbar.` : 'Verlängert sich monatlich, jederzeit kündbar.'}</p>}
-        {switched && <div className="msg ok" role="status">Erledigt. Du hast jetzt {cur.name}.{cur.backtest ? ' Das Backtesting ist ab sofort freigeschaltet.' : ''}</div>}
+        {switched && <div className="msg ok" role="status">Erledigt. Du hast jetzt {cur.name}.{gained ? ` ${gained} ${cur.prop && cur.backtest ? 'sind' : 'ist'} ab sofort freigeschaltet.` : ''}</div>}
         {sub?.status === 'past_due' && <div className="msg err">Die letzte Zahlung ist fehlgeschlagen. Aktualisiere deine Zahlungsmethode unter „Abo verwalten“.</div>}
-        <PlanSwitch to={other.id} toName={other.name} toPrice={other.price} toShort={other.short} upgrade={other.cents > cur.cents} quiet={switched} focus={want === other.id && !switched} blocked={sub?.status === 'past_due'} />
+        {others.map((id) => {
+          const o = PLANS[id], ch = switchGain(plan, id);
+          return <PlanSwitch key={id} to={o.id} toName={o.name} toPrice={o.price} toShort={o.short} upgrade={o.cents > cur.cents} gain={andList(ch.gain)} lose={andList(ch.lose)} quiet={switched} focus={want === o.id && !switched} blocked={sub?.status === 'past_due'} />;
+        })}
         <div className="row-actions acts">
-          <a className={'btn' + (switched ? ' primary' : '')} href={cur.backtest && switched ? '/app#backtest' : '/app'}>{cur.backtest && switched ? 'Zum Backtesting' : 'Zum Journal'}</a>
+          <a className={'btn' + (switched ? ' primary' : '')} href={switched ? home : '/app'}>{switched && cur.prop ? 'Zu den Prop-Konten' : switched && cur.backtest ? 'Zum Backtesting' : 'Zum Journal'}</a>
           <PortalButton />
         </div>
       </div>

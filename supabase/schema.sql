@@ -12,16 +12,16 @@ create table if not exists public.subscriptions (
   cancel_at_period_end boolean not null default false,
   consent_at timestamptz,
   updated_at timestamptz not null default now(),
-  -- journal = 7,99 €, backtest = Journal + Backtesting 14,99 €, freund = free friend account (everything)
+  -- journal = 7,99 €, backtest = Journal + Backtesting 14,99 €, pro = Blotter Pro 22,99 € (plus prop accounts),
+  -- freund = free friend account (everything)
   plan text not null default 'journal',
   trial_end timestamptz
 );
 alter table public.subscriptions add column if not exists plan text not null default 'journal';
 -- end of the free trial (kept after the trial is over, so a customer gets the trial only once)
 alter table public.subscriptions add column if not exists trial_end timestamptz;
-do $$ begin
-  alter table public.subscriptions add constraint subscriptions_plan_check check (plan in ('journal', 'backtest', 'freund'));
-exception when duplicate_object then null; end $$;
+alter table public.subscriptions drop constraint if exists subscriptions_plan_check;
+alter table public.subscriptions add constraint subscriptions_plan_check check (plan in ('journal', 'backtest', 'pro', 'freund'));
 update public.subscriptions set plan = 'freund' where price_id = 'freund' and plan <> 'freund';
 alter table public.subscriptions enable row level security;
 drop policy if exists "subs: eigenes Abo lesen" on public.subscriptions;
@@ -42,27 +42,41 @@ revoke all on function private.has_active_sub() from public;
 revoke all on function private.has_active_sub() from anon;
 grant execute on function private.has_active_sub() to authenticated;
 
--- Backtesting is part of "Journal + Backtesting" (and of friend accounts)
+-- Backtesting is part of "Journal + Backtesting" and "Pro" (and of friend accounts)
 create or replace function private.has_backtest_plan() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from public.subscriptions s
-    where s.user_id = auth.uid() and s.status in ('active', 'trialing', 'past_due') and s.plan in ('backtest', 'freund')
+    where s.user_id = auth.uid() and s.status in ('active', 'trialing', 'past_due') and s.plan in ('backtest', 'pro', 'freund')
   );
 $$;
 revoke all on function private.has_backtest_plan() from public;
 revoke all on function private.has_backtest_plan() from anon;
 grant execute on function private.has_backtest_plan() to authenticated;
 
+-- Prop accounts (simulated futures and CFD accounts) are part of "Pro" (and of friend accounts)
+create or replace function private.has_pro_plan() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.subscriptions s
+    where s.user_id = auth.uid() and s.status in ('active', 'trialing', 'past_due') and s.plan in ('pro', 'freund')
+  );
+$$;
+revoke all on function private.has_pro_plan() from public;
+revoke all on function private.has_pro_plan() from anon;
+grant execute on function private.has_pro_plan() to authenticated;
+
 -- 2) Journal-Einträge: Trades, Learnings, Outlooks und Einstellungen, getrennt pro Kunde
 create table if not exists public.entries (
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  kind text not null check (kind in ('trades', 'learnings', 'outlooks', 'settings', 'backtests')),
+  kind text not null,
   id text not null check (char_length(id) between 1 and 100),
   data jsonb not null,
   updated_at timestamptz not null default now(),
   primary key (user_id, kind, id)
 );
+alter table public.entries drop constraint if exists entries_kind_check;
+alter table public.entries add constraint entries_kind_check check (kind in ('trades', 'learnings', 'outlooks', 'settings', 'backtests', 'accounts'));
 alter table public.entries enable row level security;
 drop policy if exists "entries: eigene lesen" on public.entries;
 drop policy if exists "entries: eigene anlegen" on public.entries;
@@ -70,11 +84,17 @@ drop policy if exists "entries: eigene ändern" on public.entries;
 drop policy if exists "entries: eigene löschen" on public.entries;
 create policy "entries: eigene lesen" on public.entries
   for select to authenticated using (user_id = (select auth.uid()));
--- backtesting sessions ('backtests') can only be written with the backtesting plan; reading and deleting stay open
+-- backtesting sessions ('backtests') can only be written with backtesting, prop accounts ('accounts') only with Pro;
+-- reading and deleting stay open
 create policy "entries: eigene anlegen" on public.entries
-  for insert to authenticated with check (user_id = (select auth.uid()) and (select private.has_active_sub()) and (kind <> 'backtests' or (select private.has_backtest_plan())));
+  for insert to authenticated with check (user_id = (select auth.uid()) and (select private.has_active_sub())
+    and (kind <> 'backtests' or (select private.has_backtest_plan()))
+    and (kind <> 'accounts' or (select private.has_pro_plan())));
 create policy "entries: eigene ändern" on public.entries
-  for update to authenticated using (user_id = (select auth.uid()) and (select private.has_active_sub())) with check (user_id = (select auth.uid()) and (kind <> 'backtests' or (select private.has_backtest_plan())));
+  for update to authenticated using (user_id = (select auth.uid()) and (select private.has_active_sub()))
+  with check (user_id = (select auth.uid())
+    and (kind <> 'backtests' or (select private.has_backtest_plan()))
+    and (kind <> 'accounts' or (select private.has_pro_plan())));
 create policy "entries: eigene löschen" on public.entries
   for delete to authenticated using (user_id = (select auth.uid()) and (select private.has_active_sub()));
 

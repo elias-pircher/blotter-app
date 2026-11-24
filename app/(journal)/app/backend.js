@@ -3,7 +3,7 @@
 // screenshots), backed by Supabase. Every row belongs to the signed-in customer; the database's
 // row level security keeps customers apart and blocks writes without an active subscription.
 
-const KINDS = new Set(['trades', 'learnings', 'outlooks', 'settings', 'backtests']);
+const KINDS = new Set(['trades', 'learnings', 'outlooks', 'settings', 'backtests', 'accounts']);
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 
 function mapError(e) {
@@ -140,9 +140,11 @@ export function makeBackend(sb, uid, email, opts = {}) {
   return {
     email,
     friend: !!opts.friend,
-    // 'journal' | 'backtest' | 'freund'; backtesting is part of the larger plan and of friend accounts
+    // 'journal' | 'backtest' | 'pro' | 'freund'; backtesting is part of the two larger plans, prop accounts of Pro,
+    // friend accounts have everything
     plan: opts.plan || 'journal',
-    canBacktest: opts.plan === 'backtest' || opts.plan === 'freund' || !!opts.friend,
+    canBacktest: opts.plan === 'backtest' || opts.plan === 'pro' || opts.plan === 'freund' || !!opts.friend,
+    canProp: opts.plan === 'pro' || opts.plan === 'freund' || !!opts.friend,
     // the free trial, while it runs: its end (ISO), the same as text, and whether it is already cancelled
     trialEnd: opts.trial ? opts.trial.end : null,
     trialUntil: opts.trial ? opts.trial.until : '',

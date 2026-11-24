@@ -521,9 +521,162 @@ function sparkSvg(curve, w, h) {
   return `<svg viewBox="0 0 ${w} ${h}" class="spark ${last > 0 ? 'pos' : last < 0 ? 'neg' : ''}" preserveAspectRatio="none" aria-hidden="true"><path d="M0 ${y(0).toFixed(1)}H${w}" class="sp-zero"/><path d="${d}" class="sp-line"/></svg>`;
 }
 
+
+/* ================================================================ PROP ACCOUNTS: specs, money and rules
+   A prop account is a simulated futures or CFD account (Blotter Pro). Futures trade whole contracts, mini or micro,
+   with the CME contract specs, like on Tradesea. CFDs trade lots from 0.01 like MetaTrader 5: contract size, spread,
+   commission and leverage per symbol. The account keeps a ledger in dollars and checks the prop-firm rules
+   (profit target, daily loss limit, max loss static or trailing) on every replayed minute.
+   Defaults follow Lucid Trading (futures, EOD trailing) and the FTMO 2-step challenge (CFD); everything is editable. */
+const FUT_SIZES = [25000, 50000, 100000, 150000], CFD_SIZES = [10000, 25000, 50000, 100000];
+// size: [profit target, max loss (trailing), daily loss limit, max contracts in minis]
+const FUT_PRESET = {25000: [1250, 1000, 600, 2], 50000: [3000, 2000, 1200, 4], 100000: [6000, 3000, 1800, 6], 150000: [9000, 4500, 2700, 10]};
+// futures per market: value of a 1.0 price move per contract (USD) and the tick
+const FUTS = {
+  NAS100: [{sym: 'NQ', name: 'E-mini Nasdaq-100', pv: 20, tick: 0.25}, {sym: 'MNQ', name: 'Micro E-mini Nasdaq-100', pv: 2, tick: 0.25, micro: true}],
+  SPX500: [{sym: 'ES', name: 'E-mini S&P 500', pv: 50, tick: 0.25}, {sym: 'MES', name: 'Micro E-mini S&P 500', pv: 5, tick: 0.25, micro: true}],
+  XAUUSD: [{sym: 'GC', name: 'Gold (100 oz)', pv: 100, tick: 0.1}, {sym: 'MGC', name: 'Micro Gold (10 oz)', pv: 10, tick: 0.1, micro: true}],
+  EURUSD: [{sym: '6E', name: 'Euro FX (125.000 €)', pv: 125000, tick: 0.00005}, {sym: 'M6E', name: 'Micro EUR/USD (12.500 €)', pv: 12500, tick: 0.0001, micro: true}],
+  GBPUSD: [{sym: '6B', name: 'British Pound (62.500 £)', pv: 62500, tick: 0.0001}, {sym: 'M6B', name: 'Micro GBP/USD (6.250 £)', pv: 6250, tick: 0.0001, micro: true}],
+};
+const FUT_COMM = {mini: 4, micro: 1};        // commission per contract, round turn (USD)
+// CFDs like MetaTrader 5: contract size per lot, spread (pips or points of the market), commission per lot and side
+// ('pct': per cent of the volume per side), leverage 1:lev, max volume per position
+const CFD_DEF = {
+  EURUSD: {cs: 100000, spread: 0.2, comm: 2.5, cm: 'lot', lev: 100, max: 50},
+  GBPUSD: {cs: 100000, spread: 0.5, comm: 2.5, cm: 'lot', lev: 100, max: 50},
+  XAUUSD: {cs: 100, spread: 0.2, comm: 0.0007, cm: 'pct', lev: 50, max: 50},
+  NAS100: {cs: 1, spread: 1, comm: 0, cm: 'lot', lev: 50, max: 500},
+  SPX500: {cs: 1, spread: 0.5, comm: 0, cm: 'lot', lev: 50, max: 500},
+  GER40: {cs: 1, spread: 1, comm: 0, cm: 'lot', lev: 50, max: 500, ccy: 'EUR'},
+};
+const CFD_NAME = {EURUSD: 'Euro vs US Dollar', GBPUSD: 'Pound vs US Dollar', XAUUSD: 'Gold vs US Dollar', NAS100: 'US Tech 100 Index', SPX500: 'US 500 Index', GER40: 'Germany 40 Index'};
+const EURUSD_FX = 1.1;                       // EUR -> USD for the DAX on a USD account (editable)
+const PA_TYPES = {fut: 'Futures', cfd: 'CFD'};
+const kLabel = n => (n >= 1000 ? nf(n / 1000, 0) + 'K' : nf(n, 0));
+// money as "50.000,00 $": German grouping with dots, the currency after the amount
+const fUsd = new Intl.NumberFormat('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const usd = v => (v <= -0.005 ? '−' : '') + fUsd.format(Math.abs(v) < 0.005 ? 0 : Math.abs(v)) + '\u00a0$';
+const usdS = v => (v >= 0.005 ? '+' : v <= -0.005 ? '−' : '') + fUsd.format(Math.abs(v) < 0.005 ? 0 : Math.abs(v)) + '\u00a0$';
+const r2 = v => Math.round(v * 100) / 100;
+
+function defRules(type, size) {
+  if (type === 'fut') {
+    const p = FUT_PRESET[size] || FUT_PRESET[50000];
+    return {on: true, target: p[0], maxLoss: p[1], daily: p[2], dailyMode: 'pause', dd: 'eod', lock: true, maxQty: p[3], flat: true};
+  }
+  return {on: true, target: size * 0.1, maxLoss: size * 0.1, daily: size * 0.05, dailyMode: 'fail', dd: 'static', lock: false, maxQty: 0, flat: false};
+}
+function newAccount(type, size, name) {
+  return {id: rid('pa'), name: name || PA_TYPES[type] + ' ' + kLabel(size), type, size, rules: defRules(type, size), costs: {},
+    att: 1, ledger: [], st: {status: 'active', hwm: size, lastDay: null, pause: null}, open: null, createdAt: Date.now(), updatedAt: Date.now()};
+}
+const paMarkets = type => MARKETS.filter(m => type === 'fut' ? !!FUTS[m.id] : !!CFD_DEF[m.id]);
+const cfdSpec = (acc, mk) => Object.assign({}, CFD_DEF[mk], (acc.costs && acc.costs.cfd && acc.costs.cfd[mk]) || {});
+const fxOf = (acc, mk) => (CFD_DEF[mk] && CFD_DEF[mk].ccy === 'EUR' ? +(acc.costs && acc.costs.eurusd) || EURUSD_FX : 1);
+const futComm = (acc, micro) => { const c = (acc.costs && acc.costs.fut) || {}, k = micro ? 'micro' : 'mini'; return c[k] != null && c[k] >= 0 ? +c[k] : FUT_COMM[k]; };
+
+// the instrument an order trades on this account
+function instr(acc, mk, sym, digits) {
+  const m = MK[mk]; if (!m) return null;
+  if (acc.type === 'fut') {
+    const list = FUTS[mk]; if (!list) return null;
+    const f = list.find(x => x.sym === sym) || list[0];
+    const r = acc.rules || {};
+    const max = r.on && r.maxQty > 0 ? r.maxQty * (f.micro ? 10 : 1) : 100;
+    return {kind: 'fut', mk, sym: f.sym, name: f.name, pv: f.pv, tick: f.tick, tv: f.pv * f.tick, min: 1, step: 1, max, spread: 0, rt: futComm(acc, f.micro), micro: !!f.micro, dec: 0, unit: f.sym, digits: Math.max(decimalsOf(String(f.tick)), digits || 0)};
+  }
+  const c = cfdSpec(acc, mk), fx = fxOf(acc, mk), dg = digits || m.digits;
+  return {kind: 'cfd', mk, sym: mk, name: CFD_NAME[mk], pv: c.cs * fx, cs: c.cs, fx, tick: Math.pow(10, -dg), min: 0.01, step: 0.01, max: c.max,
+    spread: Math.max(0, c.spread) * m.pip, spreadU: c.spread, lev: Math.max(1, c.lev), comm: Math.max(0, c.comm), cm: c.cm, dec: 2, unit: 'Lots', digits: dg, ccy: CFD_DEF[mk].ccy || 'USD'};
+}
+// commission for one side of a deal (USD)
+function commSide(ins, qty, price) {
+  if (ins.kind === 'fut') return qty * ins.rt / 2;
+  if (ins.cm === 'pct') return qty * ins.cs * price * ins.fx * ins.comm / 100;
+  return qty * ins.comm;
+}
+const marginOf = (ins, qty, price) => (ins.kind === 'cfd' ? qty * ins.cs * price * ins.fx / ins.lev : 0);
+const roundQty = (ins, q) => (ins.kind === 'fut' ? Math.round(q) : Math.round(q * 100) / 100);
+const fQty = (ins, q) => (ins.kind === 'fut' ? nf(q, 0) + ' ' + ins.sym : nf(q, 2) + ' Lots');
+// what a stop costs per lot or contract, with commission: the basis for sizing by risk
+const lossPer = (ins, entry, sl, price) => Math.abs(entry - sl) * ins.pv + commSide(ins, 1, price) * 2;
+function qtyForRisk(ins, risk, entry, sl) {
+  const per = lossPer(ins, entry, sl, entry);
+  if (!(per > 0) || !(risk > 0)) return 0;
+  const q = Math.floor(risk / per / ins.step + 1e-9) * ins.step;
+  return roundQty(ins, Math.min(ins.max, q));
+}
+
+// trading days: futures roll at 17:00 New York (CME), CFDs at midnight Prague (FTMO, CE(S)T)
+const cetOffset = ms => (euDst(ms) ? 2 : 1) * HOUR;
+function dayKey(type, ms) {
+  const d = new Date(type === 'fut' ? ms + nyOffset(ms) + 7 * HOUR : ms + cetOffset(ms));
+  return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+}
+const fDay = k => fDate.format(new Date(Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10), 12)));
+// 16:45 New York on a weekday until the reopening at 18:00: prop firms close every futures position before the daily break
+function flatWindow(ms) {
+  const d = new Date(ms + nyOffset(ms)), m = d.getUTCHours() * 60 + d.getUTCMinutes(), wd = d.getUTCDay();
+  return wd >= 1 && wd <= 5 && m >= 16 * 60 + 45 && m < 18 * 60;
+}
+
+const ledgerNow = acc => (acc.ledger || []).filter(l => (l.att || 1) === (acc.att || 1));
+const balance = acc => r2(acc.size + ledgerNow(acc).reduce((s, l) => s + l.net, 0));
+const dayNet = (acc, day) => ledgerNow(acc).reduce((s, l) => s + (l.day === day ? l.net : 0), 0);
+// the equity floors the rules set: max loss (static, or trailing with the high-water mark) and today's loss limit
+function floors(acc, day) {
+  const r = acc.rules || {}, bal = balance(acc);
+  const out = {bal, max: -Infinity, day: -Infinity, dayStart: bal - dayNet(acc, day)};
+  if (!r.on) return out;
+  if (r.maxLoss > 0) {
+    if (r.dd === 'static') out.max = acc.size - r.maxLoss;
+    else { out.max = Math.max(acc.st.hwm || acc.size, acc.size) - r.maxLoss; if (r.lock) out.max = Math.min(out.max, acc.size + 100); }
+  }
+  if (r.daily > 0) out.day = out.dayStart - r.daily;
+  return out;
+}
+// a new trading day: the end-of-day trail moves up, a paused day ends
+function rollDay(acc, day) {
+  const st = acc.st;
+  if (st.lastDay === day) return false;
+  if (st.lastDay && acc.rules && acc.rules.dd === 'eod') st.hwm = Math.max(st.hwm || acc.size, balance(acc));
+  st.lastDay = day;
+  if (st.pause && st.pause !== day) st.pause = null;
+  return true;
+}
+function resetAccount(acc) {
+  acc.att = (acc.att || 1) + 1;
+  acc.ledger = [];
+  acc.st = {status: 'active', hwm: acc.size, lastDay: null, pause: null};
+  acc.open = null;
+  return acc;
+}
+// statistics in dollars, per position (partial closes count as one trade)
+function statsUsd(trades) {
+  const closed = trades.filter(t => t.exitTime != null && t.net != null);
+  let w = 0, l = 0, gw = 0, gl = 0, sum = 0, peak = 0, eq = 0, dd = 0;
+  const curve = [0];
+  for (const t of closed) {
+    const v = t.net; sum += v; eq += v; curve.push(eq); peak = Math.max(peak, eq); dd = Math.max(dd, peak - eq);
+    if (v > 0) { w++; gw += v; } else if (v < 0) { l++; gl -= v; }
+  }
+  return {n: closed.length, w, l, sum, avg: closed.length ? sum / closed.length : 0, wr: w + l ? w / (w + l) : null, pf: gl ? gw / gl : (gw ? Infinity : null), dd, curve};
+}
+// the ledger grouped back into positions
+function positions(acc) {
+  const map = new Map();
+  for (const l of ledgerNow(acc)) {
+    const p = map.get(l.pid) || {pid: l.pid, side: l.side, sym: l.sym, mk: l.mk, qty: 0, net: 0, exitTime: l.xt, entryTime: l.et, sid: l.sid};
+    p.qty += l.qty; p.net += l.net; p.exitTime = Math.max(p.exitTime, l.xt);
+    map.set(l.pid, p);
+  }
+  return [...map.values()];
+}
+
 /* ---------------------------------------------------------------- module state */
 let CTX = null;
-const V = {el: null, mode: 'list', sid: null, ws: null, dlg: null, guideOpen: null, guideSrc: 'histdata'};
+const V = {el: null, mode: 'list', sid: null, ws: null, dlg: null, guideOpen: null, guideSrc: 'histdata', backTo: null};
 
 /* ================================================================ OVERVIEW */
 function renderList() {
@@ -534,7 +687,7 @@ function renderList() {
   el.innerHTML = `
   <section class="bt-over" aria-label="Backtesting">
     <div class="page-head">
-      <div class="grow"><h1>Backtesting</h1><p>Spiel den Markt Kerze für Kerze nach und teste dein Setup, bevor echtes Geld im Spiel ist.</p></div>
+      <div class="grow"><h1>Backtesting</h1><p>Spiel den Markt Kerze für Kerze nach und teste dein Setup, bevor echtes Geld im Spiel ist.${canProp() ? ' Mit einem <a class="bt-link" href="#prop">Prop-Konto</a> rechnest du in Lots, Kontrakten und Dollar.' : ''}</p></div>
       <button type="button" class="btn primary" data-bt="new"${have.length ? '' : ' disabled'}>${ICON_PLUS}Neue Session</button>
     </div>
     <div class="bt-cols">
@@ -650,13 +803,15 @@ function mktRow(m, info) {
   </li>`;
 }
 function sessCard(s) {
-  const st = stats(s.trades || []), m = MK[s.market] || {tag: s.market};
+  const m = MK[s.market] || {tag: s.market};
+  const acc = s.acct && canProp() ? accountById(s.acct) : null;
   const when = s.cursor ? fDate.format(new Date(s.cursor)) : '';
+  const st = acc ? statsUsd((s.trades || []).filter(t => t.net != null && t.acct === acc.id)) : stats(s.trades || []);
   return `<button type="button" class="bt-card spot" data-bt="open" data-id="${esc(s.id)}">
-    <span class="bt-c-top"><span class="bt-mk-tag">${esc(m.tag)}</span><span class="bt-c-tf">${esc((TF[s.tf] || TF['5m']).label)}</span><span class="spacer"></span><span class="bt-c-when">${esc(when)}</span></span>
+    <span class="bt-c-top"><span class="bt-mk-tag">${esc(acc && acc.type === 'fut' && FUTS[s.market] ? (s.sym || FUTS[s.market][0].sym) : m.tag)}</span><span class="bt-c-tf">${esc((TF[s.tf] || TF['5m']).label)}</span>${acc ? `<span class="pa-type ${acc.type}">${PA_TYPES[acc.type]} ${kLabel(acc.size)}</span>` : ''}<span class="spacer"></span><span class="bt-c-when">${esc(when)}</span></span>
     <b class="bt-c-name">${esc(s.name || 'Session')}</b>
     ${sparkSvg(st.curve, 240, 46)}
-    <span class="bt-c-stats"><span><b>${st.n}</b> Trades</span><span><b>${st.wr == null ? '–' : Math.round(st.wr * 100) + ' %'}</b> Win-Rate</span><span class="${st.sum > 0 ? 'pos' : st.sum < 0 ? 'neg' : ''}"><b>${st.n ? fR(st.sum) : '–'}</b> gesamt</span></span>
+    <span class="bt-c-stats"><span><b>${st.n}</b> Trades</span><span><b>${st.wr == null ? '–' : Math.round(st.wr * 100) + ' %'}</b> Win-Rate</span><span class="${st.sum > 0 ? 'pos' : st.sum < 0 ? 'neg' : ''}"><b>${st.n ? (acc ? usd0(st.sum) : fR(st.sum)) : '–'}</b> ${acc ? esc(acc.name) : 'gesamt'}</span></span>
   </button>`;
 }
 
@@ -770,15 +925,22 @@ function openImport(market) {
 }
 
 /* ---- new session */
-function openNew() {
+function openNew(opt) {
+  opt = opt || {};
   const idx = dataIndex(), have = MARKETS.filter(m => idx[m.id]);
-  if (!have.length) { openImport(); return; }
-  const m0 = have[0], info0 = idx[m0.id];
+  if (!have.length) { if (opt.from === 'prop') { CTX.toast('Importiere zuerst Kursdaten unter Backtesting. Die Anleitung steht dort.', true); return; } openImport(); return; }
+  const accs = canProp() ? accounts().filter(a => a.st.status !== 'failed' || a.id === opt.acct) : [];
+  const accOf = () => { const sel = $('#bt-n-acct', d); return sel && sel.value ? accs.find(a => a.id === sel.value) : null; };
+  const mkFor = a => (a ? have.filter(m => (a.type === 'fut' ? FUTS : CFD_DEF)[m.id]) : have);
+  const m0 = mkFor(accs.find(a => a.id === opt.acct))[0] || have[0], info0 = idx[m0.id];
   const defStart = mk => { const i = idx[mk]; const k = i.last; const s = monthStart(Object.keys(i.months).sort().length > 1 ? prevMonth(k) : k); return s; };
   const toLocalInput = ms => { const d = new Date(ms); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  const mkOpts = a => mkFor(a).map(m => `<option value="${m.id}">${esc(m.name)} (${esc(a && a.type === 'fut' ? FUTS[m.id].map(f => f.sym).join(' / ') : a ? m.id : m.tag)})</option>`).join('');
   const d = dialog(`
     <div class="bt-dlg-head"><h2>Neue Session</h2><button type="button" class="btn icon ghost" data-bt="close" aria-label="Schließen">✕</button></div>
-    <label class="bt-fl">Markt<select class="inp" id="bt-n-mk">${have.map(m => `<option value="${m.id}">${esc(m.name)} (${esc(m.tag)})</option>`).join('')}</select></label>
+    ${accs.length ? `<label class="bt-fl">Konto<select class="inp" id="bt-n-acct"><option value="">Ohne Konto, Ergebnis in R</option>${accs.map(a => `<option value="${esc(a.id)}"${a.id === opt.acct ? ' selected' : ''}>${esc(a.name)} · ${PA_TYPES[a.type]} ${kLabel(a.size)} · ${esc(usd(balance(a)))}</option>`).join('')}</select></label>` : ''}
+    <label class="bt-fl">Markt<select class="inp" id="bt-n-mk">${mkOpts(accs.find(a => a.id === opt.acct))}</select></label>
+    <p class="bt-note" id="bt-n-amsg" hidden></p>
     <div class="bt-2">
       <label class="bt-fl">Start (deine Zeit)<input class="inp" type="datetime-local" id="bt-n-start" value="${toLocalInput(defStart(m0.id) + 8 * HOUR)}"></label>
       <label class="bt-fl">Zeiteinheit<select class="inp" id="bt-n-tf">${TFS.map(t => `<option value="${t.id}"${t.id === '5m' ? ' selected' : ''}>${t.min >= 1440 ? t.name : t.label}</option>`).join('')}</select></label>
@@ -787,7 +949,18 @@ function openNew() {
     <p class="bt-note" id="bt-n-span"></p>
     <p class="bt-im-msg" id="bt-n-msg" role="status"></p>
     <div class="row-btns end"><button type="button" class="btn ghost" data-bt="close">Abbrechen</button><button type="button" class="btn primary" id="bt-n-go">Session starten</button></div>`);
-  const span = () => { const i = idx[$('#bt-n-mk', d).value]; $('#bt-n-span', d).textContent = 'Daten vorhanden: ' + fMon.format(new Date(monthStart(i.first))) + ' bis ' + fMon.format(new Date(monthStart(i.last))) + '.'; };
+  const span = () => { const i = idx[$('#bt-n-mk', d).value]; if (!i) { $('#bt-n-span', d).textContent = ''; return; } $('#bt-n-span', d).textContent = 'Daten vorhanden: ' + fMon.format(new Date(monthStart(i.first))) + ' bis ' + fMon.format(new Date(monthStart(i.last))) + '.'; };
+  // the markets an account can trade: futures accounts the CME contracts (no DAX), CFD accounts all six
+  const onAcct = () => {
+    const a = accOf(), sel = $('#bt-n-mk', d), was = sel.value, list = mkFor(a), msg = $('#bt-n-amsg', d);
+    sel.innerHTML = mkOpts(a);
+    if (list.some(m => m.id === was)) sel.value = was;
+    $('#bt-n-go', d).disabled = !list.length;
+    msg.hidden = !(a && (!list.length || a.type === 'fut'));
+    msg.textContent = !a ? '' : !list.length ? 'Für dieses Konto fehlen Kursdaten. Futures-Konten brauchen Daten für Nasdaq 100, S&P 500, Gold, EUR/USD oder GBP/USD.' : 'Futures-Konten handeln die CME-Kontrakte, deshalb ohne DAX.';
+    if (list.length) { span(); if (sel.value !== was) $('#bt-n-start', d).value = toLocalInput(defStart(sel.value) + 8 * HOUR); }
+  };
+  if ($('#bt-n-acct', d)) { $('#bt-n-acct', d).addEventListener('change', onAcct); onAcct(); }
   span();
   $('#bt-n-mk', d).addEventListener('change', () => { span(); $('#bt-n-start', d).value = toLocalInput(defStart($('#bt-n-mk', d).value) + 8 * HOUR); });
   $('#bt-n-go', d).addEventListener('click', async () => {
@@ -798,11 +971,14 @@ function openNew() {
     $('#bt-n-go', d).disabled = true; msg.textContent = 'Daten werden geladen…';
     const first = await firstMinuteFrom(mk, start);
     if (first == null) { msg.textContent = 'Ab diesem Zeitpunkt gibt es keine Daten. Wähle einen früheren Start.'; $('#bt-n-go', d).disabled = false; return; }
-    const name = $('#bt-n-name', d).value.trim() || MK[mk].tag + ' ab ' + fDate.format(new Date(first));
+    const acc = accOf();
+    const name = $('#bt-n-name', d).value.trim() || (acc && acc.type === 'fut' ? FUTS[mk][0].sym : MK[mk].tag) + ' ab ' + fDate.format(new Date(first));
     const s = {id: rid('bt'), name, market: mk, tf, start: first, cursor: first, trades: [], order: null, createdAt: Date.now(), updatedAt: Date.now()};
+    if (acc) { s.acct = acc.id; if (acc.type === 'fut') s.sym = FUTS[mk][0].sym; }
     try { await CTX.Store.save('backtests', s); }
     catch (e) { msg.textContent = 'Die Session konnte nicht gespeichert werden. Prüfe deine Verbindung.'; $('#bt-n-go', d).disabled = false; return; }
     closeDialog();
+    if (opt.from === 'prop') { V.mode = 'ws'; V.sid = s.id; V.backTo = 'prop'; try { location.hash = 'backtest'; } catch (e) {} return; }
     openSession(s.id);
   });
 }
@@ -819,6 +995,7 @@ function closeSession() {
   if (V.ws) { V.ws.flush(); V.ws.destroy(); V.ws = null; }
   V.mode = 'list'; V.sid = null;
   CTX.setWide && CTX.setWide(false);
+  if (V.backTo === 'prop') { V.backTo = null; try { location.hash = 'prop'; } catch (e) {} return; }
   renderList();
 }
 
@@ -828,6 +1005,9 @@ class Workspace {
     this.tf = TF[s.tf] ? s.tf : '5m';
     this.m = MK[s.market];
     this.digits = (dataIndex()[s.market] || {}).digits || this.m.digits;
+    // a session on a prop account trades in lots or contracts and in dollars (Pro)
+    this.acc = null;
+    if (s.acct && canProp()) { const a = accountById(s.acct); if (a) this.acc = normAcc(JSON.parse(JSON.stringify(a))); }
     this.min = emptyBars(); this.i = -1;     // minute window, index of the last revealed minute
     this.view = emptyBars();                  // displayed bars
     this.playing = false; this.speed = 2; this.draft = null;
@@ -843,7 +1023,7 @@ class Workspace {
     <section class="bt-ws" aria-label="Backtest ${esc(this.s.name)}">
       <div class="bt-bar">
         <button type="button" class="btn sm ghost" data-ws="back" aria-label="Zurück zu den Sessions">‹ Sessions</button>
-        <div class="bt-title"><b>${esc(this.s.name)}</b><span><span class="bt-mk-tag">${esc(this.m.tag)}</span><span id="bt-clock">–</span></span></div>
+        <div class="bt-title"><b>${esc(this.s.name)}</b><span><span class="bt-mk-tag">${esc(this.m.tag)}</span>${this.acc ? `<span class="pa-type ${this.acc.type}">${PA_TYPES[this.acc.type]} ${kLabel(this.acc.size)}</span>` : ''}<span id="bt-clock">–</span></span></div>
         <span class="spacer"></span>
         <div class="seg bt-tfs" role="radiogroup" aria-label="Zeiteinheit">${TFS.map(t => `<button type="button" role="radio" aria-checked="${t.id === this.tf}" data-tf="${t.id}" title="${t.name}" aria-label="${t.name}">${t.label}</button>`).join('')}</div>
         <div class="bt-acts" role="group" aria-label="Chart">
@@ -854,6 +1034,7 @@ class Workspace {
       </div>
       <div class="bt-main">
         <div class="bt-chartbox">
+          ${this.acc ? '<div class="pa-bar" id="pa-bar" role="group" aria-label="Konto"></div>' : ''}
           <div class="bt-chartrow">
             <div class="bt-tools" id="bt-tools" role="toolbar" aria-label="Zeichenwerkzeuge"></div>
             <div class="bt-chart" id="bt-chart"><div class="bt-loading" id="bt-loading">Kursdaten werden geladen…</div></div>
@@ -868,6 +1049,7 @@ class Workspace {
         </div>
         <aside class="bt-side">
           <div class="bt-ticket" id="bt-ticket"></div>
+          ${this.acc ? '<div class="pa-rules-card" id="pa-rules"></div>' : ''}
           <div class="bt-stats" id="bt-stats"></div>
           <div class="bt-trades" id="bt-trades"></div>
         </aside>
@@ -889,6 +1071,7 @@ class Workspace {
     if (this.ro) this.ro.disconnect();
     if (this.draw) { this.draw.destroy(); this.draw = null; }
     clearTimeout(csTimer); saveCS(this.cs, true);
+    if (this.acc && (this.accDirty || this.accT)) { clearTimeout(this.accT); this.accT = 0; this.saveAcc(true); }
     if (this.chart) { try { this.chart.remove(); } catch (e) {} this.chart = null; }
   }
   /* ---------- data */
@@ -898,6 +1081,7 @@ class Workspace {
     await this.loadAround(this.s.cursor);
     this.redraw(true);
     this.renderSide();
+    if (this.acc) { rollDay(this.acc, dayKey(this.acc.type, this.now)); this.renderAccBar(); }
     const ld = $('#bt-loading'); if (ld) ld.remove();
   }
   async loadAround(cursor) {
@@ -1127,15 +1311,15 @@ class Workspace {
   }
   play() {
     if (this.playing) return;
-    this.playing = true; this.acc = 0; this.t0 = performance.now();
+    this.playing = true; this.tick0 = 0; this.t0 = performance.now();
     $('#bt-play') && $('#bt-play').classList.add('on');
     $('#bt-play') && $('#bt-play').setAttribute('aria-label', 'Anhalten');
     const loop = async now => {
       if (!this.playing) return;
       const dt = Math.min(100, now - this.t0); this.t0 = now;
-      this.acc += dt / 1000 * this.speed * TF[this.tf].min;
-      let k = Math.min(Math.floor(this.acc), 2400);
-      this.acc -= k;
+      this.tick0 += dt / 1000 * this.speed * TF[this.tf].min;
+      let k = Math.min(Math.floor(this.tick0), 2400);
+      this.tick0 -= k;
       while (k-- > 0 && this.playing) {
         if (!(await this.tick(true))) { this.endOfData(); break; }
         if (this.stopFlag) { this.stopFlag = false; this.pause(); break; }
@@ -1179,18 +1363,18 @@ class Workspace {
      s.trades: closed trades {id, side, entry, sl0, sl, tp, entryTime, exitTime, exit, r, kind} */
   newDraft(side) {
     if (this.s.order) { CTX.toast('Schließe zuerst die offene Position.'); return; }
+    if (this.acc && this.accBlock()) return;
     const p = this.last; if (!Number.isFinite(p)) return;
-    const a = atr(this.view, 14) || p * 0.002;
-    const d = Math.max(a * 1.2, Math.pow(10, -this.digits) * 5);
-    const r = x => +x.toFixed(this.digits);
+    const d = this.stopDist(), e = this.mkt(side);
+    const r = x => this.rp(x);
     this.draft = side === 'long'
-      ? {side, kind: 'market', entry: r(p), sl: r(p - d), tp: r(p + 2 * d)}
-      : {side, kind: 'market', entry: r(p), sl: r(p + d), tp: r(p - 2 * d)};
+      ? {side, kind: 'market', entry: r(e), sl: r(e - d), tp: r(e + 2 * d)}
+      : {side, kind: 'market', entry: r(e), sl: r(e + d), tp: r(e - 2 * d)};
+    if (this.acc) this.accInitDraft(this.draft);
     this.renderSide(); this.refreshLines();
   }
   validate(o) {
-    const lp = this.last;
-    const e = o.kind === 'market' ? lp : o.entry;
+    const e = o.kind === 'market' ? this.mkt(o.side) : o.entry;
     if (!(o.sl > 0) || !(o.tp > 0) || !(e > 0)) return 'Trag Entry, Stop Loss und Take Profit ein.';
     if (o.side === 'long' && !(o.sl < e && o.tp > e)) return 'Beim Long liegt der Stop Loss unter dem Entry und der Take Profit darüber.';
     if (o.side === 'short' && !(o.sl > e && o.tp < e)) return 'Beim Short liegt der Stop Loss über dem Entry und der Take Profit darunter.';
@@ -1198,18 +1382,34 @@ class Workspace {
   }
   place() {
     const o = this.draft; if (!o) return;
-    const lp = this.last;
+    if (this.acc && this.accBlock()) return;
+    if (this.acc) for (const k of ['entry', 'sl', 'tp']) if (Number.isFinite(o[k])) o[k] = this.rp(o[k]);
+    const lp = this.mkt(o.side);
     if (o.kind !== 'market') o.kind = (o.side === 'long') === (o.entry < lp) ? 'limit' : 'stop';
-    const err = this.validate(o);
+    const err = this.validate(o) || (this.acc ? this.accValidate(o) : '');
     if (err) { const m = $('#bt-tk-msg'); if (m) m.textContent = err; return; }
     const ord = {id: rid('t'), side: o.side, kind: o.kind, entry: o.kind === 'market' ? lp : o.entry, sl: o.sl, tp: o.tp, placedAt: this.now};
-    if (ord.kind === 'market') { ord.open = true; ord.entryTime = this.now; ord.sl0 = ord.sl; }
+    const ins = this.acc ? this.ins(o.sym) : null;
+    if (ins) { Object.assign(ord, {qty: o.qty, qty0: o.qty, sym: ins.sym, commIn: 0}); (this.s.vol = this.s.vol || {})[ins.sym] = o.qty; }
+    if (ord.kind === 'market') { ord.open = true; ord.entryTime = this.now; ord.sl0 = ord.sl; if (ins) ord.commIn = r2(commSide(ins, ord.qty, ord.entry)); }
     this.s.order = ord; this.draft = null;
+    if (ins) {
+      this.acc.open = {sid: this.s.id, name: this.s.name};
+      const side = ord.side === 'long' ? 'Buy ' : 'Sell ';
+      CTX.toast(ord.kind === 'market' ? side + fQty(ins, ord.qty) + ' zu ' + nf(ord.entry, ins.digits) + '.' : side + (ord.kind === 'limit' ? 'Limit ' : 'Stop ') + fQty(ins, ord.qty) + ' bei ' + nf(ord.entry, ins.digits) + ' platziert.');
+      this.saveAcc(true); this.renderAccBar();
+    }
     this.renderSide(); this.refreshLines(); this.markDirty(true);
   }
-  cancelOrder() { if (this.s.order && !this.s.order.open) { this.s.order = null; this.renderSide(); this.refreshLines(); this.markDirty(true); } }
+  cancelOrder() {
+    if (!this.s.order || this.s.order.open) return;
+    this.s.order = null;
+    if (this.acc) { this.acc.open = null; this.saveAcc(true); this.renderAccBar(); }
+    this.renderSide(); this.refreshLines(); this.markDirty(true);
+  }
   // runs on every revealed minute
   fill() {
+    if (this.acc) return this.fillAcc();
     const o = this.s.order; if (!o) return;
     const i = this.i, O = this.min.o[i], H = this.min.h[i], L = this.min.l[i], t = this.min.t[i];
     const long = o.side === 'long';
@@ -1246,13 +1446,17 @@ class Workspace {
     if (this.playing) this.stopFlag = true;
     this.applyMarkers(); this.renderSide(); this.refreshLines(); this.markDirty(true);
   }
-  closeNow() { const o = this.s.order; if (o && o.open) this.close(this.last, this.now); }
+  closeNow() {
+    const o = this.s.order; if (!o || !o.open) return;
+    if (this.acc) this.closeAcc(o.qty, o.side === 'long' ? this.last : this.last + this.ins(o.sym).spread, this.now, 'manual');
+    else this.close(this.last, this.now);
+  }
   toBe() { const o = this.s.order; if (o && o.open) { o.sl = o.entry; this.renderSide(); this.refreshLines(); this.markDirty(true); } }
   /* ---------- lines on the chart */
   levels() {
     const o = this.s.order || this.draft;
     if (!o) return null;
-    return {o, draft: !this.s.order, entry: o.kind === 'market' && !this.s.order ? this.last : o.entry, sl: o.sl, tp: o.tp};
+    return {o, draft: !this.s.order, entry: o.kind === 'market' && !this.s.order ? this.mkt(o.side) : o.entry, sl: o.sl, tp: o.tp};
   }
   refreshLines() {
     if (!this.series) return;
@@ -1263,10 +1467,16 @@ class Workspace {
       const v = want[k];
       if (!Number.isFinite(v)) { if (this.lines[k]) { this.series.removePriceLine(this.lines[k]); delete this.lines[k]; } continue; }
       const base = {side: lv.o.side, entry: lv.entry, sl0: lv.o.sl0 != null ? lv.o.sl0 : lv.sl};
-      const title = style[k][1] + (k === 'entry' ? '' : ' ' + fR(rOf(base, v)));
+      let title = style[k][1] + (k === 'entry' ? '' : ' ' + fR(rOf(base, v)));
+      if (this.acc && k !== 'entry' && lv.o.qty) { const ins = this.ins(lv.o.sym); title = style[k][1] + ' ' + usdS((lv.o.side === 'long' ? 1 : -1) * (v - lv.entry) * ins.pv * lv.o.qty); }
       const opt = {price: v, color: style[k][0], lineWidth: 1, lineStyle: k === 'entry' ? 2 : 0, axisLabelVisible: true, title};
       if (this.lines[k]) this.lines[k].applyOptions(opt); else this.lines[k] = this.series.createPriceLine(opt);
     }
+    // CFD accounts: the ask as a second line, like MetaTrader's "show ask line"
+    if (this.acc && this.acc.type === 'cfd' && Number.isFinite(this.last) && this.cs.lastPrice) {
+      const opt = {price: this.mkt('long'), color: '#2962ff', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: 'Ask'};
+      if (this.lines.ask) this.lines.ask.applyOptions(opt); else this.lines.ask = this.series.createPriceLine(opt);
+    } else if (this.lines.ask) { this.series.removePriceLine(this.lines.ask); delete this.lines.ask; }
     this.pos.update();
   }
   applyMarkers() {
@@ -1275,8 +1485,8 @@ class Workspace {
     for (const t of this.s.trades || []) {
       const et = this.bt(this.barOf(t.entryTime)), xt = this.bt(this.barOf(t.exitTime));
       if (et >= firstT && et <= lastT) ms.push({time: et, position: t.side === 'long' ? 'belowBar' : 'aboveBar', color: this.col.mute, shape: t.side === 'long' ? 'arrowUp' : 'arrowDown', text: ''});
-      const k = resultOf(t.r);
-      if (xt >= firstT && xt <= lastT) ms.push({time: xt, position: t.side === 'long' ? 'aboveBar' : 'belowBar', color: k === 'tp' ? this.col.up : k === 'sl' ? this.col.dn : this.col.mute, shape: 'circle', text: fR(t.r)});
+      const money = this.acc && t.net != null, k = money ? resOf(t) : resultOf(t.r);
+      if (xt >= firstT && xt <= lastT) ms.push({time: xt, position: t.side === 'long' ? 'aboveBar' : 'belowBar', color: k === 'tp' ? this.col.up : k === 'sl' ? this.col.dn : this.col.mute, shape: 'circle', text: money ? usd0(t.net) : fR(t.r)});
     }
     ms.sort((a, b) => a.time - b.time);
     try { this.markers.setMarkers(ms); } catch (e) {}
@@ -1284,17 +1494,20 @@ class Workspace {
   /* ---------- side panel */
   renderSide() { this.renderTicket(); this.renderStats(); this.renderTrades(); }
   renderLive() {
+    if (this.acc) return this.renderLiveAcc();
     const o = this.s.order, el = $('#bt-live');
     if (el && o && o.open) { const r = rOf(o, this.last); el.textContent = fR(r); el.className = 'bt-live ' + (r > 0 ? 'pos' : r < 0 ? 'neg' : ''); }
     if (this.draft && this.draft.kind === 'market') this.renderRR();
   }
   renderRR() {
+    if (this.acc) return this.renderRRAcc();
     const lv = this.levels(); const el = $('#bt-rr'); if (!el || !lv) return;
     const risk = Math.abs(lv.entry - lv.sl), rew = Math.abs(lv.tp - lv.entry);
     const dd = this.m.pip < 1 ? 1 : Math.min(2, this.digits);
     el.innerHTML = `<span><small>Risiko</small><b>${nf(risk / this.m.pip, dd)} ${this.m.unit}</b></span><span><small>Chance</small><b>${nf(rew / this.m.pip, dd)} ${this.m.unit}</b></span><span><small>R:R</small><b>1 : ${risk ? nf(rew / risk, 2) : '–'}</b></span>`;
   }
   renderTicket() {
+    if (this.acc) return this.renderTicketAcc();
     const el = $('#bt-ticket'); if (!el) return;
     const o = this.s.order, d = this.draft, fx = v => Number.isFinite(v) ? v.toFixed(this.digits) : '';
     if (o && o.open) {
@@ -1334,6 +1547,7 @@ class Workspace {
       <p class="bt-hint">Leertaste spielt ab oder hält an, → zeigt die nächste Kerze, L und S öffnen eine Order.</p>`;
   }
   renderStats() {
+    if (this.acc) return this.renderStatsAcc();
     const el = $('#bt-stats'); if (!el) return;
     const st = stats(this.s.trades || []);
     el.innerHTML = `<div class="bt-st-grid">
@@ -1347,6 +1561,7 @@ class Workspace {
       <div class="bt-cnts"><span><i class="sw tp"></i>${st.tp} TP</span><span><i class="sw be"></i>${st.be} BE</span><span><i class="sw sl"></i>${st.sl} SL</span></div>`;
   }
   renderTrades() {
+    if (this.acc) return this.renderTradesAcc();
     const el = $('#bt-trades'); if (!el) return;
     const list = (this.s.trades || []).slice().reverse();
     el.innerHTML = list.length ? `<h3 class="bt-h sm">Trades</h3><ol class="bt-tl">${list.map((t, i) => {
@@ -1356,19 +1571,31 @@ class Workspace {
   }
   /* ---------- input */
   click(e) {
-    const b = e.target.closest('[data-ws],[data-tf],[data-speed],[data-rr],[data-kind],[data-dtool],[data-dfly],[data-dopt],[data-dpick]');
+    const b = e.target.closest('[data-ws],[data-tf],[data-speed],[data-rr],[data-kind],[data-dtool],[data-dfly],[data-dopt],[data-dpick],[data-q],[data-sym],[data-runit]');
     if (!b || b.disabled) return;
+    if (this.acc && b.dataset.q) { this.setQty(+b.dataset.q); return; }
+    if (this.acc && b.dataset.sym) {
+      this.s.sym = b.dataset.sym;
+      const d = this.draft;
+      if (d) { d.sym = b.dataset.sym; for (const k of ['entry', 'sl', 'tp']) d[k] = this.rp(d[k]); d.qty = this.defQty(this.ins(d.sym), d.kind === 'market' ? this.mkt(d.side) : d.entry, d.sl); }
+      this.renderTicket(); this.refreshLines(); this.renderAccBar(); this.markDirty(); return;
+    }
+    if (this.acc && b.dataset.runit) {
+      const bal = balance(this.acc), was = this.s.runit || (this.acc.type === 'fut' ? 'usd' : 'pct'), to = b.dataset.runit;
+      if (was !== to) { const v = this.s.risk != null ? +this.s.risk : was === 'pct' ? 0.5 : 250; this.s.risk = to === 'usd' ? Math.round(bal * v / 100) : Math.round(v / bal * 10000) / 100; }
+      this.s.runit = to; this.renderTicket(); this.markDirty(); return;
+    }
     if (b.dataset.dtool || b.dataset.dfly || b.dataset.dopt || b.dataset.dpick) { if (this.draw) this.draw.toolClick(b); return; }
     if (b.dataset.tf) { this.setTf(b.dataset.tf); return; }
     if (b.dataset.speed) { this.speed = +b.dataset.speed; $$('.bt-speed [data-speed]').forEach(x => x.setAttribute('aria-checked', String(x === b))); return; }
     if (b.dataset.rr && this.draft) {
-      const d = this.draft, e0 = d.kind === 'market' ? this.last : d.entry, risk = Math.abs(e0 - d.sl);
-      d.tp = +(d.side === 'long' ? e0 + risk * +b.dataset.rr : e0 - risk * +b.dataset.rr).toFixed(this.digits);
+      const d = this.draft, e0 = d.kind === 'market' ? this.mkt(d.side) : d.entry, risk = Math.abs(e0 - d.sl);
+      d.tp = this.rp(d.side === 'long' ? e0 + risk * +b.dataset.rr : e0 - risk * +b.dataset.rr);
       this.renderTicket(); this.refreshLines(); return;
     }
     if (b.dataset.kind && this.draft) {
       const d = this.draft;
-      if (b.dataset.kind === 'market') d.kind = 'market'; else { if (d.kind === 'market') d.entry = +this.last.toFixed(this.digits); d.kind = 'pending'; }
+      if (b.dataset.kind === 'market') d.kind = 'market'; else { if (d.kind === 'market') d.entry = this.mkt(d.side); d.kind = 'pending'; }
       this.renderTicket(); this.refreshLines(); return;
     }
     const a = b.dataset.ws;
@@ -1381,6 +1608,9 @@ class Workspace {
     else if (a === 'cancelord') this.cancelOrder();
     else if (a === 'closepos') this.closeNow();
     else if (a === 'be') this.toBe();
+    else if (a === 'partial') this.partial();
+    else if (a === 'sizing') this.sizeByRisk();
+    else if ((a === 'qdn' || a === 'qup') && this.acc) { const ins = this.ins(), cur = this.draft ? this.draft.qty : this.defQty(ins, this.last, this.last - this.stopDist()); this.setQty(roundQty(ins, cur + (a === 'qup' ? ins.step : -ins.step))); }
     else if (a === 'jump') this.openJump();
     else if (a === 'undo') this.draw && this.draw.undo();
     else if (a === 'redo') this.draw && this.draw.redo();
@@ -1388,7 +1618,23 @@ class Workspace {
     else if (a === 'deltrade') { this.s.trades = (this.s.trades || []).filter(t => t.id !== b.dataset.id); this.applyMarkers(); this.renderSide(); this.markDirty(true); }
   }
   input(e) {
-    const f = e.target.dataset && e.target.dataset.lv; if (!f) return;
+    const ds = e.target.dataset || {};
+    if (this.acc && ds.qty != null) {
+      const ins = this.ins(), v = pnum(e.target.value);
+      if (!(v > 0)) return;
+      // a valid volume becomes the default; an invalid one stays in the draft so placing it explains the limit
+      const valid = v >= ins.min && v <= ins.max && Math.abs(roundQty(ins, v) - v) < 1e-9;
+      if (valid) { (this.s.vol = this.s.vol || {})[ins.sym] = roundQty(ins, v); this.markDirty(); }
+      if (this.draft) {
+        this.draft.qty = valid ? roundQty(ins, v) : v;
+        this.renderRR(); this.refreshLines();
+        const pb = $('#bt-ticket .pa-go'); if (pb) pb.textContent = pb.textContent.replace(/[\d.,]+ (Lots|\S+)$/, fQty(ins, v));
+        const m = $('#bt-tk-msg'); if (m) m.textContent = valid ? '' : this.accValidate(Object.assign({}, this.draft, {qty: v}));
+      }
+      return;
+    }
+    if (this.acc && ds.risk != null) { const v = pnum(e.target.value); if (v > 0) { this.s.risk = v; this.markDirty(); } return; }
+    const f = ds.lv; if (!f) return;
     const v = parseFloat(String(e.target.value).replace(',', '.'));
     if (!Number.isFinite(v)) return;
     const o = this.draft || (this.s.order && this.s.order.open ? this.s.order : null);
@@ -1404,7 +1650,12 @@ class Workspace {
     if (this.draw && this.draw.key(e)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const tg = e.target;
-    if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) { if (e.key === 'Enter' && this.draft && tg.dataset.lv) { e.preventDefault(); this.place(); } return; }
+    if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) {
+      if (e.key === 'Enter' && this.draft && tg.dataset.risk != null) { e.preventDefault(); this.sizeByRisk(); }
+      else if (e.key === 'Enter' && this.draft && (tg.dataset.lv || tg.dataset.qty != null)) { e.preventDefault(); this.place(); }
+      else if (e.key === 'Enter' && tg.id === 'pa-pc') { e.preventDefault(); this.partial(); }
+      return;
+    }
     const k = e.key;
     if (k === ' ') { e.preventDefault(); this.playing ? this.pause() : this.play(); }
     else if (k === 'ArrowRight') { e.preventDefault(); this.pause(); this.stepBar(); }
@@ -1454,6 +1705,7 @@ class Workspace {
     this.saveT = setTimeout(() => this.flush(), now ? 300 : 2500);
   }
   flush() {
+    if (this.acc && this.accDirty) { clearTimeout(this.accT); this.saveAcc(true); }
     if (!this.dirty) return;
     this.dirty = false; clearTimeout(this.saveT);
     this.s.updatedAt = Date.now();
@@ -1534,11 +1786,11 @@ class LineDrag {
       const price = ws.series.coordinateToPrice(p.clientY - r.top);
       if (price == null) return;
       const o = ws.draft || ws.s.order;
-      const v = +(+price).toFixed(ws.digits);
+      const v = ws.rp(+price);
       if (this.on === 'entry') o.entry = v; else o[this.on] = v;
       ws.refreshLines();
       const inp = document.querySelector(`#bt-ticket [data-lv="${this.on}"]`);
-      if (inp) inp.value = v.toFixed(ws.digits);
+      if (inp) inp.value = v.toFixed(ws.acc ? ws.ins().digits : ws.digits);
       if (ws.draft) ws.renderRR();
       ev.preventDefault && ev.cancelable && ev.preventDefault();
     };
@@ -2319,7 +2571,9 @@ class DrawLayer {
     const side = d.type === 'long' ? 'long' : 'short';
     const e0 = d.pts[0].p, tp = d.pts[1].p, sl = d.pts[2].p;
     const lp = ws.last, near = Math.abs(e0 - lp) <= Math.pow(10, -ws.digits) * 2;
-    ws.draft = {side, kind: near ? 'market' : 'pending', entry: this.rp(e0), sl: this.rp(sl), tp: this.rp(tp)};
+    if (ws.acc && ws.accBlock()) return;
+    ws.draft = {side, kind: near ? 'market' : 'pending', entry: ws.rp(e0), sl: ws.rp(sl), tp: ws.rp(tp)};
+    if (ws.acc) ws.accInitDraft(ws.draft);
     ws.renderSide(); ws.refreshLines();
     const err = ws.validate(Object.assign({}, ws.draft, {kind: near ? 'market' : (side === 'long') === (e0 < lp) ? 'limit' : 'stop'}));
     CTX.toast(err ? 'Als Entwurf übernommen. ' + err : 'Als Order-Entwurf übernommen. Prüf ihn rechts und platziere ihn.');
@@ -2625,11 +2879,669 @@ function openChartSettings(ws) {
   });
 }
 
+
+/* ================================================================ PROP ACCOUNTS in the workspace
+   A session with s.acct trades on that account: volume in lots or contracts, fills on bid and ask, costs, dollars,
+   and the account's rules. These methods extend the Workspace; without an account it behaves as before (R). */
+const accountById = id => (CTX.S.accounts || []).find(a => a.id === id) || null;
+function normAcc(a) {
+  a.rules = Object.assign(defRules(a.type, a.size), a.rules || {});
+  a.costs = a.costs || {};
+  a.ledger = Array.isArray(a.ledger) ? a.ledger : [];
+  a.att = a.att || 1;
+  a.st = Object.assign({status: 'active', hwm: a.size, lastDay: null, pause: null}, a.st || {});
+  return a;
+}
+const WHY = {sl: 'Stop Loss', tp: 'Take Profit', manual: 'Geschlossen', partial: 'Teil geschlossen', flat: 'Auto-Flat 16:45', 'liq-daily': 'Tagesverlust-Limit', 'liq-max': 'Max. Verlust'};
+const resOf = t => (t.why === 'tp' ? 'tp' : t.why === 'sl' || /^liq/.test(t.why || '') ? 'sl' : t.net > 0 ? 'tp' : t.net < 0 ? 'sl' : 'be');
+const fUsd0 = new Intl.NumberFormat('de-DE', {maximumFractionDigits: 0});
+const usd0 = v => (v >= 0.5 ? '+' : v <= -0.5 ? '−' : '') + fUsd0.format(Math.abs(Math.round(v))) + '\u00a0$';
+// a price as MetaTrader shows it: the last digits large, the pipette raised
+function pxParts(s, digits) {
+  if (digits >= 3) return `${esc(s.slice(0, -3))}<big>${esc(s.slice(-3, -1))}</big><sup>${esc(s.slice(-1))}</sup>`;
+  return `${esc(s.slice(0, -2))}<big>${esc(s.slice(-2))}</big>`;
+}
+function meter(label, val, txt, frac, tone) {
+  return `<div class="pa-m ${tone || ''}"><span class="pa-m-t"><small>${esc(label)}</small><b>${txt}</b></span><span class="pa-m-bar" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(clamp(frac, 0, 1) * 100)}"><i style="width:${(clamp(frac, 0, 1) * 100).toFixed(1)}%"></i></span>${val ? `<small class="pa-m-s">${val}</small>` : ''}</div>`;
+}
+// the three rule meters of an account at a moment (eq: equity now, day: trading day)
+function ruleMeters(acc, eq, day) {
+  const r = acc.rules;
+  if (!r.on) return '<p class="pa-off">Ohne Regeln: das Konto läuft nur mit Kontostand, ohne Ziel und ohne Limits.</p>';
+  const f = floors(acc, day), out = [];
+  const bal = f.bal;
+  if (r.target > 0) { const g = bal - acc.size; out.push(meter('Gewinnziel', acc.st.passedAt ? 'Erreicht am ' + esc(fDate.format(new Date(acc.st.passedAt))) : '', `${usdS(g)} <span>von ${usd(r.target)}</span>`, g / r.target, 'gain')); }
+  if (r.daily > 0) { const used = Math.max(0, f.dayStart - eq); out.push(meter('Tagesverlust', 'Handelstag ' + esc(fDay(day)) + (r.dailyMode === 'pause' ? ' · bei Erreichen Pause bis morgen' : ' · bei Erreichen ist das Konto verloren'), `${usd(-used)} <span>von ${usd(r.daily)}</span>`, used / r.daily, 'loss')); }
+  if (r.maxLoss > 0) {
+    const room = eq - f.max, base = f.max + r.maxLoss;
+    out.push(meter('Max. Verlust', (r.dd === 'static' ? 'Statisch' : r.dd === 'eod' ? 'Trailing zum Tagesende' : 'Trailing intraday') + (r.dd !== 'static' && r.lock ? ', stoppt bei Start + 100 $' : ''), `Grenze ${usd(f.max)} <span>· noch ${usd(Math.max(0, room))}</span>`, (base - eq) / r.maxLoss, 'loss'));
+  }
+  return out.join('');
+}
+
+const AccWS = {
+  ins(sym) { return instr(this.acc, this.s.market, sym || (this.draft && this.draft.sym) || (this.s.order && this.s.order.sym) || this.s.sym, this.digits); },
+  spr(sym) { return this.acc && this.acc.type === 'cfd' ? this.ins(sym).spread : 0; },
+  // a price rounded to what the instrument can trade: futures ticks, CFD digits
+  rp(v) {
+    if (this.acc && this.acc.type === 'fut') { const i = this.ins(); return +(Math.round(v / i.tick) * i.tick).toFixed(i.digits); }
+    return +(+v).toFixed(this.digits);
+  },
+  // the price a market order gets: buy on the ask, sell on the bid (R sessions: the last price)
+  mkt(side) { const p = this.last; if (!this.acc) return p; return this.rp(side === 'long' ? p + this.spr() : p); },
+  accNow() {
+    const acc = this.acc, o = this.s.order, day = dayKey(acc.type, this.now), f = floors(acc, day);
+    let gross = 0, cin = 0, margin = 0;
+    if (o && o.open && Number.isFinite(this.last)) {
+      const ins = this.ins(o.sym), dir = o.side === 'long' ? 1 : -1;
+      gross = dir * ((o.side === 'long' ? this.last : this.last + ins.spread) - o.entry) * ins.pv * o.qty;
+      cin = o.commIn * o.qty / o.qty0;
+      margin = marginOf(ins, o.qty, o.entry);
+    }
+    const eq = f.bal - cin + gross;
+    return {f, day, gross, eq, margin, free: eq - margin, level: margin ? eq / margin * 100 : null, dayPl: eq - f.dayStart};
+  },
+  accBlock(quiet) {
+    const acc = this.acc, st = acc.st; let msg = '';
+    if (st.status === 'failed') msg = 'Dieses Konto ist verloren. Setz es unter Prop-Konten zurück, um neu zu starten.';
+    else if (st.pause && st.pause === dayKey(acc.type, this.now)) msg = 'Tagesverlust-Limit erreicht. Handeln kannst du wieder am nächsten Handelstag.';
+    else if (acc.open && acc.open.sid !== this.s.id) msg = 'Auf diesem Konto ist schon eine Position oder Order offen, in der Session „' + (acc.open.name || 'Session') + '“.';
+    else if (acc.type === 'fut' && acc.rules.on && acc.rules.flat && flatWindow(this.now)) msg = 'Ab 16:45 New York sind Futures-Konten flat. Neue Orders gehen wieder ab der Markteröffnung um 18:00.';
+    if (msg && !quiet) CTX.toast(msg, true);
+    return msg;
+  },
+  // a first stop distance for a new order: a bit more than the average range of the last 14 bars
+  stopDist() {
+    const p = this.last, a = atr(this.view, 14) || p * 0.002;
+    const tick = this.acc && this.acc.type === 'fut' ? this.ins().tick : Math.pow(10, -this.digits);
+    return Math.max(a * 1.2, tick * 5);
+  },
+  defQty(ins, entry, sl) {
+    const v = this.s.vol && this.s.vol[ins.sym];
+    if (v >= ins.min) return Math.min(v, ins.max);
+    if (ins.kind === 'fut') return 1;
+    const q = qtyForRisk(ins, balance(this.acc) * 0.005, entry, sl);
+    return Math.max(ins.min, q);
+  },
+  accInitDraft(d) {
+    if (this.acc.type === 'fut') { const list = FUTS[this.s.market] || []; d.sym = (list.find(x => x.sym === this.s.sym) || list[0] || {}).sym; }
+    else d.sym = this.s.market;
+    const ins = this.ins(d.sym);
+    d.qty = this.defQty(ins, d.entry, d.sl);
+  },
+  setQty(q) {
+    const d = this.draft; const ins = this.ins();
+    q = roundQty(ins, clamp(q, ins.min, ins.max));
+    if (!(q >= ins.min)) return;
+    (this.s.vol = this.s.vol || {})[ins.sym] = q;
+    if (d) d.qty = q;
+    this.renderTicket(); this.refreshLines(); this.markDirty();
+  },
+  sizeByRisk() {
+    const d = this.draft; if (!d) return;
+    const ins = this.ins(), bal = balance(this.acc), unit = this.s.runit || (this.acc.type === 'fut' ? 'usd' : 'pct');
+    const v = +(this.s.risk != null ? this.s.risk : unit === 'pct' ? 0.5 : 250);
+    const risk = unit === 'pct' ? bal * v / 100 : v;
+    const e = d.kind === 'market' ? this.mkt(d.side) : d.entry;
+    const q = qtyForRisk(ins, risk, e, d.sl);
+    const m = $('#bt-tk-msg');
+    if (!(q >= ins.min)) { if (m) m.textContent = 'Bei diesem Stop ist schon ' + fQty(ins, ins.min) + ' mehr Risiko als ' + usd(risk) + '. Rück den Stop näher oder erhöhe das Risiko.'; return; }
+    this.setQty(q);
+    if (q >= ins.max) { const m2 = $('#bt-tk-msg'); if (m2) m2.textContent = 'Begrenzt auf das Maximum von ' + fQty(ins, ins.max) + '.'; }
+  },
+  accValidate(o) {
+    const ins = this.ins(o.sym);
+    if (!(o.qty >= ins.min) || Math.abs(roundQty(ins, o.qty) - o.qty) > 1e-9) return ins.kind === 'fut' ? 'Futures handelst du in ganzen Kontrakten, mindestens 1.' : 'Ungültiges Volumen: ab 0,01 Lots in Schritten von 0,01.';
+    if (o.qty > ins.max + 1e-9) return ins.kind === 'fut' ? `Dein Konto erlaubt höchstens ${fQty(ins, ins.max)}${this.acc.rules.on ? ' (Max. Kontrakte)' : ''}.` : `Höchstens ${fQty(ins, ins.max)} pro Position.`;
+    if (ins.kind === 'cfd') {
+      const e = o.kind === 'market' ? this.mkt(o.side) : o.entry, need = marginOf(ins, o.qty, e), st = this.accNow();
+      if (need > st.free) return `Nicht genug Margin: ${usd(need)} nötig, frei sind ${usd(st.free)}. Wähle weniger Lots.`;
+    }
+    return '';
+  },
+  // the price at which the account's equity reaches a rule's floor: closing there is what the prop firm does
+  liq(o, ins, t) {
+    const acc = this.acc; if (!acc.rules.on) return null;
+    const f = floors(acc, dayKey(acc.type, t)), lim = Math.max(f.max, f.day);
+    if (!(lim > -Infinity)) return null;
+    // the commission for closing is counted in, so the balance after the close lands on the floor
+    const dir = o.side === 'long' ? 1 : -1, cin = o.commIn * o.qty / o.qty0, cout = commSide(ins, o.qty, o.entry);
+    return {p: o.entry + dir * (lim - f.bal + cin + cout) / (ins.pv * o.qty), kind: f.day > f.max ? 'daily' : 'max'};
+  },
+  fillAcc() {
+    const acc = this.acc, i = this.i, t = this.min.t[i];
+    const prevT = this.prevT, prevC = this.prevC; this.prevT = t; this.prevC = this.min.c[i];
+    if (rollDay(acc, dayKey(acc.type, t))) this.accDirty = true;
+    const o = this.s.order; if (!o) return;
+    const ins = this.ins(o.sym), spr = ins.spread, long = o.side === 'long';
+    const O = this.min.o[i], H = this.min.h[i], L = this.min.l[i];
+    if (acc.type === 'fut' && acc.rules.on && acc.rules.flat) {
+      // in the window, or the data jumped over it into the next trading day: flat at the last price before
+      const inWin = flatWindow(t), gap = !inWin && prevT != null && dayKey('fut', t) !== dayKey('fut', prevT);
+      if (inWin || gap) {
+        if (!o.open) { this.s.order = null; acc.open = null; CTX.toast('16:45 New York: Order gelöscht. Futures-Konten gehen vor der Tagespause flat.'); this.accChanged(true); return; }
+        const prev = gap || (prevT != null && t - prevT > MIN && !flatWindow(prevT));
+        this.closeAcc(o.qty, prev ? prevC : O, prev ? prevT : t, 'flat'); return;
+      }
+    }
+    if (!o.open) {
+      const s = long ? spr : 0, aO = O + s, aH = H + s, aL = L + s;   // buy orders fill on the ask, sell orders on the bid
+      const hit = o.kind === 'limit' ? (long ? aL <= o.entry : aH >= o.entry) : (long ? aH >= o.entry : aL <= o.entry);
+      if (!hit) return;
+      if (o.kind === 'stop' && (long ? aO > o.entry : aO < o.entry)) o.entry = this.rp(aO);
+      if (o.kind === 'limit' && (long ? aO < o.entry : aO > o.entry)) o.entry = this.rp(aO);
+      if (ins.kind === 'cfd' && marginOf(ins, o.qty, o.entry) > this.accNow().free) {
+        this.s.order = null; acc.open = null; CTX.toast('Order gelöscht: nicht genug freie Margin.', true); this.accChanged(true); return;
+      }
+      o.open = true; o.entryTime = t; o.sl0 = o.sl; o.commIn = r2(commSide(ins, o.qty, o.entry));
+      CTX.toast((long ? 'Buy ' : 'Sell ') + fQty(ins, o.qty) + ' ausgeführt zu ' + nf(o.entry, ins.digits) + '.');
+      this.accDirty = true;
+      this.renderSide();
+    }
+    const x = long ? 0 : spr, xO = O + x, xH = H + x, xL = L + x;      // a long closes on the bid, a short on the ask
+    const lq = this.liq(o, ins, t);
+    let exit = null, why = '';
+    if (long) {
+      const byRule = lq && lq.p >= o.sl, stop = byRule ? lq.p : o.sl;
+      if (xL <= stop) { exit = xO < stop ? xO : stop; why = byRule ? 'liq-' + lq.kind : 'sl'; }
+      else if (xH >= o.tp) { exit = xO > o.tp ? xO : o.tp; why = 'tp'; }
+    } else {
+      const byRule = lq && lq.p <= o.sl, stop = byRule ? lq.p : o.sl;
+      if (xH >= stop) { exit = xO > stop ? xO : stop; why = byRule ? 'liq-' + lq.kind : 'sl'; }
+      else if (xL <= o.tp) { exit = xO < o.tp ? xO : o.tp; why = 'tp'; }
+    }
+    if (exit != null) { this.closeAcc(o.qty, exit, t, why); return; }
+    if (acc.rules.on && acc.rules.dd === 'intraday') {
+      const dir = long ? 1 : -1, eq = balance(acc) - o.commIn * o.qty / o.qty0 + dir * ((long ? xH : xL) - o.entry) * ins.pv * o.qty;
+      if (eq > (acc.st.hwm || acc.size)) { acc.st.hwm = r2(eq); this.accDirty = true; }
+    }
+  },
+  // closes k lots or contracts of the open position at a price
+  closeAcc(k, exit, t, why) {
+    const o = this.s.order, acc = this.acc; if (!o || !o.open) return;
+    if (this.pend) this.syncBar();
+    const ins = this.ins(o.sym), dir = o.side === 'long' ? 1 : -1;
+    k = roundQty(ins, Math.min(o.qty, k));
+    if (!(k > 0)) return;
+    if (ins.kind === 'fut') exit = this.rp(exit);
+    else exit = +exit.toFixed(ins.digits);
+    const gross = dir * (exit - o.entry) * ins.pv * k;
+    const comm = o.commIn / o.qty0 * k + commSide(ins, k, exit);
+    const net = r2(gross - comm), day = dayKey(acc.type, t);
+    const r = rOf({side: o.side, entry: o.entry, sl0: o.sl0}, exit);
+    acc.ledger.push({id: rid('l'), pid: o.id, sid: this.s.id, sname: this.s.name, mk: this.s.market, sym: ins.sym, side: o.side, qty: k, entry: o.entry, exit, et: o.entryTime, xt: t, at: Date.now(), gross: r2(gross), comm: r2(comm), net, day, why, att: acc.att});
+    (o.parts = o.parts || []).push({qty: k, exit, t, net, r, why});
+    o.qty = roundQty(ins, o.qty - k);
+    const done = o.qty < ins.min - 1e-9;
+    if (done) {
+      const q0 = o.parts.reduce((s, p) => s + p.qty, 0);
+      const tr = {id: o.id, side: o.side, kind: o.kind, entry: o.entry, sl0: o.sl0, sl: o.sl, tp: o.tp, entryTime: o.entryTime, exitTime: t,
+        exit: +(o.parts.reduce((s, p) => s + p.exit * p.qty, 0) / q0).toFixed(ins.digits), r: Math.round(o.parts.reduce((s, p) => s + p.r * p.qty, 0) / q0 * 100) / 100,
+        qty: r2(q0), sym: ins.sym, net: r2(o.parts.reduce((s, p) => s + p.net, 0)), comm: r2(acc.ledger.filter(l => l.pid === o.id).reduce((s, l) => s + l.comm, 0)), parts: o.parts, why, acct: acc.id, att: acc.att};
+      (this.s.trades = this.s.trades || []).push(tr);
+      this.s.order = null; acc.open = null;
+      CTX.toast((WHY[why] || 'Geschlossen') + ': ' + usdS(tr.net) + (tr.parts.length > 1 ? ' (gesamt)' : ''));
+      if (this.playing) this.stopFlag = true;
+    } else CTX.toast('Teil geschlossen: ' + fQty(ins, k) + ', ' + usdS(net) + '. Offen: ' + fQty(ins, o.qty) + '.');
+    if (acc.rules.on && acc.rules.dd === 'intraday') acc.st.hwm = Math.max(acc.st.hwm || acc.size, balance(acc));
+    if (/^liq-/.test(why)) this.breach(why.slice(4), t);
+    else this.ruleCheck(t);
+    this.applyMarkers(); this.accChanged(true);
+  },
+  ruleCheck(t) {
+    const acc = this.acc, r = acc.rules; if (!r.on || acc.st.status === 'failed') return;
+    const f = floors(acc, dayKey(acc.type, t));
+    if (f.bal <= f.max + 0.005) return this.breach('max', t);
+    if (f.bal <= f.day + 0.005) return this.breach('daily', t);
+    if (r.target > 0 && !acc.st.passedAt && f.bal >= acc.size + r.target - 0.005) {
+      acc.st.status = 'passed'; acc.st.passedAt = t;
+      if (this.playing) this.stopFlag = true;
+      dialog(`<div class="bt-dlg-head"><h2>Gewinnziel erreicht</h2><button type="button" class="btn icon ghost" data-bt="close" aria-label="Schließen">✕</button></div>
+        <p class="bt-note">${esc(acc.name)} steht bei ${usd(f.bal)}, das sind ${usdS(f.bal - acc.size)} seit dem Start. Bei einer Prop-Firma hättest du diese Phase bestanden. Du kannst weiter traden, die Regeln gelten weiter.</p>
+        <div class="row-btns end"><button type="button" class="btn" data-bt="toprop">Zu den Prop-Konten</button><button type="button" class="btn primary" data-bt="close">Weiter traden</button></div>`);
+    }
+  },
+  breach(kind, t) {
+    const acc = this.acc, r = acc.rules, day = dayKey(acc.type, t);
+    if (this.s.order && !this.s.order.open) { this.s.order = null; acc.open = null; }
+    if (this.playing) this.stopFlag = true;
+    if (kind === 'daily' && r.dailyMode === 'pause') {
+      acc.st.pause = day;
+      dialog(`<div class="bt-dlg-head"><h2>Tagesverlust-Limit erreicht</h2><button type="button" class="btn icon ghost" data-bt="close" aria-label="Schließen">✕</button></div>
+        <p class="bt-note">Heute hast du ${usd(-r.daily)} verloren. Wie bei den Futures-Prop-Firmen ist das ein weicher Verstoß: das Konto bleibt bestehen, aber am Handelstag ${esc(fDay(day))} kannst du nicht mehr traden. Spiel weiter bis zur nächsten Session ab 18:00 New York.</p>
+        <div class="row-btns end"><button type="button" class="btn primary" data-bt="close">Verstanden</button></div>`);
+      return;
+    }
+    acc.st.status = 'failed'; acc.st.why = kind; acc.st.at = t;
+    const f = floors(acc, day);
+    dialog(`<div class="bt-dlg-head"><h2>Konto verloren</h2><button type="button" class="btn icon ghost" data-bt="close" aria-label="Schließen">✕</button></div>
+      <p class="bt-note">${kind === 'max' ? `Dein Konto hat die Grenze für den maximalen Verlust erreicht (${usd(f.max)}).` : `Dein Konto hat das Tagesverlust-Limit von ${usd(r.daily)} erreicht.`} Bei einer Prop-Firma wäre das Konto jetzt beendet. Die offene Position wurde zur Grenze geschlossen, neue Orders gehen auf diesem Konto nicht mehr.</p>
+      <p class="bt-note">Unter Prop-Konten kannst du das Konto zurücksetzen und mit ${usd(acc.size)} neu starten.</p>
+      <div class="row-btns end"><button type="button" class="btn" data-bt="close">Chart ansehen</button><button type="button" class="btn primary" data-bt="toprop">Zu den Prop-Konten</button></div>`);
+  },
+  accChanged(save) {
+    this.renderSide(); this.refreshLines(); this.renderAccBar();
+    this.markDirty(true);
+    if (save) this.saveAcc(true); else this.accDirty = true;
+  },
+  saveAcc(now) {
+    if (!this.acc) return;
+    clearTimeout(this.accT);
+    const go = () => { this.accDirty = false; this.acc.updatedAt = Date.now(); CTX.Store.save('accounts', JSON.parse(JSON.stringify(this.acc))).catch(() => { this.accDirty = true; CTX.toast('Das Konto konnte nicht gespeichert werden. Prüfe deine Verbindung.', true); }); };
+    if (now) go(); else this.accT = setTimeout(go, 1500);
+  },
+  partial() {
+    const o = this.s.order; if (!o || !o.open) return;
+    const ins = this.ins(o.sym), inp = $('#pa-pc'), q = inp ? parseFloat(String(inp.value).replace(',', '.')) : NaN;
+    const m = $('#bt-tk-msg');
+    if (!(q >= ins.min) || q >= o.qty || Math.abs(roundQty(ins, q) - q) > 1e-9) { if (m) m.textContent = `Gib eine Menge zwischen ${fQty(ins, ins.min)} und ${fQty(ins, roundQty(ins, o.qty - ins.step))} ein.`; return; }
+    this.closeAcc(q, o.side === 'long' ? this.last : this.last + ins.spread, this.now, 'partial');
+  },
+  /* ---- the account bar above the chart */
+  renderAccBar() {
+    const el = $('#pa-bar'); if (!el || !this.acc) return;
+    const acc = this.acc, n = this.accNow(), st = acc.st, o = this.s.order;
+    const stTxt = st.status === 'failed' ? 'Verloren' : st.pause === n.day ? 'Pause bis morgen' : st.status === 'passed' ? 'Ziel erreicht' : 'Aktiv';
+    const stCls = st.status === 'failed' ? 'bad' : st.pause === n.day ? 'warn' : st.status === 'passed' ? 'good' : '';
+    const it = (l, v, c, id) => `<span class="pa-i${c ? ' ' + c : ''}"${id ? ` id="${id}"` : ''}><small>${l}</small><b>${v}</b></span>`;
+    const pl = c => (c > 0.004 ? 'pos' : c < -0.004 ? 'neg' : '');
+    let items;
+    if (acc.type === 'cfd') items = [it('Kontostand', usd(n.f.bal)), it('Equity', usd(n.eq)), it('Margin', usd(n.margin)), it('Freie Margin', usd(n.free)), it('Margin-Level', n.level == null ? '–' : nf(n.level, 0) + ' %'), it('Heute', usdS(n.dayPl), pl(n.dayPl))];
+    else {
+      const ins = this.ins(o ? o.sym : null), lim = acc.rules.on && acc.rules.maxQty ? ins.max : 0;
+      const used = o ? o.qty : 0;
+      items = [it('Balance', usd(n.f.bal)), it('Offener G/V', usdS(n.gross), pl(n.gross)), it('Heute', usdS(n.dayPl), pl(n.dayPl)), it('Max-Loss-Grenze', acc.rules.on && n.f.max > -Infinity ? usd(n.f.max) : '–'), it('Kontrakte', nf(used, 0) + (lim ? ' / ' + nf(lim, 0) : '') + ' ' + esc(ins.sym))];
+    }
+    el.innerHTML = `<span class="pa-id"><span class="pa-type ${acc.type}">${PA_TYPES[acc.type]}</span><b>${esc(acc.name)}</b><span class="pa-st ${stCls}">${stTxt}</span></span>${items.join('')}`;
+    const rm = $('#pa-rules');
+    if (rm) rm.innerHTML = `<h3 class="bt-h sm">Regeln</h3>${ruleMeters(acc, n.eq, n.day)}`;
+  },
+  /* ---- the order ticket: MetaTrader for CFDs, a futures ticket like Tradesea */
+  renderTicketAcc() {
+    const el = $('#bt-ticket'); if (!el) return;
+    const acc = this.acc, o = this.s.order, d = this.draft, fx = v => (Number.isFinite(v) ? v.toFixed(this.ins().digits) : '');
+    const ins = this.ins(), dg = ins.digits;
+    const block = !o && !d ? this.accBlock(true) : '';
+    this.blk = block;
+    if (o && o.open) {
+      const n = this.accNow(), r = rOf(o, o.side === 'long' ? this.last : this.last + ins.spread);
+      el.innerHTML = `<div class="bt-pos ${o.side}">
+        <div class="bt-pos-h"><span class="bt-side-tag ${o.side}">${o.side === 'long' ? 'Buy' : 'Sell'} ${esc(fQty(ins, o.qty))}</span><span>seit ${esc(fHM.format(new Date(o.entryTime)))}</span><span class="spacer"></span><span class="pa-live"><b id="bt-live" class="bt-live ${n.gross > 0 ? 'pos' : n.gross < 0 ? 'neg' : ''}">${usdS(n.gross)}</b><small id="pa-live-r">${fR(r)}</small></span></div>
+        <div class="bt-lv"><span><small>Entry</small><b>${nf(o.entry, dg)}</b></span>
+          <label><small>Stop Loss</small><input class="inp" inputmode="decimal" data-lv="sl" value="${fx(o.sl)}"></label>
+          <label><small>Take Profit</small><input class="inp" inputmode="decimal" data-lv="tp" value="${fx(o.tp)}"></label></div>
+        ${o.qty > ins.min + 1e-9 ? `<div class="pa-pc"><label><small>Teilschließen</small><span class="pa-pc-in"><input class="inp" id="pa-pc" inputmode="decimal" value="${ins.kind === 'fut' ? Math.floor(o.qty / 2) || 1 : nf(roundQty(ins, Math.max(ins.min, Math.floor(o.qty / 2 * 100) / 100)), 2)}" aria-label="Menge zum Schließen"><em>${ins.kind === 'fut' ? esc(ins.sym) : 'Lots'}</em></span></label><button type="button" class="btn sm" data-ws="partial">Teil schließen</button></div>` : ''}
+        <p class="bt-im-msg" id="bt-tk-msg" role="status"></p>
+        <div class="row-btns"><button type="button" class="btn sm ghost" data-ws="be">SL auf Einstand</button><button type="button" class="btn sm" data-ws="closepos">Position schließen</button></div>
+        <p class="bt-hint">Kommission bisher ${usd(o.commIn * o.qty / o.qty0)}${ins.kind === 'cfd' ? ' · Margin ' + usd(marginOf(ins, o.qty, o.entry)) : ''}. Ziehe SL und TP direkt im Chart.</p></div>`;
+      return;
+    }
+    if (o && !o.open) {
+      const lbl = (o.side === 'long' ? 'Buy ' : 'Sell ') + (o.kind === 'limit' ? 'Limit' : 'Stop');
+      el.innerHTML = `<div class="bt-pos ${o.side} pending">
+        <div class="bt-pos-h"><span class="bt-side-tag ${o.side}">${lbl}</span><span>${esc(fQty(ins, o.qty))} · wartet auf ${nf(o.entry, dg)}</span></div>
+        <div class="bt-lv"><span><small>Entry</small><b>${nf(o.entry, dg)}</b></span><span><small>Stop Loss</small><b>${nf(o.sl, dg)}</b></span><span><small>Take Profit</small><b>${nf(o.tp, dg)}</b></span></div>
+        <div class="row-btns"><button type="button" class="btn sm ghost" data-ws="cancelord">Order löschen</button></div></div>`;
+      return;
+    }
+    const volRow = (q) => {
+      const chips = ins.kind === 'fut' ? [1, 2, 3, 5, 10].filter(x => x <= ins.max) : [0.01, 0.1, 0.5, 1].filter(x => x <= ins.max);
+      return `<div class="pa-vol-row"><div class="pa-vol" role="group" aria-label="${ins.kind === 'fut' ? 'Kontrakte' : 'Volumen in Lots'}"><button type="button" class="btn icon sm" data-ws="qdn" aria-label="Weniger">−</button><input class="inp" data-qty inputmode="decimal" value="${ins.kind === 'fut' ? q : nf(q, 2)}" aria-label="${ins.kind === 'fut' ? 'Kontrakte' : 'Lots'}"><button type="button" class="btn icon sm" data-ws="qup" aria-label="Mehr">+</button><em>${ins.kind === 'fut' ? esc(ins.sym) : 'Lots'}</em></div>
+        <div class="bt-rrq">${chips.map(x => `<button type="button" class="chip" data-q="${x}">${ins.kind === 'fut' ? x : nf(x, 2)}</button>`).join('')}</div></div>`;
+    };
+    if (d) {
+      const unit = this.s.runit || (acc.type === 'fut' ? 'usd' : 'pct'), rv = this.s.risk != null ? this.s.risk : unit === 'pct' ? 0.5 : 250;
+      const pend = d.kind !== 'market';
+      const btn = (d.side === 'long' ? 'Buy ' : 'Sell ') + (pend ? (((d.side === 'long') === (d.entry < this.mkt(d.side))) ? 'Limit ' : 'Stop ') : (acc.type === 'cfd' ? 'by Market ' : 'Mkt ')) + fQty(ins, d.qty);
+      el.innerHTML = `<div class="bt-pos ${d.side} draft">
+        <div class="bt-pos-h"><span class="bt-side-tag ${d.side}">${d.side === 'long' ? 'Buy' : 'Sell'}</span><div class="seg bt-kind" role="radiogroup" aria-label="Ordertyp"><button type="button" role="radio" aria-checked="${!pend}" data-kind="market">${acc.type === 'cfd' ? 'Sofort' : 'Markt'}</button><button type="button" role="radio" aria-checked="${pend}" data-kind="pending">${acc.type === 'cfd' ? 'Pending' : 'Limit/Stop'}</button></div></div>
+        ${acc.type === 'fut' ? `<div class="seg pa-sym" role="radiogroup" aria-label="Kontrakt">${(FUTS[this.s.market] || []).map(f => `<button type="button" role="radio" aria-checked="${f.sym === ins.sym}" data-sym="${f.sym}" title="${esc(f.name)}">${esc(f.sym)}<small>${f.micro ? 'Micro' : 'Mini'}</small></button>`).join('')}</div>` : ''}
+        ${volRow(d.qty)}
+        <div class="pa-risk"><label><small>Größe nach Risiko</small><span class="pa-pc-in"><input class="inp" data-risk inputmode="decimal" value="${nf(rv, unit === 'pct' ? 2 : 0).replace(/,00$/, '')}" aria-label="Risiko"><span class="seg pa-ru" role="radiogroup" aria-label="Einheit"><button type="button" role="radio" aria-checked="${unit === 'pct'}" data-runit="pct">%</button><button type="button" role="radio" aria-checked="${unit === 'usd'}" data-runit="usd">$</button></span></span></label><button type="button" class="btn sm" data-ws="sizing">${acc.type === 'fut' ? 'Kontrakte' : 'Lots'} berechnen</button></div>
+        <div class="bt-lv">
+          <label><small>${pend ? 'Preis' : d.side === 'long' ? 'Ask' : 'Bid'}</small><input class="inp" inputmode="decimal" data-lv="entry" value="${fx(pend ? d.entry : this.mkt(d.side))}"${pend ? '' : ' disabled'}></label>
+          <label><small>Stop Loss</small><input class="inp" inputmode="decimal" data-lv="sl" value="${fx(d.sl)}"></label>
+          <label><small>Take Profit</small><input class="inp" inputmode="decimal" data-lv="tp" value="${fx(d.tp)}"></label></div>
+        <div class="bt-rrq" role="group" aria-label="Take Profit als Vielfaches des Risikos">${[1, 1.5, 2, 3].map(x => `<button type="button" class="chip" data-rr="${x}">${nf(x, x % 1 ? 1 : 0)}R</button>`).join('')}</div>
+        <div class="bt-rr pa-info" id="bt-rr"></div>
+        <p class="bt-im-msg" id="bt-tk-msg" role="status"></p>
+        <div class="row-btns"><button type="button" class="btn sm ghost" data-ws="discard">Verwerfen</button><button type="button" class="btn sm primary pa-go ${d.side}" data-ws="place">${esc(btn)}</button></div>
+        <p class="bt-hint">Linien im Chart ziehen oder Werte eintragen. Enter platziert, Esc verwirft.</p></div>`;
+      this.renderRR();
+      return;
+    }
+    const q = this.defQty(ins, this.last, this.last - this.stopDist());
+    const bid = this.last, ask = this.mkt('long');
+    const sub = ins.kind === 'cfd'
+      ? `Spread ${nf(ins.spreadU, 1)} ${esc(this.m.unit)} · ${this.m.pip < 1 ? 'Pip' : 'Punkt'}-Wert ${usd(ins.pv * this.m.pip * q)} · Margin ${usd(marginOf(ins, q, bid))}`
+      : `Tick ${nf(ins.tick, decimalsOf(String(ins.tick)))} = ${usd(ins.tv)} pro Kontrakt · Kommission ${usd(ins.rt)} je Round Turn`;
+    el.innerHTML = block
+      ? `<div class="pa-block"><b>${st0(acc, this.now)}</b><p>${esc(block)}</p>${acc.st.status === 'failed' ? '<button type="button" class="btn sm primary" data-bt="toprop">Zu den Prop-Konten</button>' : ''}</div>`
+      : `<div class="pa-oc">
+        <button type="button" class="pa-q sell" data-ws="short"><small>${ins.kind === 'fut' ? 'Sell' : 'SELL'}</small><b>${pxParts(nf(bid, dg), dg)}</b></button>
+        <div class="pa-oc-v"><div class="pa-vol"><button type="button" class="btn icon sm" data-ws="qdn" aria-label="Weniger">−</button><input class="inp" data-qty inputmode="decimal" value="${ins.kind === 'fut' ? q : nf(q, 2)}" aria-label="${ins.kind === 'fut' ? 'Kontrakte' : 'Lots'}"><button type="button" class="btn icon sm" data-ws="qup" aria-label="Mehr">+</button></div><small>${ins.kind === 'fut' ? esc(ins.sym) : 'Lots'}</small></div>
+        <button type="button" class="pa-q buy" data-ws="long"><small>${ins.kind === 'fut' ? 'Buy' : 'BUY'}</small><b>${pxParts(nf(ask, dg), dg)}</b></button>
+      </div>
+      ${ins.kind === 'fut' ? `<div class="seg pa-sym" role="radiogroup" aria-label="Kontrakt">${(FUTS[this.s.market] || []).map(f => `<button type="button" role="radio" aria-checked="${f.sym === ins.sym}" data-sym="${f.sym}" title="${esc(f.name)}">${esc(f.sym)}<small>${f.micro ? 'Micro' : 'Mini'}</small></button>`).join('')}</div>` : ''}
+      <p class="pa-sub">${sub}</p>
+      <p class="bt-hint">${ins.kind === 'cfd' ? 'BUY eröffnet zum Ask, SELL zum Bid, wie in MetaTrader 5.' : 'Futures handelst du in ganzen Kontrakten, Mini oder Micro.'} L und S öffnen eine Order, die Leertaste spielt ab.</p>`;
+  },
+  renderRRAcc() {
+    const el = $('#bt-rr'), d = this.draft; if (!el || !d) return;
+    const ins = this.ins(d.sym), e = d.kind === 'market' ? this.mkt(d.side) : d.entry;
+    const risk = Math.abs(e - d.sl), rew = Math.abs(d.tp - e);
+    const lossUsd = lossPer(ins, e, d.sl, e) * d.qty, winUsd = rew * ins.pv * d.qty - commSide(ins, d.qty, e) * 2;
+    const bal = balance(this.acc);
+    const cells = ins.kind === 'fut'
+      ? [['Stop', nf(Math.round(risk / ins.tick), 0) + ' Ticks'], ['Risiko', usd(-lossUsd), 'neg'], ['R:R', '1 : ' + (risk ? nf(rew / risk, 2) : '–')], ['Ziel', nf(Math.round(rew / ins.tick), 0) + ' Ticks'], ['Chance', usdS(winUsd), 'pos'], ['Kommission', usd(commSide(ins, d.qty, e) * 2)]]
+      : [['Risiko', usd(-lossUsd), 'neg'], ['vom Konto', nf(lossUsd / bal * 100, 2) + ' %'], ['R:R', '1 : ' + (risk ? nf(rew / risk, 2) : '–')], ['Chance', usdS(winUsd), 'pos'], ['Margin', usd(marginOf(ins, d.qty, e))], ['Kommission', usd(commSide(ins, d.qty, e) * 2)]];
+    el.innerHTML = cells.map(([l, v, c]) => `<span${c ? ` class="${c}"` : ''}><small>${l}</small><b>${v}</b></span>`).join('');
+  },
+  renderLiveAcc() {
+    const o = this.s.order;
+    if (o && o.open) {
+      const ins = this.ins(o.sym), n = this.accNow(), el = $('#bt-live'), rr = $('#pa-live-r');
+      if (el) { el.textContent = usdS(n.gross); el.className = 'bt-live ' + (n.gross > 0 ? 'pos' : n.gross < 0 ? 'neg' : ''); }
+      if (rr) rr.textContent = fR(rOf(o, o.side === 'long' ? this.last : this.last + ins.spread));
+    } else if (!o && !this.draft) {
+      // trading can open or close with the clock (16:45 flat, a paused day ending): redraw the ticket then
+      const blk = this.accBlock(true);
+      if (blk !== (this.blk || '')) { this.blk = blk; this.renderTicket(); }
+      const b = $('.pa-q.sell b'), a = $('.pa-q.buy b'), dg = this.ins().digits;
+      if (b && Number.isFinite(this.last)) { b.innerHTML = pxParts(nf(this.last, dg), dg); a.innerHTML = pxParts(nf(this.mkt('long'), dg), dg); }
+    }
+    if (this.draft && this.draft.kind === 'market') { const inp = $('#bt-ticket [data-lv="entry"]'); if (inp) inp.value = this.mkt(this.draft.side).toFixed(this.ins().digits); this.renderRR(); }
+    this.renderAccBar();
+    if (this.accDirty) this.saveAcc(false);
+  },
+  renderStatsAcc() {
+    const el = $('#bt-stats'); if (!el) return;
+    const st = statsUsd((this.s.trades || []).filter(t => t.acct === this.acc.id && t.att === this.acc.att));
+    const pl = v => (v > 0.004 ? 'pos' : v < -0.004 ? 'neg' : '');
+    el.innerHTML = `<h3 class="bt-h sm">Diese Session</h3><div class="bt-st-grid">
+      <span><small>Trades</small><b>${st.n}</b></span>
+      <span><small>Win-Rate</small><b>${st.wr == null ? '–' : Math.round(st.wr * 100) + ' %'}</b></span>
+      <span class="${pl(st.sum)}"><small>Netto</small><b>${st.n ? usd0(st.sum) : '–'}</b></span>
+      <span><small>Profitfaktor</small><b>${st.pf == null ? '–' : st.pf === Infinity ? '∞' : nf(st.pf, 2)}</b></span>
+      <span><small>Ø pro Trade</small><b>${st.n ? usd0(st.avg) : '–'}</b></span>
+      <span><small>Max. Drawdown</small><b>${st.n ? usd0(-st.dd) : '–'}</b></span></div>
+      <div class="bt-curve">${sparkSvg(st.curve, 300, 64)}</div>
+      <div class="bt-cnts"><span><i class="sw tp"></i>${st.w} Gewinner</span><span><i class="sw sl"></i>${st.l} Verlierer</span></div>`;
+  },
+  renderTradesAcc() {
+    const el = $('#bt-trades'); if (!el) return;
+    const list = (this.s.trades || []).filter(t => t.acct === this.acc.id).slice().reverse();
+    el.innerHTML = list.length ? `<h3 class="bt-h sm">Trades</h3><ol class="bt-tl">${list.map(t => {
+      const k = resOf(t), dg = this.digits, old = t.att !== this.acc.att;
+      return `<li${old ? ' class="old" title="Aus einem früheren Durchgang, vor dem Zurücksetzen"' : ''}><span class="bt-res ${k}">${t.why === 'tp' ? 'TP' : t.why === 'sl' ? 'SL' : /^liq/.test(t.why) ? 'LIM' : t.why === 'flat' ? 'FLAT' : k === 'tp' ? '+' : k === 'sl' ? '−' : 'BE'}</span><span class="bt-tl-m"><b>${t.side === 'long' ? 'Buy' : 'Sell'} ${esc(t.sym === this.s.market ? nf(t.qty, 2) + ' Lots' : nf(t.qty, 0) + ' ' + t.sym)} · ${esc(fDT.format(new Date(t.entryTime)))}</b><small>${nf(t.entry, dg)} → ${nf(t.exit, dg)}${t.parts && t.parts.length > 1 ? ' · ' + t.parts.length + ' Teile' : ''} · ${fR(t.r)}</small></span><b class="${t.net > 0 ? 'pos' : t.net < 0 ? 'neg' : ''}">${usdS(t.net)}</b></li>`;
+    }).join('')}</ol>` : '';
+  },
+};
+// the account's state in words, for the ticket when trading is blocked
+function st0(acc, now) {
+  if (acc.st.status === 'failed') return 'Konto verloren' + (acc.st.why === 'daily' ? ': Tagesverlust-Limit' : acc.st.why === 'max' ? ': Max. Verlust' : '');
+  if (acc.st.pause && acc.st.pause === dayKey(acc.type, now)) return 'Pause bis zum nächsten Handelstag';
+  if (acc.open) return 'Position in einer anderen Session';
+  return 'Gerade kein Handel';
+}
+
+Object.assign(Workspace.prototype, AccWS);
+
+/* ================================================================ PROP ACCOUNTS page (#prop)
+   The accounts with balance and rule meters, creating and editing them, and the guide. */
+const P = {el: null, guide: null};
+const canProp = () => !CTX || !CTX.canProp || CTX.canProp();
+const accounts = () => (CTX.S.accounts || []).filter(a => a && a.id && a.type && a.size).map(a => normAcc(JSON.parse(JSON.stringify(a))));
+const fIn = new Intl.NumberFormat(LOC, {useGrouping: false, maximumFractionDigits: 4});
+const numIn = v => (Number.isFinite(+v) ? fIn.format(+v) : '');
+const pnum = v => { const n = parseFloat(String(v == null ? '' : v).trim().replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')); return Number.isFinite(n) ? n : NaN; };
+const ICON_FUT = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16"/><path d="M7 15l4-5 3 3 5-7"/><path d="M15 6h4v4"/></svg>';
+const ICON_CFD = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 15V9M12 17V7M17 13v-3"/></svg>';
+
+function accSpark(acc) {
+  const c = [0]; let e = 0;
+  for (const l of ledgerNow(acc)) { e += l.net; c.push(e); }
+  return sparkSvg(c, 260, 46);
+}
+function accCard(acc) {
+  const bal = balance(acc), pl = bal - acc.size, st = acc.st;
+  const day = st.lastDay || dayKey(acc.type, Date.now());
+  const ss = sessions().filter(s => s.acct === acc.id).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const open = acc.open && ss.some(s => s.id === acc.open.sid) ? acc.open : null;
+  const ps = statsUsd(positions(acc).sort((a, b) => a.exitTime - b.exitTime));
+  const paused = st.pause && st.pause === st.lastDay;
+  const stTxt = st.status === 'failed' ? 'Verloren' : paused ? 'Pause' : st.status === 'passed' ? 'Ziel erreicht' : 'Aktiv';
+  const stCls = st.status === 'failed' ? 'bad' : paused ? 'warn' : st.status === 'passed' ? 'good' : '';
+  return `<article class="pa-card${st.status === 'failed' ? ' failed' : ''}" aria-labelledby="pa-n-${esc(acc.id)}">
+    <header class="pa-c-top"><span class="pa-type ${acc.type}">${PA_TYPES[acc.type]}</span><span class="pa-size">${kLabel(acc.size)}</span><span class="spacer"></span><span class="pa-st ${stCls}">${stTxt}</span></header>
+    <h3 class="pa-c-name" id="pa-n-${esc(acc.id)}">${esc(acc.name)}</h3>
+    <div class="pa-c-bal"><b>${usd(bal)}</b><span class="${pl > 0.004 ? 'pos' : pl < -0.004 ? 'neg' : ''}">${usdS(pl)} · ${pl >= 0 ? '+' : '−'}${nf(Math.abs(pl / acc.size * 100), 2)} %</span></div>
+    ${accSpark(acc)}
+    ${st.status === 'failed' ? `<p class="pa-fail">${st.why === 'daily' ? 'Tagesverlust-Limit' : 'Max. Verlust'} erreicht${st.at ? ' am ' + esc(fDate.format(new Date(st.at))) : ''}. Setz das Konto zurück, um neu zu starten.</p>` : ''}
+    <div class="pa-meters">${ruleMeters(acc, bal, day)}</div>
+    <div class="bt-c-stats"><span><b>${ps.n}</b> Trades</span><span><b>${ps.wr == null ? '–' : Math.round(ps.wr * 100) + ' %'}</b> Win-Rate</span><span><b>${ps.pf == null ? '–' : ps.pf === Infinity ? '∞' : nf(ps.pf, 2)}</b> Profitfaktor</span></div>
+    ${ss.length ? `<ul class="pa-sess" aria-label="Sessions auf diesem Konto">${ss.slice(0, 4).map(s => `<li><span class="bt-mk-tag">${esc((MK[s.market] || {}).tag || s.market)}</span><span class="pa-s-m"><b>${esc(s.name || 'Session')}</b><small>${s.cursor ? esc(fDT.format(new Date(s.cursor))) : ''}${open && open.sid === s.id ? ' · Position offen' : ''}</small></span><button type="button" class="btn sm ghost" data-pa="open" data-id="${esc(s.id)}">Weiter</button></li>`).join('')}</ul>` : ''}
+    <div class="pa-acts">
+      <button type="button" class="btn sm primary" data-pa="trade" data-id="${esc(acc.id)}"${st.status === 'failed' ? ' disabled' : ''}>Neue Session</button>
+      <button type="button" class="btn sm ghost" data-pa="edit" data-id="${esc(acc.id)}">Regeln und Kosten</button>
+      <button type="button" class="btn sm ${st.status === 'failed' ? '' : 'ghost'}" data-pa="reset" data-id="${esc(acc.id)}">Zurücksetzen</button>
+      <button type="button" class="btn sm ghost pa-del" data-pa="del" data-id="${esc(acc.id)}" aria-label="Konto ${esc(acc.name)} löschen">Löschen</button>
+    </div>
+  </article>`;
+}
+function renderProp() {
+  const el = P.el; if (!el) return;
+  const list = accounts().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const loaded = CTX.S.loaded ? CTX.S.loaded.accounts !== false : true;
+  const choose = `<div class="pa-choose">
+      <button type="button" class="pa-pick" data-pa="new" data-type="fut"><span class="pa-pick-ic">${ICON_FUT}</span><b>Futures-Konto</b><span>25K, 50K, 100K oder 150K. Ganze Kontrakte wie bei Tradesea: NQ, ES, Gold, Euro und Pfund, als Mini oder Micro.</span></button>
+      <button type="button" class="pa-pick" data-pa="new" data-type="cfd"><span class="pa-pick-ic">${ICON_CFD}</span><b>CFD-Konto</b><span>10K, 25K, 50K oder 100K. Lots ab 0,01 wie in MetaTrader 5, mit Spread, Kommission und Margin.</span></button>
+    </div>`;
+  el.innerHTML = `<section class="pa-page" aria-label="Prop-Konten">
+    <div class="page-head">
+      <div class="grow"><h1>Prop-Konten</h1><p>Backteste wie auf einem echten Konto: Futures in ganzen Kontrakten, CFDs in Lots wie in MetaTrader 5, der Kontostand in Dollar und die Regeln der Prop-Firmen.</p></div>
+      <button type="button" class="btn primary" data-pa="new">${ICON_PLUS}Neues Konto</button>
+    </div>
+    ${!loaded ? '<div class="empty sm"><p>Konten werden geladen…</p></div>'
+      : list.length ? `<div class="pa-grid">${list.map(accCard).join('')}</div>`
+      : `<div class="pa-empty"><h2 class="bt-h">Leg dein erstes Konto an</h2><p class="bt-note">Wähle die Art des Kontos. Größe, Regeln und Kosten stellst du im nächsten Schritt ein.</p>${choose}</div>`}
+    ${propGuide(P.guide == null ? !list.length : P.guide)}
+  </section>`;
+  const g = $('#pa-guide', el);
+  if (g) g.addEventListener('toggle', () => { P.guide = g.open; });
+}
+
+/* ---- create or edit an account */
+function openAccDlg(id, type0) {
+  const cur = id ? accounts().find(a => a.id === id) : null;
+  const F = cur ? {type: cur.type, size: cur.size, name: cur.name, rules: Object.assign({}, cur.rules), costs: JSON.parse(JSON.stringify(cur.costs || {}))}
+    : {type: type0 === 'cfd' ? 'cfd' : 'fut', size: type0 === 'cfd' ? 50000 : 50000, name: '', rules: defRules(type0 === 'cfd' ? 'cfd' : 'fut', 50000), costs: {}};
+  let named = !!cur;
+  const d = dialog('<div id="pa-dlg-in"></div>', 'wide pa-dlg');
+  const body = () => {
+    const r = F.rules, fut = F.type === 'fut', sizes = fut ? FUT_SIZES : CFD_SIZES;
+    const num = (k, v, unit, lbl, hint) => `<label class="bt-fl">${lbl}<span class="pa-in"><input class="inp" data-pf="${k}" inputmode="decimal" value="${v == null ? '' : numIn(v)}"><em>${unit}</em></span>${hint ? `<small class="pa-hint">${hint}</small>` : ''}</label>`;
+    const pct = v => F.size ? ' = ' + nf(v / F.size * 100, 1) + ' % des Kontos' : '';
+    const cfdRows = paMarkets('cfd').map(m => {
+      const c = Object.assign({}, CFD_DEF[m.id], (F.costs.cfd || {})[m.id] || {});
+      return `<tr><th scope="row">${esc(m.id)}</th>
+        <td><input class="inp" data-pc="${m.id}.cs" inputmode="decimal" value="${numIn(c.cs)}" aria-label="${m.id} Kontraktgröße"></td>
+        <td><input class="inp" data-pc="${m.id}.spread" inputmode="decimal" value="${numIn(c.spread)}" aria-label="${m.id} Spread in ${m.unit}"></td>
+        <td><input class="inp" data-pc="${m.id}.comm" inputmode="decimal" value="${c.cm === 'pct' ? numIn(c.comm) : nf(c.comm, 2)}" aria-label="${m.id} Kommission"><small>${c.cm === 'pct' ? '%' : '$'}</small></td>
+        <td><input class="inp" data-pc="${m.id}.lev" inputmode="decimal" value="${numIn(c.lev)}" aria-label="${m.id} Hebel"></td></tr>`;
+    }).join('');
+    $('#pa-dlg-in', d).innerHTML = `
+      <div class="bt-dlg-head"><h2>${cur ? 'Regeln und Kosten' : 'Neues Prop-Konto'}</h2><button type="button" class="btn icon ghost" data-bt="close" aria-label="Schließen">✕</button></div>
+      ${cur ? `<p class="bt-note">${PA_TYPES[F.type]}-Konto mit ${usd(F.size)}. Art und Größe bleiben fest, Regeln und Kosten kannst du jederzeit ändern. Sie gelten ab jetzt.</p>`
+        : `<div class="pa-types" role="radiogroup" aria-label="Art des Kontos">
+          <button type="button" role="radio" aria-checked="${fut}" data-pt="fut"><span class="pa-pick-ic">${ICON_FUT}</span><b>Futures</b><small>Ganze Kontrakte, Mini und Micro</small></button>
+          <button type="button" role="radio" aria-checked="${!fut}" data-pt="cfd"><span class="pa-pick-ic">${ICON_CFD}</span><b>CFD</b><small>Lots ab 0,01 wie in MT5</small></button></div>
+        <div class="bt-fl" id="pa-sz-l">Kontogröße<div class="pa-sizes" role="radiogroup" aria-labelledby="pa-sz-l">${sizes.map(s => `<button type="button" class="chip" role="radio" aria-checked="${s === F.size}" data-ps="${s}">${kLabel(s)}</button>`).join('')}</div></div>`}
+      <label class="bt-fl">Name<input class="inp" id="pa-name" maxlength="40" value="${esc(F.name || PA_TYPES[F.type] + ' ' + kLabel(F.size))}"></label>
+      <fieldset class="pa-fs">
+        <legend><label class="pa-sw"><input type="checkbox" id="pa-on"${r.on ? ' checked' : ''}><span>Prop-Firm-Regeln</span></label></legend>
+        <p class="pa-hint">${fut ? 'Voreingestellt wie die Evaluation bei Lucid Trading, einer der Futures-Firmen auf Tradesea.' : 'Voreingestellt wie die FTMO Challenge (2-Step).'} Alle Werte kannst du an deine Firma anpassen.</p>
+        <div class="pa-rules"${r.on ? '' : ' hidden'}>
+          <div class="bt-2">${num('target', r.target, '$', 'Gewinnziel', pct(r.target))}${num('maxLoss', r.maxLoss, '$', 'Max. Verlust', pct(r.maxLoss))}</div>
+          <div class="bt-2"><label class="bt-fl">Art des Max. Verlusts<select class="inp" data-pf="dd"><option value="static"${r.dd === 'static' ? ' selected' : ''}>Statisch ab Startkapital</option><option value="eod"${r.dd === 'eod' ? ' selected' : ''}>Trailing zum Tagesende (EOD)</option><option value="intraday"${r.dd === 'intraday' ? ' selected' : ''}>Trailing intraday</option></select></label>
+            <label class="pa-chk"${r.dd === 'static' ? ' hidden' : ''}><input type="checkbox" data-pf="lock"${r.lock ? ' checked' : ''}><span>Trailing stoppt bei Startkapital + 100 $</span></label></div>
+          <div class="bt-2">${num('daily', r.daily, '$', 'Tagesverlust-Limit', pct(r.daily))}<label class="bt-fl">Bei Erreichen<select class="inp" data-pf="dailyMode"><option value="pause"${r.dailyMode === 'pause' ? ' selected' : ''}>Pause bis zum nächsten Tag</option><option value="fail"${r.dailyMode === 'fail' ? ' selected' : ''}>Konto verloren</option></select></label></div>
+          ${fut ? `<div class="bt-2">${num('maxQty', r.maxQty, 'Mini', 'Max. Kontrakte', 'Entspricht ' + nf((r.maxQty || 0) * 10, 0) + ' Micro')}<label class="pa-chk"><input type="checkbox" data-pf="flat"${r.flat ? ' checked' : ''}><span>Positionen um 16:45 New York schließen</span></label></div>` : ''}
+          <p class="pa-hint">${fut ? 'Ein Handelstag läuft von 18:00 bis 17:00 New York.' : 'Ein Handelstag beginnt um Mitternacht in Prag (MEZ/MESZ), wie bei FTMO.'} Das Tageslimit zählt ab dem Kontostand zu Tagesbeginn, mit offenen Positionen.</p>
+        </div>
+      </fieldset>
+      <details class="pa-costs"${cur ? ' open' : ''}><summary>Kosten${fut ? '' : ' und Kontraktgrößen'}</summary>
+        ${fut ? `<div class="bt-2">${num('c.mini', (F.costs.fut || {}).mini != null ? F.costs.fut.mini : FUT_COMM.mini, '$', 'Kommission Mini, je Round Turn')}${num('c.micro', (F.costs.fut || {}).micro != null ? F.costs.fut.micro : FUT_COMM.micro, '$', 'Kommission Micro, je Round Turn')}</div>
+          <p class="pa-hint">Futures haben feste Kontraktwerte der CME, zum Beispiel NQ 20 $ pro Punkt und MNQ 2 $. Die Kurse kommen aus deinen Kursdaten.</p>`
+        : `<div class="pa-tbl-w"><table class="pa-tbl"><thead><tr><th scope="col">Symbol</th><th scope="col">Kontrakt je Lot</th><th scope="col">Spread</th><th scope="col">Kommission je Lot und Seite</th><th scope="col">Hebel 1:</th></tr></thead><tbody>${cfdRows}</tbody></table></div>
+          <div class="bt-2">${num('c.eurusd', F.costs.eurusd || EURUSD_FX, 'USD', 'Kurs EUR/USD für den DAX')}<p class="pa-hint">Spread in Pips (EUR/USD, GBP/USD) oder Punkten. Gold rechnet die Kommission in Prozent vom Volumen. Schau bei deinem Broker unter „Spezifikation“, wenn du andere Werte hast.</p></div>`}
+      </details>
+      <p class="bt-im-msg" id="pa-msg" role="status"></p>
+      <div class="row-btns end"><button type="button" class="btn ghost" data-bt="close">Abbrechen</button><button type="button" class="btn primary" id="pa-save">${cur ? 'Speichern' : 'Konto anlegen'}</button></div>`;
+  };
+  // reads the inputs back into F
+  const read = () => {
+    const nm = $('#pa-name', d); if (nm) { F.name = nm.value.trim(); }
+    const on = $('#pa-on', d); if (on) F.rules.on = on.checked;
+    $$('[data-pf]', d).forEach(x => {
+      const k = x.dataset.pf;
+      if (x.type === 'checkbox') F.rules[k] = x.checked;
+      else if (x.tagName === 'SELECT') F.rules[k] = x.value;
+      else if (k.startsWith('c.')) { const v = pnum(x.value); if (k === 'c.eurusd') F.costs.eurusd = v; else (F.costs.fut = F.costs.fut || {})[k.slice(2)] = v; }
+      else F.rules[k] = pnum(x.value);
+    });
+    $$('[data-pc]', d).forEach(x => { const [mk, k] = x.dataset.pc.split('.'); ((F.costs.cfd = F.costs.cfd || {})[mk] = F.costs.cfd[mk] || {})[k] = pnum(x.value); });
+  };
+  body();
+  d.addEventListener('click', e => {
+    const t = e.target.closest('[data-pt],[data-ps]'); if (!t) return;
+    read();
+    if (t.dataset.pt) { F.type = t.dataset.pt; F.size = F.type === 'fut' ? (FUT_SIZES.includes(F.size) ? F.size : 50000) : (CFD_SIZES.includes(F.size) ? F.size : 50000); F.costs = {}; }
+    else F.size = +t.dataset.ps;
+    F.rules = defRules(F.type, F.size);
+    if (!named) F.name = '';
+    body();
+    const f = $(`[data-pt="${F.type}"][aria-checked="true"],[data-ps="${F.size}"]`, d); if (f && t.dataset.ps) f.focus(); else if (t.dataset.pt) { const b = $(`[data-pt="${F.type}"]`, d); if (b) b.focus(); }
+  });
+  d.addEventListener('input', e => { if (e.target.id === 'pa-name') named = true; });
+  d.addEventListener('change', e => {
+    if (e.target.id === 'pa-on') { const r = $('.pa-rules', d); if (r) r.hidden = !e.target.checked; }
+    if (e.target.dataset && e.target.dataset.pf === 'dd') { const l = $('[data-pf="lock"]', d); if (l) l.closest('.pa-chk').hidden = e.target.value === 'static'; }
+  });
+  $('#pa-dlg-in', d).addEventListener('click', async e => {
+    if (!e.target.closest('#pa-save')) return;
+    read();
+    const r = F.rules, msg = $('#pa-msg', d);
+    const bad = (k, lbl) => { const x = $(`[data-pf="${k}"]`, d); if (x) x.focus(); msg.textContent = lbl; return true; };
+    if (r.on) {
+      if (!(r.target >= 0)) return bad('target', 'Trag ein Gewinnziel ein, 0 für keins.');
+      if (!(r.maxLoss >= 0) || r.maxLoss >= F.size) return bad('maxLoss', 'Der maximale Verlust muss kleiner als das Startkapital sein, 0 für keinen.');
+      if (!(r.daily >= 0)) return bad('daily', 'Trag ein Tagesverlust-Limit ein, 0 für keins.');
+      if (F.type === 'fut' && !(r.maxQty >= 1 && r.maxQty % 1 === 0 && r.maxQty <= 100)) return bad('maxQty', 'Max. Kontrakte: eine ganze Zahl zwischen 1 und 100.');
+    }
+    if (F.type === 'fut') { const c = F.costs.fut || {}; if (!(c.mini >= 0) || !(c.micro >= 0)) { msg.textContent = 'Die Kommissionen müssen 0 oder mehr sein.'; return; } }
+    else {
+      if (!(F.costs.eurusd > 0.2 && F.costs.eurusd < 5)) { msg.textContent = 'Der EUR/USD-Kurs sieht nicht richtig aus, zum Beispiel 1,10.'; return; }
+      for (const [mk, c] of Object.entries(F.costs.cfd || {})) {
+        if (!(c.cs > 0) || !(c.spread >= 0) || !(c.comm >= 0) || !(c.lev >= 1)) { msg.textContent = `Prüf die Werte bei ${mk}: Kontraktgröße über 0, Spread und Kommission 0 oder mehr, Hebel ab 1.`; return; }
+      }
+    }
+    // only what differs from the defaults is stored
+    const costs = {};
+    if (F.type === 'fut') { const c = F.costs.fut; if (c.mini !== FUT_COMM.mini || c.micro !== FUT_COMM.micro) costs.fut = {mini: c.mini, micro: c.micro}; }
+    else {
+      if (F.costs.eurusd !== EURUSD_FX) costs.eurusd = F.costs.eurusd;
+      for (const [mk, c] of Object.entries(F.costs.cfd || {})) { const dv = CFD_DEF[mk], o = {}; for (const k of ['cs', 'spread', 'comm', 'lev']) if (c[k] !== dv[k]) o[k] = c[k]; if (Object.keys(o).length) (costs.cfd = costs.cfd || {})[mk] = o; }
+    }
+    if (!r.on) { /* keep the values for when the rules are switched back on */ }
+    const acc = cur ? Object.assign(cur, {name: F.name || cur.name, rules: r, costs, updatedAt: Date.now()}) : Object.assign(newAccount(F.type, F.size, F.name), {rules: r, costs});
+    d.dataset.busy = '1'; $('#pa-save', d).disabled = true;
+    try { await CTX.Store.save('accounts', acc); }
+    catch (err) { delete d.dataset.busy; $('#pa-save', d).disabled = false; msg.textContent = err && err.code === 'no_sub' ? 'Prop-Konten gibt es im Abo Pro.' : 'Das Konto konnte nicht gespeichert werden. Prüfe deine Verbindung.'; return; }
+    delete d.dataset.busy;
+    closeDialog();
+    CTX.toast(cur ? 'Gespeichert.' : 'Konto angelegt: ' + acc.name + ' mit ' + usd(acc.size) + '.');
+    if (V.mode === 'ws' && V.ws && V.ws.acc && V.ws.acc.id === acc.id) { V.ws.acc.rules = acc.rules; V.ws.acc.costs = acc.costs; V.ws.acc.name = acc.name; V.ws.accChanged(true); }
+    renderProp();
+  });
+}
+function confirmDlg(title, text, okLabel, danger, fn) {
+  const d = dialog(`<div class="bt-dlg-head"><h2>${esc(title)}</h2><button type="button" class="btn icon ghost" data-bt="close" aria-label="Schließen">✕</button></div>
+    <p class="bt-note">${text}</p><p class="bt-im-msg" id="pa-cmsg" role="status"></p>
+    <div class="row-btns end"><button type="button" class="btn ghost" data-bt="close">Abbrechen</button><button type="button" class="btn ${danger ? 'danger' : 'primary'}" id="pa-ok">${esc(okLabel)}</button></div>`);
+  $('#pa-ok', d).addEventListener('click', async () => {
+    d.dataset.busy = '1'; $('#pa-ok', d).disabled = true;
+    try { await fn(); delete d.dataset.busy; closeDialog(); renderProp(); }
+    catch (e) { delete d.dataset.busy; $('#pa-ok', d).disabled = false; $('#pa-cmsg', d).textContent = 'Das hat nicht geklappt. Prüfe deine Verbindung.'; }
+  });
+}
+function propAction(b) {
+  const a = b.dataset.pa, id = b.dataset.id;
+  if (a === 'new') openAccDlg(null, b.dataset.type);
+  else if (a === 'edit') openAccDlg(id);
+  else if (a === 'trade') openNew({acct: id, from: 'prop'});
+  else if (a === 'open') { V.mode = 'ws'; V.sid = id; V.backTo = 'prop'; try { location.hash = 'backtest'; } catch (e) {} }
+  else if (a === 'reset') {
+    const acc = accounts().find(x => x.id === id); if (!acc) return;
+    confirmDlg('Konto zurücksetzen?', `${esc(acc.name)} startet wieder mit ${usd(acc.size)}: Kontostand, Ziel, Limits und Trailing beginnen neu. Deine Sessions bleiben erhalten, ihre bisherigen Trades zählen nicht mehr für das Konto.${acc.open ? ' Die offene Position oder Order wird gelöscht.' : ''}`, 'Zurücksetzen', false, async () => {
+      if (acc.open) { const s = sessions().find(x => x.id === acc.open.sid); if (s && s.order) { const c = JSON.parse(JSON.stringify(s)); c.order = null; await CTX.Store.save('backtests', c); } }
+      await CTX.Store.save('accounts', Object.assign(resetAccount(acc), {updatedAt: Date.now()}));
+      CTX.toast(acc.name + ' wurde zurückgesetzt.');
+    });
+  } else if (a === 'del') {
+    const acc = accounts().find(x => x.id === id); if (!acc) return;
+    const n = sessions().filter(s => s.acct === id).length;
+    confirmDlg('Konto löschen?', `${esc(acc.name)} und sein Verlauf werden gelöscht.${n ? ` ${n === 1 ? 'Die Session' : 'Die ' + n + ' Sessions'} auf dem Konto ${n === 1 ? 'bleibt' : 'bleiben'} erhalten und ${n === 1 ? 'rechnet' : 'rechnen'} danach in R.` : ''}`, 'Löschen', true, async () => {
+      await CTX.Store.remove('accounts', id);
+      CTX.toast(acc.name + ' wurde gelöscht.');
+    });
+  }
+}
+
+/* ---- the guide on the page */
+function propGuide(open) {
+  const futRows = Object.entries(FUTS).map(([mk, l]) => l.map(f => `<tr><th scope="row">${esc(f.sym)}</th><td>${esc(f.name)}</td><td>${esc(MK[mk].name)}</td><td>${nf(f.tick, decimalsOf(String(f.tick)))}</td><td>${usd(f.pv * f.tick)}</td><td>${f.micro ? 'Micro' : 'Mini'}</td></tr>`).join('')).join('');
+  const cfdRows = paMarkets('cfd').map(m => { const c = CFD_DEF[m.id]; return `<tr><th scope="row">${esc(m.id)}</th><td>${nf(c.cs, 0)}${m.id === 'XAUUSD' ? ' oz' : c.cs === 100000 ? ' ' + m.id.slice(0, 3) : ' × Index'}</td><td>${m.pip < 1 ? usd(c.cs * m.pip) + ' je Pip' : (c.ccy === 'EUR' ? nf(c.cs, 0) + ' € je Punkt' : usd(c.cs) + ' je Punkt')}</td><td>${nf(c.spread, c.spread % 1 ? 1 : 0)} ${esc(c.spread === 1 ? m.unit.replace(/e$|s$/, '') : m.unit)}</td><td>${c.cm === 'pct' ? nf(c.comm, 4) + ' %' : c.comm ? usd(c.comm) : '–'}</td><td>1:${c.lev}</td></tr>`; }).join('');
+  return `<details class="bt-guide pa-guide" id="pa-guide"${open ? ' open' : ''}>
+    <summary><span class="bt-g-title">Anleitung: So tradest du auf einem Prop-Konto</span><span class="bt-g-hint">Konto anlegen, Lots und Kontrakte, Kosten und die Regeln der Prop-Firmen</span></summary>
+    <div class="bt-g-body pa-g">
+      <p class="bt-g-intro">Ein Prop-Konto ist ein simuliertes Konto mit Startkapital in Dollar. Statt in R rechnet Blotter jeden Trade so, wie er auf dem echten Konto abgerechnet würde: mit deiner Positionsgröße, Spread, Kommission und den Regeln der Prop-Firma.</p>
+      <ol class="bt-g-steps">
+        <li><b>Konto anlegen.</b> Wähle Futures (25K bis 150K) oder CFD (10K bis 100K). Die Regeln sind wie bei Lucid Trading bzw. FTMO voreingestellt, du kannst sie an deine Firma anpassen.</li>
+        <li><b>Session starten.</b> Unter „Neue Session“ wählst du Markt, Startzeit und Zeiteinheit. Die Kursdaten sind dieselben wie im Backtesting.</li>
+        <li><b>Positionsgröße wählen.</b> Lots oder Kontrakte direkt eintragen oder mit „Größe nach Risiko“ aus deinem Stop berechnen lassen.</li>
+        <li><b>Traden.</b> Stop und Ziel setzt du wie gewohnt, im Chart oder im Ticket. Teile einer Position kannst du jederzeit schließen.</li>
+        <li><b>Regeln im Blick behalten.</b> Über dem Chart stehen Kontostand und Equity, daneben die Balken für Gewinnziel, Tagesverlust und maximalen Verlust.</li>
+      </ol>
+      <h3 class="bt-g-sub">CFD-Konten: Lots wie in MetaTrader 5</h3>
+      <p class="bt-g-lead">Das Volumen wählst du in Lots, ab 0,01 in Schritten von 0,01. Ein Lot ist eine feste Menge, die Kontraktgröße: bei EUR/USD 100.000 Euro, bei Gold 100 Unzen, beim Index ein Kontrakt pro Punkt. Gekauft wird zum Ask, verkauft zum Bid. Der Unterschied ist der Spread, deshalb startet jeder Trade leicht im Minus. Dazu kommt bei Forex und Gold eine Kommission pro Lot. Für die Position wird Margin hinterlegt: Volumen × Kontraktgröße × Kurs ÷ Hebel.</p>
+      <p class="bt-g-tip"><b>Beispiel:</b> 0,50 Lots EUR/USD, Stop 20 Pips. Ein Pip ist bei 1 Lot 10 $ wert, bei 0,50 Lots 5 $. Das Risiko ist 20 × 5 $ = 100 $, plus 2,50 $ Kommission für Eröffnen und Schließen.</p>
+      <div class="pa-tbl-w"><table class="pa-tbl ro"><caption>Voreinstellungen der CFD-Konten, änderbar pro Konto</caption><thead><tr><th scope="col">Symbol</th><th scope="col">Kontrakt je Lot</th><th scope="col">Wert bei 1 Lot</th><th scope="col">Spread</th><th scope="col">Kommission</th><th scope="col">Hebel</th></tr></thead><tbody>${cfdRows}</tbody></table></div>
+      <h3 class="bt-g-sub">Futures-Konten: ganze Kontrakte wie bei Tradesea</h3>
+      <p class="bt-g-lead">Futures handelst du in ganzen Kontrakten: 1, 2, 3 und so weiter. Dein Risiko passt du deshalb nicht auf den Dollar genau an, sondern über die Zahl der Kontrakte und die Wahl zwischen Mini und Micro. Ein Micro ist ein Zehntel eines Minis. Der Preis bewegt sich in Ticks, und jeder Tick hat einen festen Wert in Dollar. Die Kommission zahlst du pro Kontrakt.</p>
+      <p class="bt-g-tip"><b>Beispiel:</b> 2 MNQ, Stop 40 Ticks (10 Punkte). Ein Tick ist bei MNQ 0,50 $ wert, das Risiko ist 40 × 0,50 $ × 2 = 40 $. Mit 2 NQ wären es 400 $.</p>
+      <div class="pa-tbl-w"><table class="pa-tbl ro"><caption>Kontraktwerte der CME</caption><thead><tr><th scope="col">Kontrakt</th><th scope="col">Name</th><th scope="col">Kurse aus</th><th scope="col">Tick</th><th scope="col">Wert je Tick</th><th scope="col">Größe</th></tr></thead><tbody>${futRows}</tbody></table></div>
+      <h3 class="bt-g-sub">Die Regeln der Prop-Firmen</h3>
+      <dl class="bt-g-notes pa-notes">
+        <div><dt>Gewinnziel</dt><dd>Erreicht dein Kontostand Startkapital plus Ziel, hast du die Phase bestanden. Du kannst danach weiter traden.</dd></div>
+        <div><dt>Tagesverlust-Limit</dt><dd>So viel darfst du an einem Handelstag verlieren, gerechnet ab dem Kontostand zu Tagesbeginn, offene Positionen eingeschlossen. Bei Futures pausiert das Konto bis zum nächsten Tag, bei CFDs ist es verloren.</dd></div>
+        <div><dt>Max. Verlust</dt><dd>Statisch heißt: die Grenze bleibt beim Startkapital minus Verlust. Trailing heißt: sie zieht mit deinem höchsten Kontostand nach, zum Tagesende (EOD) oder laufend (intraday), bis sie bei Startkapital + 100 $ stehen bleibt.</dd></div>
+        <div><dt>Was bei einem Verstoß passiert</dt><dd>Erreicht deine Equity eine Grenze, schließt Blotter die Position genau dort, wie es die Firma tun würde. Danach kannst du das Konto zurücksetzen.</dd></div>
+        <div><dt>Max. Kontrakte und Auto-Flat</dt><dd>Futures-Konten haben ein Limit für die Kontrakte, gezählt in Minis (10 Micro = 1 Mini). Um 16:45 New York werden offene Positionen geschlossen.</dd></div>
+        <div><dt>Was nicht simuliert wird</dt><dd>Swaps über Nacht, Slippage, Mindesthandelstage und Konsistenzregeln. Futures-Kurse kommen aus deinen CFD- und Spot-Daten, der Abstand zum echten Future fehlt also.</dd></div>
+      </dl>
+    </div>
+  </details>`;
+}
+
 /* ================================================================ module API */
 function onClick(e) {
+  const pa = e.target.closest('[data-pa]');
+  if (pa && !pa.disabled && P.el && P.el.contains(pa)) { propAction(pa); return; }
   const b = e.target.closest('[data-bt]');
   if (!b || b.disabled) return;
   const a = b.dataset.bt;
+  if (a === 'toprop') { closeDialog(); if (V.ws) { V.ws.flush(); } V.backTo = null; try { location.hash = 'prop'; } catch (err) {} return; }
   if (a === 'new') openNew();
   else if (a === 'import') openImport(b.dataset.mk);
   else if (a === 'open') openSession(b.dataset.id);
@@ -2658,8 +3570,17 @@ window.BlotterBT = {
   },
   update() { if (V.mode === 'list') renderList(); },
   unmount() { if (V.ws) { V.ws.flush(); V.ws.destroy(); V.ws = null; } closeDialog(); CTX && CTX.setWide && CTX.setWide(false); },
+  // the prop accounts page (#prop)
+  mountProp(el, ctx) {
+    CTX = ctx; P.el = el;
+    if (!this.bound) { document.addEventListener('click', onClick); window.addEventListener('keydown', onKeyDlg, true); document.addEventListener('keydown', onKeyTabs); this.bound = true; }
+    renderProp();
+  },
+  updateProp() { if (P.el && P.el.isConnected && !V.dlg) renderProp(); },
+  unmountProp() { closeDialog(); P.el = null; },
   busy() { return V.mode === 'ws'; },
   // for tests and the console
-  _: {encodeBlock, decodeBlock, detectFormat, FORMATS, TZS, aggregate, barStart, stats, rOf, usDst, importFiles, inspectFiles, dataIndex, minutes, hours, V},
+  _: {encodeBlock, decodeBlock, detectFormat, FORMATS, TZS, aggregate, barStart, stats, rOf, usDst, importFiles, inspectFiles, dataIndex, minutes, hours, V, P,
+    instr, commSide, marginOf, qtyForRisk, lossPer, dayKey, flatWindow, floors, balance, rollDay, newAccount, defRules, resetAccount, statsUsd, FUTS, CFD_DEF},
 };
 })();

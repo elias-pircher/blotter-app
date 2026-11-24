@@ -457,6 +457,24 @@ button{cursor:pointer}
 .lock-fig .en{stroke:var(--gold);stroke-width:1.2;stroke-dasharray:3 3}
 .lock-fig .lb{font:600 10px var(--f-mono);fill:var(--muted)}
 .lock-fig .lb.tp{fill:var(--up)}.lock-fig .lb.sl{fill:var(--down)}.lock-fig .rr{font-weight:500;fill:var(--up)}
+/* prop accounts in the smaller plans: a small account card as the picture */
+.pl-fig{display:flex;flex-direction:column;gap:12px;padding:18px}
+.pl-top{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.pl-tag{padding:1px 8px;border-radius:6px;font-weight:600;color:#5eead4;background:rgba(45,212,191,.14);box-shadow:inset 0 0 0 1px rgba(45,212,191,.35)}
+.pl-st{margin-left:auto;padding:2px 9px;border-radius:999px;font-weight:600;color:var(--up);background:rgba(var(--up-rgb),.12)}
+.pl-bal{display:flex;align-items:baseline;gap:10px;font-variant-numeric:tabular-nums}
+.pl-bal b{font-family:var(--f-display);font-stretch:108%;font-weight:800;font-size:26px}
+.pl-bal span{font:500 13px var(--f-mono);color:var(--up)}
+.pl-m{display:flex;flex-direction:column;gap:5px}
+.pl-m>span{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.pl-m>span b{font:500 12px var(--f-mono);color:var(--ink-2)}
+.pl-m i{display:block;height:6px;border-radius:3px;background:rgba(var(--fg-rgb),.08);overflow:hidden}
+.pl-m i::after{content:"";display:block;height:100%;width:var(--w);border-radius:3px;background:var(--c)}
+.pl-oc{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center;margin-top:4px}
+.pl-oc span{display:flex;flex-direction:column;align-items:center;padding:8px 4px;border-radius:10px;color:#fff;font:500 13px/1.1 var(--f-mono)}
+.pl-oc span small{font:700 10px var(--f-body);letter-spacing:.08em;opacity:.9}
+.pl-oc .s{background:linear-gradient(180deg,#f2545b,#c93b43)} .pl-oc .b{background:linear-gradient(180deg,#3b7bf6,#2457c9)}
+.pl-oc em{font-style:normal;font:600 13px var(--f-mono);padding:0 6px;color:var(--ink)}
 @media (max-width:760px){
   .lock-card{grid-template-columns:minmax(0,1fr);gap:20px;padding:18px}
   .lock-fig{order:-1}
@@ -771,6 +789,11 @@ html.touring .rv-pop{animation:none!important}
   .stat:nth-child(n+4){grid-column:span 3}
   .d-pnl{font-size:13px}
   .hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+}
+/* five pages: below 1000px the tabs get a row of their own */
+@media (max-width:1000px){
+  .tabs{order:3;width:100%}
+  .tabs a{flex:1 1 auto;text-align:center}
 }
 @media (max-width:760px){
   .brand .sub{display:none}
@@ -1106,9 +1129,9 @@ html.vt #view{pointer-events:none}
 
 /* fourth tab: short label on narrow screens */
 .tabs .t-s{display:none}
-@media (max-width:520px){ .tabs .t-l{display:none} .tabs .t-s{display:inline} }
+@media (max-width:520px){ .tabs .t-l{display:none} .tabs .t-s{display:inline} .tabs a{flex:1 1 auto;padding:8px 5px;font-size:13.5px} }
 /* four tabs on the narrowest phones (320 px) */
-@media (max-width:380px){ .tabs a{padding:8px 4px;font-size:13px} }
+@media (max-width:380px){ .tabs a{padding:8px 3px;font-size:12.5px} }
 
 .acct-mail{margin:0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
 .acct-mail b{color:var(--ink);font-weight:600}
