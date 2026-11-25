@@ -2895,7 +2895,7 @@ function normAcc(a) {
 const WHY = {sl: 'Stop Loss', tp: 'Take Profit', manual: 'Closed', partial: 'Partly closed', flat: 'Auto-flat 16:45', 'liq-daily': 'Daily loss limit', 'liq-max': 'Max loss'};
 const resOf = t => (t.why === 'tp' ? 'tp' : t.why === 'sl' || /^liq/.test(t.why || '') ? 'sl' : t.net > 0 ? 'tp' : t.net < 0 ? 'sl' : 'be');
 const fUsd0 = new Intl.NumberFormat('en-US', {maximumFractionDigits: 0});
-const usd0 = v => (v >= 0.5 ? '+' : v <= -0.5 ? '−' : '') + fUsd0.format(Math.abs(Math.round(v))) + '\u00a0$';
+const usd0 = v => (v >= 0.5 ? '+' : v <= -0.5 ? '−' : '') + '$' + fUsd0.format(Math.abs(Math.round(v)));
 // a price as MetaTrader shows it: the last digits large, the pipette raised
 function pxParts(s, digits) {
   if (digits >= 3) return `${esc(s.slice(0, -3))}<big>${esc(s.slice(-3, -1))}</big><sup>${esc(s.slice(-1))}</sup>`;

@@ -1042,3 +1042,5 @@
 !> title="Redo (${
 = Margin-Level
 > Margin level
+!= const usd0 = v => (v >= 0.5 ? '+' : v <= -0.5 ? '−' : '') + fUsd0.format(Math.abs(Math.round(v))) + '\u00a0$';
+!> const usd0 = v => (v >= 0.5 ? '+' : v <= -0.5 ? '−' : '') + '$' + fUsd0.format(Math.abs(Math.round(v)));
